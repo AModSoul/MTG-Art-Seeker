@@ -14,7 +14,7 @@ use std::{
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::{card::Card, Result, APP_ID};
+use crate::{card::Card, text::fold, Result, APP_ID};
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS fetched (
@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS fetched (
   mtgpics TEXT NOT NULL,      -- JSON: per face, the MTGPics image URL, or null
   checked_at INTEGER NOT NULL, -- when MTGPics was last searched for it
   fetched_at INTEGER NOT NULL  -- when its art was last saved
+);
+CREATE TABLE IF NOT EXISTS artist_websites (
+  artist TEXT PRIMARY KEY,     -- the artist's name, folded
+  url TEXT,                    -- the website MTGPics links, or null for none
+  checked_at INTEGER NOT NULL  -- when MTGPics was asked
 );
 CREATE TABLE IF NOT EXISTS found_by_hand (
   illustration_id TEXT PRIMARY KEY, -- Scryfall's id for the artwork
@@ -56,6 +61,21 @@ pub struct History {
 pub struct FoundByHand {
     pub url: String,
     pub page: Option<String>,
+}
+
+/// What MTGPics said of an artist's website, and when.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnownWebsite {
+    /// The website, or `None` when MTGPics links none.
+    pub url: Option<String>,
+    pub checked_at: SystemTime,
+}
+
+impl KnownWebsite {
+    /// Whether MTGPics was asked recently enough not to ask again.
+    pub fn is_recent(&self) -> bool {
+        self.checked_at.elapsed().is_ok_and(|age| age < RECHECK_MISSING_AFTER)
+    }
 }
 
 /// What the log knows of a printing.
@@ -133,6 +153,34 @@ impl History {
                 secs(checked_at),
                 secs(SystemTime::now()),
             ])?;
+        Ok(())
+    }
+
+    /// What MTGPics said of `artist`'s website, if it has been asked.
+    pub fn artist_website(&self, artist: &str) -> Result<Option<KnownWebsite>> {
+        Ok(self
+            .lock()
+            .prepare_cached("SELECT url, checked_at FROM artist_websites WHERE artist = ?1")?
+            .query_row([fold(artist)], |row| {
+                Ok(KnownWebsite {
+                    url: row.get(0)?,
+                    checked_at: UNIX_EPOCH + Duration::from_secs(row.get::<_, i64>(1)?.max(0).unsigned_abs()),
+                })
+            })
+            .optional()?)
+    }
+
+    /// Logs what MTGPics said of `artist`'s website: `url`, or none.
+    pub fn remember_artist_website(&self, artist: &str, url: Option<&str>) -> Result<()> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(i64::MAX));
+        self.lock()
+            .prepare_cached(
+                "INSERT INTO artist_websites (artist, url, checked_at) VALUES (?1, ?2, ?3) \
+                 ON CONFLICT (artist) DO UPDATE SET url = ?2, checked_at = ?3",
+            )?
+            .execute(params![fold(artist), url, now])?;
         Ok(())
     }
 

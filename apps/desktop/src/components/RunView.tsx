@@ -19,10 +19,11 @@ import {
   LuClipboardCopy,
   LuExternalLink,
   LuFolderOpen,
+  LuGlobe,
   LuImageDown,
   LuRotateCcw,
 } from "react-icons/lu";
-import { SiArtstation, SiDeviantart, SiGooglelens, SiPixiv } from "react-icons/si";
+import { SiArtstation, SiDeviantart, SiGooglelens, SiInstagram, SiPixiv } from "react-icons/si";
 
 import { api } from "@/api";
 import type { ArtSource } from "@/bindings/ArtSource";
@@ -286,6 +287,8 @@ const SITES: { site: Site; icon: IconType; tip: (file: SavedFile) => string }[] 
     tip: (file) => `Look for ${file.artist} on DeviantArt`,
   },
   { site: "pixiv", icon: SiPixiv, tip: (file) => `Look for ${file.artist} on Pixiv` },
+  { site: "instagram", icon: SiInstagram, tip: (file) => `Look for ${file.artist} on Instagram` },
+  { site: "website", icon: LuGlobe, tip: (file) => `Open ${file.artist}'s website` },
 ];
 
 /** What can be done with a saved image beyond showing it: look for a larger

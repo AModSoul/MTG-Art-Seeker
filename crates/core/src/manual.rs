@@ -28,8 +28,9 @@ use crate::{
     carddb::CardDb,
     engine::{face_dir, face_stem, output_dir_for, place, ArtSource, PathReserver, SavedFile, TempFile},
     faces::{plan_faces, FacePlan},
-    history::{FoundByHand, History},
+    history::{FoundByHand, History, KnownWebsite},
     http::{Http, ImageKind},
+    mtgpics::{self, Artists},
     scryfall::{self, Identifier},
     settings::Settings,
     verify::{self, Verdict},
@@ -55,11 +56,13 @@ impl Target {
             .expect("prepare checks there's an art crop")
     }
 
-    /// Where to open `site` to look for a larger copy of the face's art.
-    pub fn search_url(&self, site: Site) -> Url {
+    /// Where to open `site` to look for a larger copy of the face's art;
+    /// `None` for [`Site::Website`], which has to be looked up: see
+    /// [`site_url`].
+    pub fn search_url(&self, site: Site) -> Option<Url> {
         let parse = |url: &str| Url::parse(url).expect("a valid URL");
         let artist = self.face.artist.as_str();
-        match site {
+        Some(match site {
             Site::Lens => {
                 let mut url = parse("https://lens.google.com/uploadbyurl");
                 url.query_pairs_mut().append_pair("url", self.art_crop());
@@ -81,8 +84,51 @@ impl Target {
                 url.path_segments_mut().expect("an http URL").push(artist);
                 url
             }
-        }
+            // Instagram has no search without a login; Google finds the
+            // artist's account.
+            Site::Instagram => {
+                let mut url = parse("https://www.google.com/search");
+                url.query_pairs_mut()
+                    .append_pair("q", &format!("\"{artist}\" site:instagram.com"));
+                url
+            }
+            Site::Website => return None,
+        })
     }
+}
+
+/// Where to open `site` for `target`: its search, or for [`Site::Website`],
+/// the website MTGPics links for the artist. What MTGPics says is logged in
+/// `history`, and asked again a month later.
+pub async fn site_url(
+    http: &Http,
+    history: Option<&History>,
+    artists: &Artists,
+    target: &Target,
+    site: Site,
+) -> Result<Url> {
+    if let Some(url) = target.search_url(site) {
+        return Ok(url);
+    }
+    let artist = target.face.artist.as_str();
+    let known = history
+        .and_then(|history| history.artist_website(artist).ok().flatten())
+        .filter(KnownWebsite::is_recent);
+    let website = match known {
+        Some(known) => known.url,
+        None => {
+            let website = mtgpics::artist_website(http, artists, artist).await?;
+            if let Some(history) = history {
+                let _ = history.remember_artist_website(artist, website.as_deref());
+            }
+            website
+        }
+    };
+    let website = website.ok_or_else(|| Error::Other(format!("MTGPics doesn't list a website for {artist}.")))?;
+    Url::parse(&website).map_err(|error| Error::Invalid {
+        url: website.clone(),
+        reason: error.to_string(),
+    })
 }
 
 /// Where the user can look for a larger copy of a face's art.
@@ -98,6 +144,10 @@ pub enum Site {
     Deviantart,
     /// Pixiv's search for the artist's name.
     Pixiv,
+    /// A Google search for the artist's Instagram account.
+    Instagram,
+    /// The artist's own website, as MTGPics links it.
+    Website,
 }
 
 impl Site {
@@ -107,6 +157,8 @@ impl Site {
             Self::Artstation => "ArtStation",
             Self::Deviantart => "DeviantArt",
             Self::Pixiv => "Pixiv",
+            Self::Instagram => "Instagram",
+            Self::Website => "the artist's website",
         }
     }
 }
@@ -331,7 +383,7 @@ mod tests {
     #[test]
     fn opens_each_site_on_the_art_or_its_artist() {
         let target = target("Seb McKinnon");
-        let url = |site| target.search_url(site).to_string();
+        let url = |site| target.search_url(site).unwrap().to_string();
         assert_eq!(
             url(Site::Lens),
             "https://lens.google.com/uploadbyurl?url=https%3A%2F%2Fcards.scryfall.io%2Fart_crop%2Ffront%2Fx.jpg%3F1"
@@ -345,6 +397,11 @@ mod tests {
             "https://www.deviantart.com/search?q=Seb+McKinnon"
         );
         assert_eq!(url(Site::Pixiv), "https://www.pixiv.net/tags/Seb%20McKinnon");
+        assert_eq!(
+            url(Site::Instagram),
+            "https://www.google.com/search?q=%22Seb+McKinnon%22+site%3Ainstagram.com"
+        );
+        assert_eq!(target.search_url(Site::Website), None);
     }
 
     #[test]
@@ -352,11 +409,11 @@ mod tests {
         // A slash or an ampersand stays part of the name.
         let target = target("Jesper Ejsing & Ron Spencer/RK");
         assert_eq!(
-            target.search_url(Site::Pixiv).as_str(),
+            target.search_url(Site::Pixiv).unwrap().as_str(),
             "https://www.pixiv.net/tags/Jesper%20Ejsing%20&%20Ron%20Spencer%2FRK"
         );
         assert_eq!(
-            target.search_url(Site::Artstation).as_str(),
+            target.search_url(Site::Artstation).unwrap().as_str(),
             "https://www.artstation.com/search/artists?query=Jesper+Ejsing+%26+Ron+Spencer%2FRK"
         );
     }

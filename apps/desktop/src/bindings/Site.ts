@@ -3,4 +3,4 @@
 /**
  * Where the user can look for a larger copy of a face's art.
  */
-export type Site = "lens" | "artstation" | "deviantart" | "pixiv";
+export type Site = "lens" | "artstation" | "deviantart" | "pixiv" | "instagram" | "website";

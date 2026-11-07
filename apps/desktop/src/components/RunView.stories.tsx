@@ -218,6 +218,21 @@ export const FindLargerCopy: Story = {
     await expect(
       canvas.getByRole("button", { name: /Look for Christopher Moeller on Pixiv/ }),
     ).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: /Look for Christopher Moeller on Instagram/ }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("button", {
+        name: "Open Christopher Moeller's website, for Lightning Bolt",
+      }),
+    );
+    await expect(api.findLargerCopy).toHaveBeenLastCalledWith(
+      3,
+      2,
+      0,
+      "website",
+      expect.any(Function),
+    );
   },
 };
 

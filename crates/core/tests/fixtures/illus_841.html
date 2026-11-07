@@ -1,0 +1,1655 @@
+
+<!DOCTYPE HTML>
+<html>
+<head>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-116820003-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-116820003-1');
+</script>
+
+<title>Dmitry Burmak - mtgpics.com</title>
+<link rel="shortcut icon" type="image/png" href="https://www.mtgpics.com/favicon.png">
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<meta http-equiv="content-language" content="en">
+<meta name="keywords" lang="fr" content="magic the gathering cards">
+<meta name="description" content="All Magic the Gathering cards">
+  <link href="https://www.mtgpics.com/styles.css" rel="stylesheet" type="text/css">
+
+<script language="JavaScript">
+<!--
+
+var x
+var y
+var ref
+var timereff=0
+
+var cur_ref="";
+gamerid="doo";
+
+function MAJCoords(evt){
+	x=evt.clientX
+	y=evt.clientY
+	return false;	
+}
+
+document.onkeydown = function(evt) {
+    evt = evt || window.event;
+    if (evt.keyCode == 27) {
+        CloseIllus();
+    }
+}
+
+function initElement(){
+	document.getElementById("mtgpics_content").onclick = TreatClick;
+}
+
+function TreatClick(event){
+	event = event || window.event;
+	elem = event.target || event.srcElement;
+	id = elem.id;
+
+	if (id.substring(0,4)=="c_t_") {CardClick(id.substring(4));return false;}
+	//CardClick(id.substring(4));return false;
+}
+
+function MM_preloadImages() { //v3.0
+  var d=document; if(d.images){ if(!d.MM_p) d.MM_p=new Array();
+    var i,j=d.MM_p.length,a=MM_preloadImages.arguments; for(i=0; i<a.length; i++)
+    if (a[i].indexOf("#")!=0){ d.MM_p[j]=new Image; d.MM_p[j++].src=a[i];}}
+}
+
+
+function OnTheFlyContent(src,dst) {
+	var xhr_object = null;
+
+	if(window.XMLHttpRequest) // Firefox
+	   xhr_object = new XMLHttpRequest();
+	else if(window.ActiveXObject) // Internet Explorer
+	   xhr_object = new ActiveXObject('Microsoft.XMLHTTP');
+
+
+	xhr_object.open("POST", src, true);
+
+	xhr_object.onreadystatechange = function() {
+	   if(xhr_object.readyState == 4) document.getElementById(dst).innerHTML=xhr_object.responseText;
+	}
+
+	xhr_object.send(null);
+}
+
+function CloseIllus(){
+
+	document.getElementById("illus_tooltip").style.visibility="hidden";
+
+}
+
+
+
+function LoadIllus(ch){
+	OnTheFlyContent("load_illus?i="+ch,"illus_tooltip_content");
+	document.getElementById("illus_tooltip").style.visibility="visible";
+
+}
+
+function CardClick(gamerid){
+	document.getElementById("tooltip_content").innerHTML="<div align=center><img style=\"margin:10px;\" src=/graph/misc/loadingGIF.gif></div>";
+	OnTheFlyContent("/ttcard?ref="+gamerid,"tooltip_content") ;
+	affTool();
+	cur_ref=gamerid.substring(0,6);
+	return false;
+
+}
+
+function affTool(){
+
+ 	if (document.documentElement && document.documentElement.scrollTop) {
+		theTop = document.documentElement.scrollTop
+	}
+	else if (document.body) {
+		theTop = document.body.scrollTop
+	}
+	
+	if (x>700) {
+		document.getElementById("tooltip").style.left=(x-315)+"px";
+		document.getElementById("close_tooltip").style.left="297px";
+	}
+	else {
+		document.getElementById("tooltip").style.left=(x+15)+"px";
+		document.getElementById("close_tooltip").style.left="17px";
+	}
+	document.getElementById("tooltip").style.top=(theTop+y+10)+"px";
+	document.getElementById("tooltip").style.visibility="visible";
+}
+
+function delayEff(passedref){
+	ref=passedref
+	clearTimeout(timeraff)
+	timereff=setTimeout("effTool()",200);
+}
+
+function effTool(){document.getElementById("tooltip").style.visibility="hidden";}
+
+
+
+//-->
+</script>
+</head>
+
+
+<body onmousemove="MAJCoords(event)" onload="initElement();" >
+<a name="haut_de_page"></a>
+<div id=tooltip style="visibility:hidden;width:320px;z-index:10;position: absolute;">
+  <div style="width:320px;box-shadow: 0px 3px 5px 3px #333333;padding:2px;background:#ffffff;border-radius:4px;border:2px #666666 solid;">
+    <div id=close_tooltip onclick="effTool();" style="cursor:pointer;" class=G10 align=center>Close this window</div>
+	<div id=tooltip_content class=S11 align=left style="width:312px;padding:3px;"></div>
+  </div>
+</div>
+<div id=illus_tooltip class=container_popup>
+  <div id=illus_tooltip_content class=popup></div>
+  <div class=W14 style="cursor:pointer;position:absolute;top:10px;left:10px;" onclick="CloseIllus();">Close<br>(or Esc)</div>
+</div>
+<div align=center>
+<div style="width:100%;min-width: 750px;max-width: 1280px;" align=center id=mtgpics_content>
+<table style="width:99%;" border=0 cellspacing=0 cellpadding=0><tr><td>
+<table width=100% height=90 border=0 cellspacing=0 cellpadding=0 align=center>
+  <tr> 
+	<td align=center><a href=https://www.mtgpics.com/index><img height=50 src=https://www.mtgpics.com/graph/nav/mtgpics_logo.png alt="mtgpics.com logo"></a></td>
+	<td width=730 align=right valign=bottom><a target=_blank href=https://magic.wizards.com/en/products/marvel/marvel-super-heroes><img src=/graph/leaderboard_msh.jpg style="width:728px;height:90px;"></a></td>
+  </tr>
+</table>
+<div style="display:flex;justify-content:space-evenly;align-items:center;height:30px;">
+    <div><a class=titleM href=/search>Advanced Card Search</a></div>
+    <div><a class=titleM href=/combos/>Combos</a></div>
+    <div><a class=titleM href=/illustrators>Artists</a></div>
+    <div><a class=titleM href=/rules>Rules</a></div>
+    <div><a class=titleM href=/sets>Sets</a></div>
+    <div><a class=titleM href=/trivia>Trivia</a></div>
+    <div><a class=titleM href=/card>Random Card</a></div>
+    <div> 
+      <table cellspacing=0 cellpadding=0  border=0>
+      <form method=post action=https://www.mtgpics.com/results.php?zbob=1>
+        <tr>
+          <td align=center><input type=text name=cardtitle_search class=search_input value="" style="width: 200px;" placeholder="Card Search..."></td>
+          <td align=left><input type=submit value=GO></td>
+        </tr>
+        </form>
+      </table>
+    </div>
+
+</div></td></tr></table>
+	<div style="padding:2px;border-radius:10px;">
+	<div style="padding:4px;border-radius:8px;">
+	
+	<div style="margin:1px;background:#ffffff;padding:2px;border-radius:4px;">
+	
+<div>
+<table width=98% border=0 height=80>
+  <tr>
+    <td width=40% align=center class=titleB16>Dmitry Burmak</td>
+    <td class=titleB14 width=20% align=center><a href=illus_txt?art=841>Cards list</a></td>
+    <td class=titleB14 width=20% align=center><a href=illus.php?art=841>Cards pics</a></td>
+    <td class=titleB14 width=20% align=center><a href=art?art=841>Art</a></td>
+  </tr>
+</table>
+</div><div class=S14><a href=?art=841&reprints=1>Include reprints</a></div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=trk233>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/trk/233.jpg alt="Dathon, His Heart Open 1 - Star Trek">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2026</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fra128>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fra/128.jpg alt="Denzilore Fatehold 1 - Reality Fracture">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fra130>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fra/130.jpg alt="Emergency Phytomedic - Reality Fracture">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fra246>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fra/246.jpg alt="Jiang Yanggu, Alone - Reality Fracture">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fra261>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fra/261.jpg alt="Jiang Yanggu, Never Alone - Reality Fracture">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=sld2784>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/sld/2784.jpg alt="Sakashima the Impostor - Secret Lair">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=hoc005>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/hoc/005.jpg alt="Bag End Banquet - The Hobbit Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=hoc004>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/hoc/004.jpg alt="Bilbo, Fellow Conspirator - The Hobbit Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=hoc001>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/hoc/001.jpg alt="Fíli and Kíli, Joyous - The Hobbit Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=hoc002>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/hoc/002.jpg alt="Gandalf, Party Guest - The Hobbit Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=hoc006>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/hoc/006.jpg alt="Ori, Plate Stacker - The Hobbit Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=hoc003>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/hoc/003.jpg alt="Thorin, King of Durin's Folk - The Hobbit Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=om1076>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/om1/076.jpg alt="Electro, Assaulting Battery - Through the Omenpaths">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2025</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=om1068>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/om1/068.jpg alt="Scorpion, Seething Striker - Through the Omenpaths">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=om1123>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/om1/123.jpg alt="Silk, Web Weaver - Through the Omenpaths">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eoe005>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eoe/005.jpg alt="Auxiliary Boosters - Edge of Eternities">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eoe150>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eoe/150.jpg alt="Oreplate Pangolin - Edge of Eternities">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eoe151>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eoe/151.jpg alt="Pain for All 1 - Edge of Eternities">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eoe112>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eoe/112.jpg alt="Perigee Beckoner - Edge of Eternities">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eoe123>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eoe/123.jpg alt="Umbral Collar Zealot 1 - Edge of Eternities">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=dft097>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/dft/097.jpg alt="Momentum Breaker - Aetherdrift">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=dft025>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/dft/025.jpg alt="Ride's End - Aetherdrift">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fdn343>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fdn/343.jpg alt="Alesha, Who Laughs at Fate 2 - Foundations">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2024</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fdn317>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fdn/317.jpg alt="Blasphemous Edict 2 - Foundations">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fdn058>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fdn/058.jpg alt="Bloodthirsty Conqueror 1 - Foundations">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fdn122>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fdn/122.jpg alt="Kykar, Zephyr Awakener 1 - Foundations">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fdn359>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fdn/359.jpg alt="Liliana, Dreadhorde General 2 - Foundations">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fdn051>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fdn/051.jpg alt="Sphinx of Forgotten Lore 1 - Foundations">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=blc092>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/blc/092.jpg alt="Teferi, Time Raveler - Bloomburrow Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=sld1679>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/sld/1679.jpg alt="Ashnod's Altar - Secret Lair">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=sld1702>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/sld/1702.jpg alt="Vraska, Golgari Queen - Secret Lair">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=blb206>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/blb/206.jpg alt="Burrowguard Mentor - Bloomburrow">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=blb121>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/blb/121.jpg alt="Wick's Patrol - Bloomburrow">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mh3247>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mh3/247.jpg alt="Ral, Monsoon Mage 1 - Modern Horizons III">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=otc031>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/otc/031.jpg alt="Dune Chanter 1 - Outlaws of Thunder Junction Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=otc226>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/otc/226.jpg alt="Fallen Shinobi - Outlaws of Thunder Junction Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=otj197>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/otj/197.jpg alt="Breeches, the Blastmaker 1 - Outlaws of Thunder Junction">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=otj219>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/otj/219.jpg alt="Malcolm, the Eyes 1 - Outlaws of Thunder Junction">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mkm187>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mkm/187.jpg alt="Assassin's Trophy 1 - Murders at Karlov Manor">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mkm098>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mkm/098.jpg alt="Persuasive Interrogators 1 - Murders at Karlov Manor">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mkm245>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mkm/245.jpg alt="Yarus, Roar of the Old Gods 1 - Murders at Karlov Manor">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=sl1447>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/sl1/447.jpg alt="Baral, Chief of Compliance - Secret Lair">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2023</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=woc002>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/woc/002.jpg alt="Ellivere of the Wild Court 1 - Wilds of Eldraine Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=woe207>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/woe/207.jpg alt="Johann, Apprentice Sorcerer - Wilds of Eldraine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=woe818>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/woe/818.jpg alt="On an Adventure - Wilds of Eldraine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=woe188>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/woe/188.jpg alt="Tanglespan Lookout 1 - Wilds of Eldraine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ltr018>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ltr/018.jpg alt="Frodo, Sauron's Bane 1 - The Lord of the Rings: Tales of Middle-earth">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ltr050>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ltr/050.jpg alt="Gandalf, Friend of the Shire 1 - The Lord of the Rings: Tales of Middle-earth">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ltr390>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ltr/390.jpg alt="Gollum, Scheming Guide 2 - The Lord of the Rings: Tales of Middle-earth">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ltr176>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ltr/176.jpg alt="Many Partings 1 - The Lord of the Rings: Tales of Middle-earth">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ltr234>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ltr/234.jpg alt="Tom Bombadil 1 - The Lord of the Rings: Tales of Middle-earth">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mom061>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mom/061.jpg alt="Invasion of Arcavios - March of the Machine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=tbw249>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/tbw/249.jpg alt="Su-Chi Cave Guard - The Brothers’ War">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2022</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=gn3004>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/gn3/004.jpg alt="Nogi, Draco-Zealot - Game Night free-for-all">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf201>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/201.jpg alt="Bounce Chamber 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf135>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/135.jpg alt="Coming Attraction 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf209>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/209.jpg alt="Drop Tower 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf139>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/139.jpg alt="Finishing Move 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf217>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/217.jpg alt="Haunted House 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf121>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/121.jpg alt="Rad Rascal 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf177>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/177.jpg alt="Roxi, Publicist to the Stars 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf229>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/229.jpg alt="Storybook Ride 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=unf199>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/unf/199.jpg alt="Urza's Fun House 1 - Unfinity">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=dci166>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/dci/166.jpg alt="Growing Rites of Itlimoc - Judge Gift Promos">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=dci990>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/dci/990.jpg alt="Itlimoc, Cradle of the Sun - Judge Gift Promos">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=dmc045>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/dmc/045.jpg alt="Tobias, Doomed Conqueror 1 - Dominaria United Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=dmu075>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/dmu/075.jpg alt="Vodalian Hexcatcher 1 - Dominaria United">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=neo151>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/neo/151.jpg alt="Kindled Fury - Kamigawa: Neon Dynasty">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=vow172>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/vow/172.jpg alt="Olivia's Attendants 1 - Innistrad: Crimson Vow">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2021</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=sld671>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/sld/671.jpg alt="Questing Phelddagrif 2 - Secret Lair">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mic004>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mic/004.jpg alt="Kyler, Sigardian Emissary 1 - Innistrad Midnight Hunt Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mid232>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mid/232.jpg alt="Liesa, Forgotten Archangel 1 - Innistrad: Midnight Hunt">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=afc016>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/afc/016.jpg alt="Minn, Wily Illusionist 1 - D&D Forgotten Realms Commander Decks">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=afr023>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/afr/023.jpg alt="Loyal Warhound 1 - Dungeons & Dragons: Adventures in the Forgotten Realms">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=c21004>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/c21/004.jpg alt="Zaffai, Thunder Conductor 1 - Commander 2021">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=stx248>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/stx/248.jpg alt="Witherbloom Command 1 - Strixhaven School of Mages">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=khm120>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/khm/120.jpg alt="Arni Brokenbrow 1 - Kaldheim">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=khm150>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/khm/150.jpg alt="Shackles of Treachery - Kaldheim">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=khm377>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/khm/377.jpg alt="Surtland Flinger - Kaldheim">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=cmr282>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/cmr/282.jpg alt="Juri, Master of the Revue 1 - Commander Legends">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2020</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=znr090>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/znr/090.jpg alt="Agadeem's Awakening 1 - Zendikar Rising">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=znr549>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/znr/549.jpg alt="Agadeem, the Undercrypt - Zendikar Rising">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=znr255>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/znr/255.jpg alt="Stonework Packbeast - Zendikar Rising">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=znr208>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/znr/208.jpg alt="Tajuru Blightblade - Zendikar Rising">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=sld110>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/sld/110.jpg alt="Swords to Plowshares - Secret Lair">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=jmp024>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/jmp/024.jpg alt="Muxus, Goblin Grandee - Jumpstart">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=jmp027>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/jmp/027.jpg alt="Zurzoth, Chaos Rider - Jumpstart">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=iko143>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/iko/143.jpg alt="Almighty Brushwagg - Ikoria Lair of Behemoths">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=iko254>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/iko/254.jpg alt="Fully Grown - Ikoria Lair of Behemoths">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=iko229>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/iko/229.jpg alt="Proud Wildbonder - Ikoria Lair of Behemoths">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=iko034>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/iko/034.jpg alt="Stormwild Capridor - Ikoria Lair of Behemoths">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=und016>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/und/016.jpg alt="Alexander Clamilton - Unsanctioned">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=und057>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/und/057.jpg alt="Stet, Draconic Proofreader - Unsanctioned">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=thb115>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/thb/115.jpg alt="Soulreaper of Mogis - Theros Beyond Death">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=thb228>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/thb/228.jpg alt="Staggering Insight - Theros Beyond Death">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eld270>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eld/270.jpg alt="Garruk, Cursed Huntsman 2 - Throne of Eldraine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2019</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eld101>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eld/101.jpg alt="Rankle, Master of Pranks 1 - Throne of Eldraine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=eld104>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/eld/104.jpg alt="Revenge of Ravens - Throne of Eldraine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=m20084>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/m20/084.jpg alt="Audacious Thief - Core Set 2020">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=m20222>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/m20/222.jpg alt="Bag of Holding - Core Set 2020">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=m20223>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/m20/223.jpg alt="Colossus Hammer - Core Set 2020">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mh1213>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mh1/213.jpg alt="Ruination Rioter - Modern Horizons">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mh1110>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mh1/110.jpg alt="Throatseeker - Modern Horizons">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=war162>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/war/162.jpg alt="Giant Growth - War of the Spark">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=war204>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/war/204.jpg alt="Mayhem Devil - War of the Spark">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=rna063>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/rna/063.jpg alt="Blade Juggler - Ravnica Allegiance">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=rna160>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/rna/160.jpg alt="Captive Audience - Ravnica Allegiance">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=rna099>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/rna/099.jpg alt="Electrodominance - Ravnica Allegiance">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=rna119>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/rna/119.jpg alt="Storm Strike - Ravnica Allegiance">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=fnm234>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/fnm/234.jpg alt="Light Up the Stage - FNM Promos">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=grn226>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/grn/226.jpg alt="Flower / Flourish - Guilds of Ravnica">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2018</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=grn291>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/grn/291.jpg alt="Flower / Flourish - Guilds of Ravnica">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=grn238>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/grn/238.jpg alt="Izzet Locket - Guilds of Ravnica">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=grn051>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/grn/051.jpg alt="Quasiduplicate - Guilds of Ravnica">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=c18057>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/c18/057.jpg alt="Retrofitter Foundry - Commander 2018">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=m19220>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/m19/220.jpg alt="Poison-Tip Archer - Magic 2019">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=bbd015>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/bbd/015.jpg alt="Chakram Retriever - Battlebond">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=bbd016>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/bbd/016.jpg alt="Chakram Slinger - Battlebond">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=bbd038>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/bbd/038.jpg alt="Out of Bounds - Battlebond">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=bbd064>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/bbd/064.jpg alt="Stolen Strategy - Battlebond">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=dci119>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/dci/119.jpg alt="Rules Lawyer - Judge Gift Promos">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ust028>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ust/028.jpg alt="Chipper Chopper - Unstable">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>2017</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ust005>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ust/005.jpg alt="Chivalrous Chevalier - Unstable">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ust220>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ust/220.jpg alt="Faerie Spy - Unstable">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ust236>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ust/236.jpg alt="Gnome - Unstable">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ust153>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ust/153.jpg alt="Lobe Lobber - Unstable">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ust126>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ust/126.jpg alt="Willing Test Subject - Unstable">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=ust137>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/ust/137.jpg alt="X - Unstable">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:transparent;border:1px transparent solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=pmo390>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/pmo/390.jpg alt="Some Disassembly Required - Misc. Promos">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mh34006>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mh3/4006.jpg alt="Ral, Leyline Prodigy 1 - Modern Horizons III">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	<div style="position:absolute;background:black;left:25px;bottom:35px;padding:1px 6px 1px 6px;border-radius:3px;" class=title16>0000</div>
+	</div><div style="position:relative;display:inline-block;margin:0px 2px 0px 2px;">
+	<table width=220 height=307 border=0 cellspacing=0 cellpadding=0 style="border-radius:10px;background:black;border:1px black solid;">
+	  <tr>
+	    <td align=center valign=middle>
+	      <a href=card?ref=mom970>
+	      <img style="display:block;" src=https://www.mtgpics.com/pics/reg/mom/970.jpg alt="Invocation of the Founders - March of the Machine">
+	      </a>
+	    </td>
+	  </tr>
+	</table>
+	
+	</div>
+	</div>
+	</div>
+	</div>
+<div style="padding:3px;">
+<div align=center class=W12>
+
+  <a class=white href=https://www.mtgpics.com/contact_us?c_script=%2Fillus.php&c_query=art%3D841&c_title=Dmitry+Burmak>Contact us<a/>
+<div style="width:1200px" valign=top class=W10 align=left>
+The information presented on this site about Magic: The Gathering, both literal and graphical, is copyrighted by Wizards of the Coast.
+This website is not produced, endorsed, supported, or affiliated with Wizards of the Coast.
+</div>
+</div>
+</body>
+</html>

@@ -20,6 +20,7 @@ use mtg_art_core::{
     http::{Http, HttpConfig},
     list::{parse_list, ListFile, ParsedList},
     manual::{self, Destination, Found, FoundEvent, Imported, Site, Target},
+    mtgpics::Artists,
     presets::{presets, PresetInfo},
     settings::{default_settings_path, Settings},
 };
@@ -48,6 +49,8 @@ struct AppState {
     /// kept until they say whether to save them anyway, by token.
     doubtful: Mutex<HashMap<u32, (Search, finder::Saved)>>,
     next_token: AtomicU32,
+    /// MTGPics' list of artists, for their websites, read once a session.
+    artists: Artists,
 }
 
 /// What's kept of a run, so an image the user finds later is saved where the
@@ -229,7 +232,9 @@ async fn find_larger_copy(
     )
     .await
     .map_err(|e| e.to_string())?;
-    let url = target.search_url(site);
+    let url = manual::site_url(&state.http, state.history.as_deref(), &state.artists, &target, site)
+        .await
+        .map_err(|e| e.to_string())?;
     let title = format!("Find a larger copy of {} on {}", target.face.name, site.name());
     *lock(&state.search) = Some(Search {
         run,
@@ -437,6 +442,7 @@ pub fn run() {
                 search: Mutex::new(None),
                 doubtful: Mutex::new(HashMap::new()),
                 next_token: AtomicU32::new(1),
+                artists: Artists::default(),
             });
             finder::clear_downloads(app.handle());
             // Scryfall publishes new card data daily; until the first copy is

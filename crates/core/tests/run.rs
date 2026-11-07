@@ -978,3 +978,73 @@ async fn forgets_the_users_copy_once_it_is_gone() {
     assert_eq!((summary.done, summary.web_files, summary.mtgpics_files), (1, 0, 1));
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
 }
+
+/// A card by `artist`, to look for a larger copy of.
+fn target_by(artist: &str) -> manual::Target {
+    let card: mtg_art_core::card::Card = serde_json::from_value(json!({
+        "name": "Twilight Prophet", "set": "rix", "collector_number": "88", "artist": artist,
+        "image_uris": { "art_crop": "https://cards.scryfall.io/art_crop/front/x.jpg" }
+    }))
+    .unwrap();
+    let face = mtg_art_core::faces::plan_faces(&card, &Settings::default()).remove(0);
+    manual::Target { card, face }
+}
+
+#[tokio::test]
+async fn opens_the_website_mtgpics_links_for_the_artist() {
+    let servers = Servers::start().await;
+    // The list of artists is read once, and each artist's page once: after
+    // that, the history answers.
+    Mock::given(method("GET"))
+        .and(path("/illustrators"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(fixture("illustrators.html"), "text/html; charset=ISO-8859-1"),
+        )
+        .expect(1)
+        .mount(&servers.mtgpics)
+        .await;
+    for id in ["729", "841"] {
+        Mock::given(method("GET"))
+            .and(path("/illus"))
+            .and(query_param("art", id))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_raw(fixture(&format!("illus_{id}.html")), "text/html; charset=ISO-8859-1"),
+            )
+            .expect(1)
+            .mount(&servers.mtgpics)
+            .await;
+    }
+    let http = servers.http();
+    let artists = mtg_art_core::mtgpics::Artists::default();
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let website = manual::Site::Website;
+
+    for _ in 0..2 {
+        let url = manual::site_url(&http, Some(&history), &artists, &target_by("Seb McKinnon"), website)
+            .await
+            .unwrap();
+        assert_eq!(url.as_str(), "http://www.sebmckinnon.com/");
+    }
+    for _ in 0..2 {
+        let error = manual::site_url(&http, Some(&history), &artists, &target_by("Dmitry Burmak"), website)
+            .await
+            .unwrap_err();
+        assert_eq!(error.to_string(), "MTGPics doesn't list a website for Dmitry Burmak.");
+    }
+    // The other sites are searches, with nothing to look up.
+    let url = manual::site_url(
+        &http,
+        None,
+        &artists,
+        &target_by("Dmitry Burmak"),
+        manual::Site::Artstation,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        url.as_str(),
+        "https://www.artstation.com/search/artists?query=Dmitry+Burmak"
+    );
+}
