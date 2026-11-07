@@ -23,6 +23,11 @@ pub struct MtgpicsArt {
 static ART_PATH: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)pics/(?:art|art_th)/([a-z0-9]+)/([a-z0-9]+(?:_\d+)?)\.(jpg|png)").unwrap());
 
+/// A whole-card scan. A page shows its card's faces' scans front first, which
+/// its art thumbnails don't always follow.
+static CARD_SCAN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)pics/(?:big|reg)/([a-z0-9]+)/([a-z0-9]+)\.(?:jpg|png)").unwrap());
+
 static TITLE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)<title>\s*(.*?)\s*-\s*mtgpics\.com\s*</title>").unwrap());
 
@@ -39,7 +44,12 @@ pub fn page_artists(html: &str) -> Vec<String> {
         .collect()
 }
 
-/// Every distinct artwork on a card page, in page order.
+/// Every distinct artwork on a card page, front face first.
+///
+/// Thumbnails mostly come in face order, but not always: `stx/006` shows its
+/// back's art (`715`) before its front's. The page's card scans do come front
+/// first, so art that has a scan of the same number is put in their order.
+/// Art without one keeps its place after them.
 pub fn extract_arts(html: &str, origin: &str) -> Vec<MtgpicsArt> {
     let mut arts: Vec<MtgpicsArt> = Vec::new();
     for captures in ART_PATH.captures_iter(html) {
@@ -53,6 +63,15 @@ pub fn extract_arts(html: &str, origin: &str) -> Vec<MtgpicsArt> {
             });
         }
     }
+    let scans: Vec<(String, String)> = CARD_SCAN
+        .captures_iter(html)
+        .map(|c| (c[1].to_lowercase(), c[2].to_lowercase()))
+        .collect();
+    // A stable sort: variants of one image, and art with no scan, keep their order.
+    arts.sort_by_key(|art| {
+        let key = (art.set.to_lowercase(), base_number(&art.number).to_lowercase());
+        scans.iter().position(|scan| *scan == key).unwrap_or(usize::MAX)
+    });
     arts
 }
 
@@ -139,6 +158,20 @@ mod tests {
         assert_eq!(numbers(&arts), ["090", "549"]);
         let picked: Vec<_> = pick_arts(&arts, 2).into_iter().map(|a| a.map(|a| a.number)).collect();
         assert_eq!(picked, [Some("090".to_owned()), Some("549".to_owned())]);
+    }
+
+    #[test]
+    fn puts_art_in_face_order_when_the_thumbnails_are_not() {
+        // The page's thumbnails show the back's art first; its scans don't.
+        let html = fixture("card_stx006.html");
+        assert_eq!(
+            page_title(&html).as_deref(),
+            Some("Wandering Archaic/Explore the Vastlands")
+        );
+        let arts = extract_arts(&html, ORIGIN);
+        assert_eq!(numbers(&arts), ["006", "715"]);
+        let picked: Vec<_> = pick_arts(&arts, 2).into_iter().map(|a| a.map(|a| a.number)).collect();
+        assert_eq!(picked, [Some("006".to_owned()), Some("715".to_owned())]);
     }
 
     #[test]

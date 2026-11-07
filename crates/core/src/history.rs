@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS fetched (
 );
 ";
 
+/// The log's version, kept in SQLite's `user_version`. Opening an older log
+/// brings it up to date; see [`migrate`].
+const VERSION: i64 = 1;
+
 /// A face MTGPics had no art for is looked for again after this long, in case
 /// MTGPics has added it since.
 pub const RECHECK_MISSING_AFTER: Duration = Duration::from_secs(30 * 24 * 60 * 60);
@@ -68,6 +72,7 @@ impl History {
         conn.busy_timeout(Duration::from_secs(5))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.execute_batch(SCHEMA)?;
+        migrate(&conn)?;
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -123,6 +128,22 @@ impl History {
     }
 }
 
+/// Brings a log written by an older version up to date.
+fn migrate(conn: &Connection) -> Result<()> {
+    let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    if version < 1 {
+        // Before version 1, a card with two faces could have its faces' MTGPics
+        // art logged the wrong way round, when its page showed the back's art
+        // first. Forget every card with more than one face, so each is found
+        // again, once, the right way round.
+        conn.execute("DELETE FROM fetched WHERE json_array_length(mtgpics) > 1", [])?;
+    }
+    if version < VERSION {
+        conn.pragma_update(None, "user_version", VERSION)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,6 +153,35 @@ mod tests {
             "id": id, "name": "Karn, Scion of Urza", "set": "dom", "collector_number": "1"
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn forgets_two_faced_cards_logged_before_version_1() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.sqlite");
+        let url = |n: &str| Some(format!("https://www.mtgpics.com/pics/art/stx/{n}.jpg"));
+        {
+            let history = History::open(&path).unwrap();
+            history
+                .remember(&card("one-face"), &[url("001")], SystemTime::now())
+                .unwrap();
+            history
+                .remember(&card("two-faces"), &[url("715"), url("006")], SystemTime::now())
+                .unwrap();
+            // As a log from before version 1 would be.
+            history.lock().pragma_update(None, "user_version", 0).unwrap();
+        }
+        let history = History::open(&path).unwrap();
+        assert!(history.remembered(&card("one-face"), 1).unwrap().is_some());
+        assert_eq!(history.remembered(&card("two-faces"), 2).unwrap(), None);
+
+        // Logged again after the update, it stays.
+        history
+            .remember(&card("two-faces"), &[url("006"), url("715")], SystemTime::now())
+            .unwrap();
+        drop(history);
+        let history = History::open(&path).unwrap();
+        assert!(history.remembered(&card("two-faces"), 2).unwrap().is_some());
     }
 
     #[test]

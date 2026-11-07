@@ -1,0 +1,453 @@
+<!DEBUG SELECT * FROM gamer WHERE id="stx715">
+<!DOCTYPE HTML>
+<html>
+<head>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-116820003-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-116820003-1');
+</script>
+
+<title>Wandering Archaic/Explore the Vastlands - mtgpics.com</title>
+<link rel="shortcut icon" type="image/png" href="https://www.mtgpics.com/favicon.png">
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<meta http-equiv="content-language" content="en">
+<meta name="keywords" lang="fr" content="magic the gathering cards">
+<meta name="description" content="All Magic the Gathering cards">
+  <link href="https://www.mtgpics.com/styles.css" rel="stylesheet" type="text/css">
+
+<script language="JavaScript">
+<!--
+
+var x
+var y
+var ref
+var timereff=0
+
+var cur_ref="";
+gamerid="doo";
+
+function MAJCoords(evt){
+	x=evt.clientX
+	y=evt.clientY
+	return false;	
+}
+
+document.onkeydown = function(evt) {
+    evt = evt || window.event;
+    if (evt.keyCode == 27) {
+        CloseIllus();
+    }
+}
+
+function initElement(){
+	document.getElementById("mtgpics_content").onclick = TreatClick;
+}
+
+function TreatClick(event){
+	event = event || window.event;
+	elem = event.target || event.srcElement;
+	id = elem.id;
+
+	if (id.substring(0,4)=="c_t_") {CardClick(id.substring(4));return false;}
+	//CardClick(id.substring(4));return false;
+}
+
+function MM_preloadImages() { //v3.0
+  var d=document; if(d.images){ if(!d.MM_p) d.MM_p=new Array();
+    var i,j=d.MM_p.length,a=MM_preloadImages.arguments; for(i=0; i<a.length; i++)
+    if (a[i].indexOf("#")!=0){ d.MM_p[j]=new Image; d.MM_p[j++].src=a[i];}}
+}
+
+
+function OnTheFlyContent(src,dst) {
+	var xhr_object = null;
+
+	if(window.XMLHttpRequest) // Firefox
+	   xhr_object = new XMLHttpRequest();
+	else if(window.ActiveXObject) // Internet Explorer
+	   xhr_object = new ActiveXObject('Microsoft.XMLHTTP');
+
+
+	xhr_object.open("POST", src, true);
+
+	xhr_object.onreadystatechange = function() {
+	   if(xhr_object.readyState == 4) document.getElementById(dst).innerHTML=xhr_object.responseText;
+	}
+
+	xhr_object.send(null);
+}
+
+function CloseIllus(){
+
+	document.getElementById("illus_tooltip").style.visibility="hidden";
+
+}
+
+
+
+function LoadIllus(ch){
+	OnTheFlyContent("load_illus?i="+ch,"illus_tooltip_content");
+	document.getElementById("illus_tooltip").style.visibility="visible";
+
+}
+
+function CardClick(gamerid){
+	document.getElementById("tooltip_content").innerHTML="<div align=center><img style=\"margin:10px;\" src=/graph/misc/loadingGIF.gif></div>";
+	OnTheFlyContent("/ttcard?ref="+gamerid,"tooltip_content") ;
+	affTool();
+	cur_ref=gamerid.substring(0,6);
+	return false;
+
+}
+
+function affTool(){
+
+ 	if (document.documentElement && document.documentElement.scrollTop) {
+		theTop = document.documentElement.scrollTop
+	}
+	else if (document.body) {
+		theTop = document.body.scrollTop
+	}
+	
+	if (x>700) {
+		document.getElementById("tooltip").style.left=(x-315)+"px";
+		document.getElementById("close_tooltip").style.left="297px";
+	}
+	else {
+		document.getElementById("tooltip").style.left=(x+15)+"px";
+		document.getElementById("close_tooltip").style.left="17px";
+	}
+	document.getElementById("tooltip").style.top=(theTop+y+10)+"px";
+	document.getElementById("tooltip").style.visibility="visible";
+}
+
+function delayEff(passedref){
+	ref=passedref
+	clearTimeout(timeraff)
+	timereff=setTimeout("effTool()",200);
+}
+
+function effTool(){document.getElementById("tooltip").style.visibility="hidden";}
+
+
+
+//-->
+</script>
+</head>
+
+
+<body onmousemove="MAJCoords(event)" onload="initElement();" >
+<a name="haut_de_page"></a>
+<div id=tooltip style="visibility:hidden;width:320px;z-index:10;position: absolute;">
+  <div style="width:320px;box-shadow: 0px 3px 5px 3px #333333;padding:2px;background:#ffffff;border-radius:4px;border:2px #666666 solid;">
+    <div id=close_tooltip onclick="effTool();" style="cursor:pointer;" class=G10 align=center>Close this window</div>
+	<div id=tooltip_content class=S11 align=left style="width:312px;padding:3px;"></div>
+  </div>
+</div>
+<div id=illus_tooltip class=container_popup>
+  <div id=illus_tooltip_content class=popup></div>
+  <div class=W14 style="cursor:pointer;position:absolute;top:10px;left:10px;" onclick="CloseIllus();">Close<br>(or Esc)</div>
+</div>
+<div align=center>
+<div style="width:100%;min-width: 750px;max-width: 1280px;" align=center id=mtgpics_content>
+<table style="width:99%;" border=0 cellspacing=0 cellpadding=0><tr><td>
+<table width=100% height=90 border=0 cellspacing=0 cellpadding=0 align=center>
+  <tr> 
+	<td align=center><a href=https://www.mtgpics.com/index><img height=50 src=https://www.mtgpics.com/graph/nav/mtgpics_logo.png alt="mtgpics.com logo"></a></td>
+	<td width=730 align=right valign=bottom><a target=_blank href=https://magic.wizards.com/en/products/marvel/marvel-super-heroes><img src=/graph/leaderboard_msh.jpg style="width:728px;height:90px;"></a></td>
+  </tr>
+</table>
+<div style="display:flex;justify-content:space-evenly;align-items:center;height:30px;">
+    <div><a class=titleM href=/search>Advanced Card Search</a></div>
+    <div><a class=titleM href=/combos/>Combos</a></div>
+    <div><a class=titleM href=/illustrators>Artists</a></div>
+    <div><a class=titleM href=/rules>Rules</a></div>
+    <div><a class=titleM href=/sets>Sets</a></div>
+    <div><a class=titleM href=/trivia>Trivia</a></div>
+    <div><a class=titleM href=/card>Random Card</a></div>
+    <div> 
+      <table cellspacing=0 cellpadding=0  border=0>
+      <form method=post action=https://www.mtgpics.com/results.php?zbob=1>
+        <tr>
+          <td align=center><input type=text name=cardtitle_search class=search_input value="" style="width: 200px;" placeholder="Card Search..."></td>
+          <td align=left><input type=submit value=GO></td>
+        </tr>
+        </form>
+      </table>
+    </div>
+
+</div></td></tr></table>
+<script>
+var prev_ref="stx005";
+var next_ref="stx007";
+function checkKeycode(event) {
+    var keyDownEvent = event || window.event,
+        keycode = (keyDownEvent.which) ? keyDownEvent.which : keyDownEvent.keyCode;
+
+    if(keycode==37 && prev_ref!=""){window.location ="card?ref="+prev_ref;}
+    else if(keycode==39 && next_ref!=""){window.location ="card?ref="+next_ref;}
+
+}
+
+document.onkeydown = checkKeycode;
+</script>
+<script>
+function LoadGlo(refglo,lang){
+	document.getElementById("glo_tooltip_content").innerHTML="<div align=center><img style=\"margin:10px;\" src=/graph/misc/loadingGIF.gif></div>";
+	OnTheFlyContent("/rules/glo_entry?refglo="+refglo,"glo_tooltip_content");
+	if (refglo!="") {
+ 	if (document.documentElement && document.documentElement.scrollTop) {
+		theTop = document.documentElement.scrollTop
+	}
+	else if (document.body) {
+		theTop = document.body.scrollTop
+	}
+	
+	new_x=x-250;
+	if(new_x<10){new_x=10;}
+	if(new_x+520>window.innerWidth){new_x=window.innerWidth-520;}
+	document.getElementById("glo_tooltip").style.left=new_x+"px";
+	document.getElementById("glo_tooltip").style.top=(theTop+y+20)+"px";
+	document.getElementById("glo_tooltip").style.visibility="visible";
+	}
+}
+
+function UpdateGlo(refglo,lang){
+	document.getElementById("glo_tooltip_content").innerHTML="<div align=center><img style=\"margin:10px;\" src=../graph/divers/loadingGIF.gif></div>";
+	OnTheFlyContent("/fr/regles/glo_entry?lang="+lang+"&refglo="+refglo,"glo_tooltip_content");
+}
+
+function EffGlo(){document.getElementById("glo_tooltip").style.visibility="hidden";}
+
+</script>
+<div id=glo_tooltip style="visibility:hidden;z-index:10;position: absolute;">
+  <div style="box-shadow: 0px 3px 5px 3px #333333;padding:2px;background:#ffffff;border-radius:4px;border:2px #666666 solid;">
+  <div class=fakelink onclick="EffGlo();">close</div>
+	<div id=glo_tooltip_content style="width:500px;padding:3px;"></div>
+  </div>
+</div>
+<script type="text/javascript" language="javascript"> 
+
+function AffCollector(){
+	document.getElementById('OtherTools').style.display='none';
+	document.getElementById('Collector').style.display='block';
+}
+
+function AffBig(){
+	document.getElementById('Collector').style.display='none';
+	document.getElementById('OtherTools').style.display='block';
+}
+
+function AffPlane(){
+	document.getElementById('plane_popup').style.display='block';
+}
+
+function EffPlane(){
+	document.getElementById('plane_popup').style.display='none';
+}
+
+function AffDecks(){
+	document.getElementById('OtherTools').innerHTML='<a href=# onclick="AffCollector()">Back</a><br><IFRAME height=445 width=98% marginwidth=0 marginheight=0 hspace=0 vspace=0 frameborder=0 src=carte_decks.php?gamerid=stx006&view=1></IFRAME>';
+	document.getElementById('Collector').style.display='none';
+	document.getElementById('OtherTools').style.display='block';
+}
+
+function AffCombos(){
+	document.getElementById('OtherTools').innerHTML='<a href=# onclick="AffCollector()">Back</a><br><IFRAME height=445 width=100% marginwidth=0 marginheight=0 hspace=0 vspace=0 frameborder=0 src=carte_combos.php?gamerid=stx006&view=1></IFRAME>';
+	document.getElementById('Collector').style.display='none';
+	document.getElementById('OtherTools').style.display='block';
+}
+
+function AffOtherSets() {
+  if (document.getElementById('OtherSets').style.display == "none") {
+	document.getElementById('OtherSets').style.display = "block";
+	document['mvshoptap'].src="graph/divers/deck_det2.gif";
+  }
+  else {
+	document.getElementById('OtherSets').style.display = "none";
+	document['mvshoptap'].src="graph/divers/deck_det.gif";
+  }
+}
+
+function AffOtherSetsFoil() {
+  if (document.getElementById('OtherSetsFoil').style.display == "none") {
+	document.getElementById('OtherSetsFoil').style.display = "block";
+	document['mvshoptapfoil'].src="graph/divers/deck_det2.gif";
+  }
+  else {
+	document.getElementById('OtherSetsFoil').style.display = "none";
+	document['mvshoptapfoil'].src="graph/divers/deck_det.gif";
+  }
+}
+
+
+
+function ShowReminder(id) {
+	if (document.getElementById(id).style.display == "inline") {
+		document.getElementById(id).style.display = "none";
+	}
+	else {document.getElementById(id).style.display = "inline";}
+}
+
+
+</script>
+	<div style="padding:2px;border-radius:10px;">
+	<div style="padding:4px;border-radius:8px;">
+	
+	<div style="margin:1px;background:#ffffff;padding:2px;border-radius:4px;">
+	
+  <table width=100% align=center border=0 cellspacing=0 cellpadding=0>
+  <tr height=460>
+    <td valign=top width=35% align=center>
+      
+<table align=center cellpadding=0 cellspacing=0 width=95% border=0>
+  <tr>
+    <td align=center>
+      <table width=100% align=center border=0 height=56 cellspacing=0 cellpadding=0>
+        <tr>
+          <td  align=center><img src=graph/rarity/carte10.png border=0></td>
+          <td width=170 align=center><a href=set?set=343><img src=graph/sets/logos/stx.png border=0></a></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<table align=center cellpadding=0 cellspacing=0  width=95% border=0>
+  <tr>
+   <form method=post action=card> <input type=hidden name=serie value=343>  
+    <td align=center>
+     
+      <a href=card?ref=stx005><img src=graph/nav/left.png border=0 align=absmiddle></a>&nbsp;<input type=text name=num value="6" maxlength=3 style="font-family: verdana;font-size:12px; width:30px;border:none;" align=absmiddle>/ 391&nbsp;<a href=card?ref=stx007><img src=graph/nav/right.png border=0 align=absmiddle></a><br>
+
+    </td>
+    </form>
+  </tr>
+</table><b>1</b>&nbsp;<a href=card?ref=stx286>2</a>&nbsp;<div class=S12 style="height:14px;margin:3px;"></div>
+      
+<table width=95% cellspacing=0  border=0>
+  <tr>
+    <td>
+     
+      <div style="height:25px;float:right;"><img  height=25 src=/graph/manas_cc/5.png></div>
+      
+      <div class=Card20>Wandering Archaic</div>
+      <div style="clear:both;"></div>
+	  <div class=CardG16 style="padding:5px 0px 5px 0px;">Creature — Avatar</div>
+      <div align=center>
+	  <div id=EngShort style="display:block;" class=Card15 align=justify>Whenever an opponent casts an instant or sorcery spell, they may pay <img style="vertical-align:-20%;" src=graph/manas_txt/2.png alt="%2">. If they don&#039;t, you may copy that spell. You may choose new targets for the copy.</div>
+	  
+	  </div>
+	  <div align=right class=CardG16 style="padding-right:3px;">4/4</div>
+	  
+    </td>
+  </tr>
+</table>
+	<table width=95% cellspacing=0  border=0 style="padding-top:20px;">
+	  <tr>
+		<td>
+		  <div style="height:25px;float:right;"><img  height=25 src=/graph/manas_cc/3.png></div>
+		  
+		  <div class=Card20>Explore the Vastlands</div>
+		  <div style="clear:both;"></div>
+		  <div class=CardG16 style="padding:5px 0px 5px 0px;">Sorcery</div>
+		  <div align=center>
+		  <div id=EngShort style="display:block;" class=Card15 align=justify>Each player looks at the top five cards of their library and may reveal a land card and/or an instant or sorcery card from among them. Each player puts the cards they revealed this way into their hand and the rest on the bottom of their library in a random order. Each player gains 3 life.</div>
+		  
+		  </div>
+		  <div align=right class=CardG16 style="padding-right:3px;"></div>
+		</td>
+	  </tr>
+	</table>
+      
+<div class=titleB16 style="padding-top:20px;">Legality</div>
+<div style="display:flex;justify-content:space-around;margin-top:10px;">
+<div class=format_legal title="This card is legal in Vintage">Vintage</div>
+<div class=format_legal title="This card is legal in Legacy">Legacy</div>
+<div class=format_notlegal title="This card is not legal in Premodern">Premodern</div>
+<div class=format_legal title="This card is legal in Modern">Modern</div>
+<div class=format_legal title="This card is legal in Pioneer">Pioneer</div>
+<div class=format_notlegal title="This card is not legal in Standard">Standard</div>
+</div>
+<div style="display:flex;justify-content:space-around;margin-top:10px;">
+<div class=format_legal title="This card is legal in Duel Commander">Duel Commander</div>
+<div class=format_legal title="This card is legal in multiplayer Commander">Commander Multi</div>
+<div class=format_legal title="This card is legal in Historic">Historic</div>
+<div class=format_notlegal title="This card is not legal in Alchemy">Alchemy</div>
+</div>
+
+      
+	<div class=titleB16 style="padding-top:20px;">Other Sets</div>
+	<div><select name=sel_ed onchange="window.open(this.value,'_top')"><option value="">Choose (3)</option><option value="card?ref=15p002" >Prerelease Promos</option><option value="card?ref=stx006" disabled>Strixhaven School of Mages 1</option><option value="card?ref=stx286" >Strixhaven School of Mages 2</option></select></div>
+	<div><a href=reprints?gid=stx006>See all prints of this cards</a></div>
+    </td>
+    <td valign=top align=center width=40% align=right>
+<table width=100% cellspacing=0 cellpadding=0 border=0>
+  <tr height=460>
+    <td align=center valign=top>
+      <div id=Collector style="display:block;">
+    	<table width=100% align=center border=0 cellspacing=0 cellpadding=0>
+          <tr>
+      		<td valign=top align=center>
+      	      
+		<script>
+		function Tap() {
+		if(document.getElementById("CardScan").className=="card_box_180Y") {
+			document.getElementById("CardScan").className="card_box";
+			document.getElementById("CardScanBack").className="card_box_180Ya";
+		}
+		else {
+			document.getElementById("CardScan").className="card_box_180Y";
+			document.getElementById("CardScanBack").className="card_box";
+		}
+
+		}
+		</script>
+<div style="height:14px;" class=S10>CLICK ON THE CARD TO SEE THE OTHER SIDE.</div>
+<div align=center style="position:relative;perspective: 2000px;width:325px;height:460px;">
+<div id=CardScan class=card_box>
+<table width=325 height=460 border=0 cellspacing=0 cellpadding=0 style="border-radius:15px;background:black;;border:1px black solid;">
+  <tr><td width=325  align=center valign=middle><img src=https://www.mtgpics.com/pics/big/stx/006.jpg onClick=Tap()></td></tr>
+</table>
+</div>
+
+		<div id=CardScanBack class=card_box_180Ya>
+		<table width=325 height=460 border=0 cellspacing=0 cellpadding=0 style="border-radius:15px;background:black;border:1px black solid;">
+		  <tr><td width=325  align=center valign=middle><img src=pics/big/stx/715.jpg onClick=Tap()></td></tr>
+		</table>
+		</div>
+</div>
+              
+	<table>
+	  <tr><td>Illus. (Wandering Archaic) <a href=illus?art=374>Wayne Reynolds</a></td></tr>
+	  <tr><td>Illus. (Explore the Vastlands) <a href=illus?art=374>Wayne Reynolds</a></td></tr>
+	</table>
+            </td>          
+          </tr>
+        </table>           
+     </div>
+     <div id=OtherTools style="display:none;" align=center></div>
+  </td></tr>
+</table></td>
+    <td valign=top width=25% align=left><div align=center><div style="display:inline-block;margin:2px;"><a onclick="LoadIllus('45018');"><img style="display:block;border:4px black solid;cursor:pointer;" src=pics/art_th/stx/715.jpg></a></div><div style="display:inline-block;margin:2px;"><a onclick="LoadIllus('45206');"><img style="display:block;border:4px black solid;cursor:pointer;" src=pics/art_th/stx/006.jpg></a></div></div></td>
+  </tr>
+</table>
+	</div>
+	</div>
+	</div>
+<div style="padding:3px;">
+<div align=center class=W12>
+
+  <a class=white href=https://www.mtgpics.com/contact_us?c_script=%2Fcard.php&c_query=ref%3Dstx006&c_title=Wandering+Archaic%2FExplore+the+Vastlands>Contact us<a/>
+<div style="width:1200px" valign=top class=W10 align=left>
+The information presented on this site about Magic: The Gathering, both literal and graphical, is copyrighted by Wizards of the Coast.
+This website is not produced, endorsed, supported, or affiliated with Wizards of the Coast.
+</div>
+</div>
+</body>
+</html>
