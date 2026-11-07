@@ -2,7 +2,7 @@ import { IconButton } from "@chakra-ui/react";
 import { RiDiscordFill } from "react-icons/ri";
 
 import { api } from "@/api";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip } from "@mtg-art/ui/tooltip";
 import { showError } from "@/notify";
 
 async function openDiscord() {

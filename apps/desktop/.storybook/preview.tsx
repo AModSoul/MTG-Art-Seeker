@@ -1,5 +1,4 @@
-import { ChakraProvider } from "@chakra-ui/react";
-import { withThemeByClassName } from "@storybook/addon-themes";
+import { basePreview, resetUi } from "@mtg-art/ui/storybook";
 import type { Preview } from "@storybook/react-vite";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -10,9 +9,7 @@ import { mocked, sb } from "storybook/test";
 import { cardData, presets } from "../src/__fixtures__/run.ts";
 import { defaultSettings } from "../src/__fixtures__/settings.ts";
 import { api } from "../src/api.ts";
-import { Toaster, toaster } from "../src/components/ui/toaster.tsx";
 import { useInput, useRun, useSettings } from "../src/store.ts";
-import { system } from "../src/theme.ts";
 
 // Storybook has no Tauri backend, so every module that reaches it is mocked.
 // Each export becomes a spy; the defaults below make the app behave as if the
@@ -30,20 +27,7 @@ const PLACEHOLDER_ART = `data:image/svg+xml,${encodeURIComponent(
 )}`;
 
 const preview: Preview = {
-  decorators: [
-    withThemeByClassName({
-      themes: { light: "", dark: "dark" },
-      defaultTheme: "light",
-    }),
-    // ChakraProvider rather than the app's Provider: next-themes would fight
-    // the themes addon over the class on <html>.
-    (Story) => (
-      <ChakraProvider value={system}>
-        <Story />
-        <Toaster />
-      </ChakraProvider>
-    ),
-  ],
+  ...basePreview,
   beforeEach: () => {
     mocked(api.getSettings).mockResolvedValue(defaultSettings);
     mocked(api.saveSettings).mockResolvedValue();
@@ -65,25 +49,11 @@ const preview: Preview = {
 
     // Every story starts from the app's initial state, with settings loaded
     // and no toasts left over from the story before.
-    toaster.remove();
+    resetUi();
     useInput.persist.clearStorage();
     useInput.setState(useInput.getInitialState(), true);
     useRun.setState(useRun.getInitialState(), true);
     useSettings.setState({ ...useSettings.getInitialState(), settings: defaultSettings }, true);
-  },
-  parameters: {
-    controls: {
-      matchers: {
-        color: /(background|color)$/i,
-        date: /Date$/i,
-      },
-    },
-    a11y: {
-      // 'todo' - show a11y violations in the test UI only
-      // 'error' - fail CI on a11y violations
-      // 'off' - skip a11y checks entirely
-      test: "todo",
-    },
   },
 };
 

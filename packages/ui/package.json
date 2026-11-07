@@ -1,0 +1,53 @@
+{
+  "name": "@mtg-art/ui",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    "./theme": "./src/theme.ts",
+    "./storybook": "./src/storybook.tsx",
+    "./*": "./src/components/ui/*.tsx"
+  },
+  "scripts": {
+    "typegen": "chakra typegen src/theme.ts",
+    "typecheck": "pnpm run typegen && tsc --noEmit",
+    "test": "pnpm run typegen && vitest run",
+    "storybook": "storybook dev -p 6008",
+    "ci-storybook": "storybook dev -p 6008 --quiet --ci",
+    "build-storybook": "storybook build"
+  },
+  "devDependencies": {
+    "@chakra-ui/cli": "catalog:",
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@storybook/addon-a11y": "catalog:",
+    "@storybook/addon-docs": "catalog:",
+    "@storybook/addon-mcp": "catalog:",
+    "@storybook/addon-themes": "catalog:",
+    "@storybook/addon-vitest": "catalog:",
+    "@storybook/react-vite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "next-themes": "catalog:",
+    "playwright": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-icons": "catalog:",
+    "storybook": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "next-themes": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-icons": "catalog:"
+  }
+}

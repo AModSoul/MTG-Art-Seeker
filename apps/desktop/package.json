@@ -5,20 +5,20 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "dev": "pnpm run typegen && vite",
-    "build": "pnpm run typegen && tsc --noEmit && vite build",
+    "dev": "pnpm --filter @mtg-art/ui typegen && vite",
+    "build": "pnpm --filter @mtg-art/ui typegen && tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typecheck": "tsc --noEmit",
-    "typegen": "chakra typegen src/theme.ts",
+    "typecheck": "pnpm --filter @mtg-art/ui typegen && tsc --noEmit",
     "test": "vitest run",
-    "storybook": "storybook dev -p 6008",
-    "ci-storybook": "storybook dev -p 6008 --quiet --ci",
+    "storybook": "storybook dev -p 6009",
+    "ci-storybook": "storybook dev -p 6009 --quiet --ci",
     "build-storybook": "storybook build"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@mtg-art/ui": "workspace:*",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-process": "^2.4.0",
@@ -30,7 +30,6 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
-    "@chakra-ui/cli": "catalog:",
     "@storybook/addon-a11y": "catalog:",
     "@storybook/addon-docs": "catalog:",
     "@storybook/addon-mcp": "catalog:",

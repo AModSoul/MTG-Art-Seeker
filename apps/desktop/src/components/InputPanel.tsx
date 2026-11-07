@@ -18,9 +18,9 @@ import type { ListFile } from "@/bindings/ListFile";
 import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
 import type { RunInput } from "@/bindings/RunInput";
-import { Field } from "@/components/ui/field";
-import { Radio, RadioGroup } from "@/components/ui/radio";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Field } from "@mtg-art/ui/field";
+import { Radio, RadioGroup } from "@mtg-art/ui/radio";
+import { Tooltip } from "@mtg-art/ui/tooltip";
 import { showError } from "@/notify";
 import {
   cancelRun,

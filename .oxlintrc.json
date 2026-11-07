@@ -71,7 +71,7 @@
               "Toggle",
               "Tooltip"
             ],
-            "message": "Use the snippet from @/components/ui instead (e.g. @/components/ui/tooltip for Tooltip). If it's missing, add it with `npx @chakra-ui/cli snippet add <name> --tsx --outdir src/components/ui`."
+            "message": "Use the snippet from @mtg-art/ui instead (e.g. @mtg-art/ui/tooltip for Tooltip). If it is missing, add it with `npx @chakra-ui/cli snippet add <name> --tsx --outdir packages/ui/src/components/ui`."
           }
         ]
       }
@@ -79,7 +79,7 @@
   },
   "overrides": [
     {
-      "files": ["apps/desktop/src/components/ui/**"],
+      "files": ["packages/ui/src/components/ui/**"],
       "rules": {
         "eslint/no-shadow": "off",
         "jsx-a11y/prefer-tag-over-role": "off",
@@ -91,7 +91,7 @@
       }
     },
     {
-      "files": ["apps/desktop/src/theme.ts", "**/.storybook/**"],
+      "files": ["packages/ui/src/**", "**/.storybook/**"],
       "rules": {
         "no-restricted-imports": "off"
       }

@@ -5,7 +5,7 @@ import { DiscordButton } from "@/components/DiscordButton";
 import { InputPanel } from "@/components/InputPanel";
 import { RunView } from "@/components/RunView";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
-import { ColorModeButton } from "@/components/ui/color-mode";
+import { ColorModeButton } from "@mtg-art/ui/color-mode";
 import { UpdateButton } from "@/components/UpdateButton";
 import { useSettings } from "@/store";
 
