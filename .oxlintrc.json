@@ -103,6 +103,7 @@
     "**/src-tauri",
     "crates",
     "apps/desktop/src/bindings",
-    "**/storybook-static"
+    "**/storybook-static",
+    "apps/site/src/routeTree.gen.ts"
   ]
 }

@@ -1,0 +1,48 @@
+{
+  "name": "site",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @mtg-art/ui typegen && vite dev --port 3000",
+    "build": "pnpm --filter @mtg-art/ui typegen && vite build && tsc --noEmit",
+    "preview": "vite preview --port 3000",
+    "typecheck": "pnpm --filter @mtg-art/ui typegen && tsc --noEmit",
+    "test": "vitest run",
+    "storybook": "storybook dev -p 6010",
+    "ci-storybook": "storybook dev -p 6010 --quiet --ci",
+    "build-storybook": "storybook build"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@mtg-art/ui": "workspace:*",
+    "@tanstack/react-router": "^1.170.15",
+    "next-themes": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-icons": "catalog:"
+  },
+  "devDependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@storybook/addon-a11y": "catalog:",
+    "@storybook/addon-docs": "catalog:",
+    "@storybook/addon-mcp": "catalog:",
+    "@storybook/addon-themes": "catalog:",
+    "@storybook/addon-vitest": "catalog:",
+    "@storybook/react-vite": "catalog:",
+    "@tanstack/router-plugin": "^1.168.18",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
+    "storybook": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-prerender-plugin": "^0.5.13",
+    "vitest": "catalog:"
+  }
+}
