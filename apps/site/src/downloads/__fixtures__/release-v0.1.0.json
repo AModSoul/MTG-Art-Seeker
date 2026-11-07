@@ -1,0 +1,78 @@
+{
+  "assets": [
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/latest.json",
+      "name": "latest.json",
+      "size": 7132
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader-0.1.0-1.x86_64.rpm",
+      "name": "MTG.Art.Downloader-0.1.0-1.x86_64.rpm",
+      "size": 7192836
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader-0.1.0-1.x86_64.rpm.sig",
+      "name": "MTG.Art.Downloader-0.1.0-1.x86_64.rpm.sig",
+      "size": 448
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_amd64.AppImage",
+      "name": "MTG.Art.Downloader_0.1.0_amd64.AppImage",
+      "size": 85244408
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_amd64.AppImage.sig",
+      "name": "MTG.Art.Downloader_0.1.0_amd64.AppImage.sig",
+      "size": 452
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_amd64.deb",
+      "name": "MTG.Art.Downloader_0.1.0_amd64.deb",
+      "size": 7186038
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_amd64.deb.sig",
+      "name": "MTG.Art.Downloader_0.1.0_amd64.deb.sig",
+      "size": 444
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_universal.dmg",
+      "name": "MTG.Art.Downloader_0.1.0_universal.dmg",
+      "size": 12136003
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_x64-setup.exe",
+      "name": "MTG.Art.Downloader_0.1.0_x64-setup.exe",
+      "size": 5022225
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_x64-setup.exe.sig",
+      "name": "MTG.Art.Downloader_0.1.0_x64-setup.exe.sig",
+      "size": 452
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_x64_en-US.msi",
+      "name": "MTG.Art.Downloader_0.1.0_x64_en-US.msi",
+      "size": 7094272
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_0.1.0_x64_en-US.msi.sig",
+      "name": "MTG.Art.Downloader_0.1.0_x64_en-US.msi.sig",
+      "size": 452
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_universal.app.tar.gz",
+      "name": "MTG.Art.Downloader_universal.app.tar.gz",
+      "size": 12496585
+    },
+    {
+      "browser_download_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v0.1.0/MTG.Art.Downloader_universal.app.tar.gz.sig",
+      "name": "MTG.Art.Downloader_universal.app.tar.gz.sig",
+      "size": 440
+    }
+  ],
+  "html_url": "https://github.com/AModSoul/mtg-art-downloader-rust/releases/tag/v0.1.0",
+  "name": "MTG Art Downloader v0.1.0",
+  "published_at": "2026-11-07T17:34:29Z",
+  "tag_name": "v0.1.0"
+}
