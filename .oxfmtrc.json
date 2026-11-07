@@ -4,7 +4,7 @@
   "ignorePatterns": [
     "dist",
     "target",
-    "src-tauri/gen",
+    "apps/desktop/src-tauri/gen",
     "crates/core/tests/fixtures",
     "pnpm-lock.yaml",
     "storybook-static",

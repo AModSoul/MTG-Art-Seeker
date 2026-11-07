@@ -79,7 +79,7 @@
   },
   "overrides": [
     {
-      "files": ["src/components/ui/**"],
+      "files": ["apps/desktop/src/components/ui/**"],
       "rules": {
         "eslint/no-shadow": "off",
         "jsx-a11y/prefer-tag-over-role": "off",
@@ -91,11 +91,18 @@
       }
     },
     {
-      "files": ["src/theme.ts", ".storybook/**"],
+      "files": ["apps/desktop/src/theme.ts", "**/.storybook/**"],
       "rules": {
         "no-restricted-imports": "off"
       }
     }
   ],
-  "ignorePatterns": ["dist", "target", "src-tauri", "crates", "src/bindings", "storybook-static"]
+  "ignorePatterns": [
+    "**/dist",
+    "target",
+    "**/src-tauri",
+    "crates",
+    "apps/desktop/src/bindings",
+    "**/storybook-static"
+  ]
 }
