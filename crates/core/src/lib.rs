@@ -20,6 +20,7 @@ pub mod presets;
 pub mod scryfall;
 pub mod settings;
 pub mod text;
+pub mod verify;
 
 pub use error::{Error, Result};
 
