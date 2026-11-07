@@ -1,5 +1,4 @@
 /// <reference types="vitest/config" />
-import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
@@ -11,7 +10,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, type Plugin } from "vite";
 import { vitePrerenderPlugin } from "vite-prerender-plugin";
 
-import { BASE_PATH, CUSTOM_DOMAIN } from "./src/site-config";
+import { BASE_PATH } from "./src/site-config";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const PRERENDER_SCRIPT = path.join(dirname, "src/prerender.tsx");
@@ -73,19 +72,6 @@ function exitAfterBuild(): Plugin {
   };
 }
 
-/** GitHub Pages serves a custom domain only when the site has a `CNAME` file. */
-function cname(): Plugin {
-  return {
-    name: "cname",
-    apply: "build",
-    async writeBundle(options) {
-      if (CUSTOM_DOMAIN && options.dir) {
-        await writeFile(path.join(options.dir, "CNAME"), `${CUSTOM_DOMAIN}\n`);
-      }
-    },
-  };
-}
-
 export default defineConfig(({ command }) => ({
   base: BASE_PATH,
   resolve: {
@@ -130,7 +116,6 @@ export default defineConfig(({ command }) => ({
           exitAfterBuild(),
         ]
       : []),
-    cname(),
   ],
   build: {
     target: "es2022",
