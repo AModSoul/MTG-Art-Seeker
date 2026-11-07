@@ -12,9 +12,15 @@
 //!
 //! An image that doesn't look like a larger copy of the art isn't saved
 //! unless the user says to: a person picked it, but may have picked wrong.
+//!
+//! Some sites cover their images so they can't be saved. For those, the user
+//! asks the app to look at the page they have open, and [`import_from_page`]
+//! is handed the images the page lists: it tries them, largest first, and
+//! saves the one that is the art.
 
 use std::{
-    path::Path,
+    collections::HashSet,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
 };
 
@@ -234,6 +240,8 @@ pub enum FoundEvent {
     /// It doesn't look like a larger copy of `face`'s art, and is kept until
     /// the user says whether to save it anyway; `token` names it.
     Doubtful { token: u32, face: String, doubt: Doubt },
+    /// None of the `images` on the page the user asked about is `face`'s art.
+    NoMatch { face: String, images: u32 },
     /// It couldn't be saved.
     Failed { message: String },
 }
@@ -344,31 +352,196 @@ pub async fn import(
 
 /// Why `downloaded` isn't a larger copy of the face's art, if it isn't.
 async fn doubt(http: &Http, target: &Target, downloaded: &Path) -> Result<Option<Doubt>> {
-    let crop = downloaded.with_extension(format!("art-crop-{}", TEMP_IDS.fetch_add(1, Ordering::Relaxed)));
-    if http.download(target.art_crop(), &crop).await?.is_none() {
-        return Err(Error::Other(format!(
-            "Scryfall's art crop of {} is gone",
-            target.face.name
-        )));
+    let crop = ArtCrop::fetch(http, target, downloaded.parent().unwrap_or(Path::new("."))).await?;
+    crop.doubt(downloaded).await
+}
+
+/// Scryfall's art crop of a face, downloaded to check images against;
+/// deleted when dropped.
+struct ArtCrop(PathBuf);
+
+impl ArtCrop {
+    async fn fetch(http: &Http, target: &Target, dir: &Path) -> Result<Self> {
+        let crop = Self(dir.join(format!(".art-crop-{}", TEMP_IDS.fetch_add(1, Ordering::Relaxed))));
+        if http.download(target.art_crop(), &crop.0).await?.is_none() {
+            return Err(Error::Other(format!(
+                "Scryfall's art crop of {} is gone",
+                target.face.name
+            )));
+        }
+        Ok(crop)
     }
-    let candidate = downloaded.to_owned();
-    let compared = {
-        let crop = crop.clone();
-        tokio::task::spawn_blocking(move || verify::compare(&crop, &candidate)).await
-    };
-    let _ = tokio::fs::remove_file(&crop).await;
-    let verdict = compared.map_err(|error| Error::Other(error.to_string()))??;
-    Ok(match verdict {
-        Verdict::Same { .. } => None,
-        Verdict::Smaller => Some(Doubt::Smaller),
-        Verdict::CardScan => Some(Doubt::CardScan),
-        Verdict::Different => Some(Doubt::Different),
+
+    /// Why `candidate` isn't a larger copy of the art, if it isn't.
+    async fn doubt(&self, candidate: &Path) -> Result<Option<Doubt>> {
+        let (crop, candidate) = (self.0.clone(), candidate.to_owned());
+        let verdict = tokio::task::spawn_blocking(move || verify::compare(&crop, &candidate))
+            .await
+            .map_err(|error| Error::Other(error.to_string()))??;
+        Ok(match verdict {
+            Verdict::Same { .. } => None,
+            Verdict::Smaller => Some(Doubt::Smaller),
+            Verdict::CardScan => Some(Doubt::CardScan),
+            Verdict::Different => Some(Doubt::Different),
+        })
+    }
+}
+
+impl Drop for ArtCrop {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// The most images of a page tried, largest first.
+pub const MAX_PAGE_IMAGES: usize = 12;
+
+/// An image on the page the user has open, as the page gives it: its address,
+/// and its size in pixels when the page knows it (`0` when it doesn't).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct PageImage {
+    pub url: String,
+    #[serde(default)]
+    pub width: u32,
+    #[serde(default)]
+    pub height: u32,
+}
+
+/// What came of looking for the art among a page's images.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FromPage {
+    Saved {
+        file: SavedFile,
+        replaced: Option<String>,
+    },
+    /// None was a larger copy, but the one at `image_url`, downloaded to
+    /// `downloaded`, may be the art: a card scan, or a copy no larger. It's
+    /// saved if the user says so, by [`import`] with `force`.
+    Doubtful {
+        doubt: Doubt,
+        image_url: String,
+        downloaded: PathBuf,
+    },
+    /// None of the `images` tried is the art.
+    NoMatch {
+        images: usize,
+    },
+}
+
+/// Looks for `target`'s art among `images`, from the page at `page`: each is
+/// downloaded into `dir`, largest first, and checked against the art crop;
+/// the first that's a larger copy is saved, as [`import`] saves it.
+pub async fn import_from_page(
+    http: &Http,
+    history: Option<&History>,
+    target: &Target,
+    destination: Destination<'_>,
+    images: &[PageImage],
+    page: Option<&str>,
+    dir: &Path,
+) -> Result<FromPage> {
+    let candidates = page_candidates(images);
+    if candidates.is_empty() {
+        return Ok(FromPage::NoMatch { images: 0 });
+    }
+    tokio::fs::create_dir_all(dir).await?;
+    let crop = ArtCrop::fetch(http, target, dir).await?;
+    let mut doubtful: Option<(Doubt, &PageImage, PathBuf)> = None;
+    for image in &candidates {
+        let file = dir.join(format!(".page-{}.part", TEMP_IDS.fetch_add(1, Ordering::Relaxed)));
+        // An image that won't download, or isn't a JPEG, PNG or WebP, is skipped.
+        if !matches!(http.download(&image.url, &file).await, Ok(Some(_))) {
+            let _ = tokio::fs::remove_file(&file).await;
+            continue;
+        }
+        match crop.doubt(&file).await {
+            Ok(None) => {
+                let found = Found {
+                    image_url: &image.url,
+                    page,
+                };
+                let imported = import(http, history, target, destination, &file, found, true).await;
+                let _ = tokio::fs::remove_file(&file).await;
+                if let Some((.., kept)) = &doubtful {
+                    let _ = tokio::fs::remove_file(kept).await;
+                }
+                return match imported? {
+                    Imported::Saved { file, replaced } => Ok(FromPage::Saved { file, replaced }),
+                    Imported::Doubtful(doubt) => Err(Error::Other(format!("not saved: {doubt:?}"))),
+                };
+            }
+            // The first near miss is kept to ask about, if nothing better turns up.
+            Ok(Some(doubt @ (Doubt::Smaller | Doubt::CardScan))) if doubtful.is_none() => {
+                doubtful = Some((doubt, image, file));
+            }
+            _ => {
+                let _ = tokio::fs::remove_file(&file).await;
+            }
+        }
+    }
+    Ok(match doubtful {
+        Some((doubt, image, downloaded)) => FromPage::Doubtful {
+            doubt,
+            image_url: image.url.clone(),
+            downloaded,
+        },
+        None => FromPage::NoMatch {
+            images: candidates.len(),
+        },
     })
+}
+
+/// The images worth trying: web addresses, each once, none known to be too
+/// small to be a larger copy of an art crop, largest first, at most
+/// [`MAX_PAGE_IMAGES`]. Ones whose size the page didn't give come last.
+fn page_candidates(images: &[PageImage]) -> Vec<PageImage> {
+    // Scryfall's art crops are 626 pixels wide; a copy has to be wider still.
+    const TOO_NARROW: u32 = 640;
+    let mut seen = HashSet::new();
+    let mut candidates: Vec<PageImage> = images
+        .iter()
+        .filter(|image| image.url.starts_with("https://") || image.url.starts_with("http://"))
+        .filter(|image| image.width == 0 || image.width >= TOO_NARROW)
+        .filter(|image| seen.insert(image.url.clone()))
+        .cloned()
+        .collect();
+    candidates.sort_by_key(|image| match image.width {
+        0 => (1, 0),
+        width => (0, u64::MAX - u64::from(width) * u64::from(image.height.max(1))),
+    });
+    candidates.truncate(MAX_PAGE_IMAGES);
+    candidates
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tries_a_pages_large_images_first() {
+        let image = |url: &str, width, height| PageImage {
+            url: url.into(),
+            width,
+            height,
+        };
+        let images = [
+            image("https://cdn.example/avatar.jpg", 150, 150),
+            image("https://cdn.example/post-1080.jpg", 1080, 1350),
+            image("data:image/png;base64,AAAA", 2000, 2000),
+            image("https://cdn.example/og.jpg", 0, 0),
+            image("https://cdn.example/post-1440.jpg", 1440, 1800),
+            image("https://cdn.example/post-1440.jpg", 1440, 1800),
+        ];
+        let urls: Vec<_> = page_candidates(&images).into_iter().map(|i| i.url).collect();
+        assert_eq!(
+            urls,
+            [
+                "https://cdn.example/post-1440.jpg",
+                "https://cdn.example/post-1080.jpg",
+                "https://cdn.example/og.jpg",
+            ]
+        );
+    }
 
     fn target(artist: &str) -> Target {
         let card: Card = serde_json::from_value(serde_json::json!({

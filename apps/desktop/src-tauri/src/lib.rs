@@ -19,7 +19,7 @@ use mtg_art_core::{
     history::{default_history_path, History},
     http::{Http, HttpConfig},
     list::{parse_list, ListFile, ParsedList},
-    manual::{self, Destination, Found, FoundEvent, Imported, Site, Target},
+    manual::{self, Destination, Found, FoundEvent, FromPage, Imported, PageImage, Site, Target},
     mtgpics::Artists,
     presets::{presets, PresetInfo},
     settings::{default_settings_path, Settings},
@@ -242,7 +242,7 @@ async fn find_larger_copy(
         target,
         events: on_event,
     });
-    finder::open(&app, url, &title, on_saved).map_err(|e| e.to_string())?;
+    finder::open(&app, url, &title, on_saved, on_page).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -278,61 +278,154 @@ fn on_saved(app: &AppHandle, saved: finder::Saved) {
     });
 }
 
-async fn import_found(state: &AppState, search: &Search, saved: &finder::Saved, force: bool) -> FoundEvent {
-    let record = lock(&state.records).get(&search.run).map(|record| {
-        let replace = record
-            .files
-            .get(&search.job)
-            .and_then(|files| files.iter().find(|f| f.face_index as usize == search.target.face.index))
-            .map(|file| PathBuf::from(&file.path));
-        (record.settings.clone(), record.list_folder.clone(), replace)
-    });
-    let Some((settings, list_folder, replace)) = record else {
-        let _ = std::fs::remove_file(&saved.path);
-        return FoundEvent::Failed {
-            message: "That run is too long ago. Run the card again to look for a larger copy.".into(),
+/// The images of the page the user is on, when they ask to find the art on
+/// it: the one that's a larger copy of the face being looked for is saved.
+fn on_page(app: &AppHandle, images: Vec<PageImage>, page: Option<tauri::Url>) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let search = lock(&state.search).clone();
+        let Some(search) = search else {
+            return;
         };
+        let event = import_page(&app, &state, &search, &images, page).await;
+        let _ = search.events.send(event);
+    });
+}
+
+async fn import_page(
+    app: &AppHandle,
+    state: &AppState,
+    search: &Search,
+    images: &[PageImage],
+    page: Option<tauri::Url>,
+) -> FoundEvent {
+    let Some((settings, list_folder, replace)) = destination(state, search) else {
+        return too_long_ago();
+    };
+    let dir = match finder::downloads_dir(app) {
+        Ok(dir) => dir,
+        Err(error) => {
+            return FoundEvent::Failed {
+                message: error.to_string(),
+            }
+        }
     };
     let destination = Destination {
         settings: &settings,
         list_folder: list_folder.as_deref(),
         replace: replace.as_deref(),
     };
-    let found = Found {
-        image_url: saved.image_url.as_str(),
-        page: saved.page.as_ref().map(|page| page.as_str()),
+    let found = manual::import_from_page(
+        &state.http,
+        state.history.as_deref(),
+        &search.target,
+        destination,
+        images,
+        page.as_ref().map(|page| page.as_str()),
+        &dir,
+    )
+    .await;
+    let face = search.target.face.name.clone();
+    match found {
+        Ok(FromPage::Saved { file, replaced }) => saved(state, search, file, replaced),
+        Ok(FromPage::Doubtful {
+            doubt,
+            image_url,
+            downloaded,
+        }) => {
+            let Ok(image_url) = tauri::Url::parse(&image_url) else {
+                let _ = std::fs::remove_file(&downloaded);
+                return FoundEvent::NoMatch { face, images: 0 };
+            };
+            let token = state.next_token.fetch_add(1, Ordering::Relaxed);
+            let kept = finder::Saved {
+                image_url,
+                page,
+                path: downloaded,
+            };
+            lock(&state.doubtful).insert(token, (search.clone(), kept));
+            FoundEvent::Doubtful { token, face, doubt }
+        }
+        Ok(FromPage::NoMatch { images }) => FoundEvent::NoMatch {
+            face,
+            images: images as u32,
+        },
+        Err(error) => FoundEvent::Failed {
+            message: error.to_string(),
+        },
+    }
+}
+
+/// Where the run saved the face being looked for: its settings, its list
+/// folder, and the file there now. `None` once the run is forgotten.
+fn destination(state: &AppState, search: &Search) -> Option<(Settings, Option<String>, Option<PathBuf>)> {
+    lock(&state.records).get(&search.run).map(|record| {
+        let replace = record
+            .files
+            .get(&search.job)
+            .and_then(|files| files.iter().find(|f| f.face_index as usize == search.target.face.index))
+            .map(|file| PathBuf::from(&file.path));
+        (record.settings.clone(), record.list_folder.clone(), replace)
+    })
+}
+
+fn too_long_ago() -> FoundEvent {
+    FoundEvent::Failed {
+        message: "That run is too long ago. Run the card again to look for a larger copy.".into(),
+    }
+}
+
+/// Notes a found image as the face's file, so a second one replaces it, and
+/// says so.
+fn saved(state: &AppState, search: &Search, file: SavedFile, replaced: Option<String>) -> FoundEvent {
+    if let Some(files) = lock(&state.records)
+        .get_mut(&search.run)
+        .and_then(|record| record.files.get_mut(&search.job))
+    {
+        files.retain(|f| f.face_index != file.face_index);
+        files.push(file.clone());
+    }
+    FoundEvent::Saved {
+        run: search.run,
+        job: search.job,
+        file,
+        replaced,
+    }
+}
+
+async fn import_found(state: &AppState, search: &Search, found: &finder::Saved, force: bool) -> FoundEvent {
+    let Some((settings, list_folder, replace)) = destination(state, search) else {
+        let _ = std::fs::remove_file(&found.path);
+        return too_long_ago();
+    };
+    let destination = Destination {
+        settings: &settings,
+        list_folder: list_folder.as_deref(),
+        replace: replace.as_deref(),
+    };
+    let from = Found {
+        image_url: found.image_url.as_str(),
+        page: found.page.as_ref().map(|page| page.as_str()),
     };
     let imported = manual::import(
         &state.http,
         state.history.as_deref(),
         &search.target,
         destination,
-        &saved.path,
-        found,
+        &found.path,
+        from,
         force,
     )
     .await;
     match imported {
         Ok(Imported::Saved { file, replaced }) => {
-            let _ = std::fs::remove_file(&saved.path);
-            // A second copy found for the face replaces this one, not the first.
-            if let Some(files) = lock(&state.records)
-                .get_mut(&search.run)
-                .and_then(|record| record.files.get_mut(&search.job))
-            {
-                files.retain(|f| f.face_index != file.face_index);
-                files.push(file.clone());
-            }
-            FoundEvent::Saved {
-                run: search.run,
-                job: search.job,
-                file,
-                replaced,
-            }
+            let _ = std::fs::remove_file(&found.path);
+            saved(state, search, file, replaced)
         }
         Ok(Imported::Doubtful(doubt)) => {
             let token = state.next_token.fetch_add(1, Ordering::Relaxed);
-            lock(&state.doubtful).insert(token, (search.clone(), saved.clone()));
+            lock(&state.doubtful).insert(token, (search.clone(), found.clone()));
             FoundEvent::Doubtful {
                 token,
                 face: search.target.face.name.clone(),
@@ -340,7 +433,7 @@ async fn import_found(state: &AppState, search: &Search, saved: &finder::Saved, 
             }
         }
         Err(error) => {
-            let _ = std::fs::remove_file(&saved.path);
+            let _ = std::fs::remove_file(&found.path);
             FoundEvent::Failed {
                 message: error.to_string(),
             }

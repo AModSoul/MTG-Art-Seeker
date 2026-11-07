@@ -12,3 +12,7 @@ export function showError(title: string, error: unknown) {
 export function showSuccess(title: string) {
   toaster.create({ type: "success", title });
 }
+
+export function showInfo(title: string, description?: string) {
+  toaster.create({ type: "info", title, description });
+}

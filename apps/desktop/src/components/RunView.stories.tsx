@@ -257,6 +257,27 @@ export const SavesAFoundCopy: Story = {
   },
 };
 
+/** Asked to find the art on a page, the app found none of it there. */
+export const NothingOnThePage: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.findLargerCopy).mockImplementation(async (_run, _job, _face, _site, onEvent) => {
+      onEvent({ event: "noMatch", face: "Lightning Bolt", images: 4 });
+    });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Search Google Lens for this art, for Lightning Bolt" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText("None of the images on this page look like Lightning Bolt's art"),
+      ).toBeVisible(),
+    );
+    await expect(screen.getByText("Looked at the 4 largest images it has.")).toBeVisible();
+  },
+};
+
 /** Found art is badged as such, and links to the page it came from. */
 export const FoundArt: Story = {
   beforeEach: () => {

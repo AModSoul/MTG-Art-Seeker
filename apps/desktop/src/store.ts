@@ -12,7 +12,7 @@ import type { RunSummary } from "@/bindings/RunSummary";
 import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
-import { errorText, showError, showSuccess } from "@/notify";
+import { errorText, showError, showInfo, showSuccess } from "@/notify";
 
 // --- What the user is about to download, remembered between launches -------
 
@@ -252,6 +252,14 @@ function onFound(event: FoundEvent) {
       break;
     case "doubtful":
       useRun.setState((state) => ({ doubts: [...state.doubts, event] }));
+      break;
+    case "noMatch":
+      showInfo(
+        `None of the images on this page look like ${event.face}'s art`,
+        event.images === 0
+          ? "The page has no images large enough."
+          : `Looked at the ${event.images === 1 ? "one image" : `${event.images} largest images`} it has.`,
+      );
       break;
     case "failed":
       showError("Couldn't save the image", event.message);

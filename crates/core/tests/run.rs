@@ -1048,3 +1048,76 @@ async fn opens_the_website_mtgpics_links_for_the_artist() {
         "https://www.artstation.com/search/artists?query=Dmitry+Burmak"
     );
 }
+
+#[tokio::test]
+async fn finds_the_art_among_the_images_of_a_page() {
+    let servers = Servers::start().await;
+    let art = karn_with_art(&servers).await;
+    // The page's images: an avatar, another painting, a card scan of the art,
+    // and the art itself.
+    let crop =
+        art.crop_imm(120, 100, 960, 960 * 457 / 626)
+            .resize_exact(626, 457, image::imageops::FilterType::Triangle);
+    let mut card = image::RgbImage::from_pixel(745, 1040, image::Rgb([30, 30, 30]));
+    image::imageops::overlay(&mut card, &crop.to_rgb8(), 60, 110);
+    Servers::image(&servers.cdn, "/avatar.jpg", &jpeg(&painting(150, 150, 3))).await;
+    Servers::image(&servers.cdn, "/other.jpg", &jpeg(&painting(900, 675, 4))).await;
+    Servers::image(&servers.cdn, "/scan.jpg", &jpeg(&image::DynamicImage::ImageRgb8(card))).await;
+    Servers::image(&servers.cdn, "/art.jpg", &jpeg(&art)).await;
+    let image = |name: &str, width, height| manual::PageImage {
+        url: format!("{}/{name}", servers.cdn.uri()),
+        width,
+        height,
+    };
+
+    let http = servers.http();
+    let out = tempfile::tempdir().unwrap();
+    let settings = settings(out.path());
+    let dir = tempfile::tempdir().unwrap();
+    let target = manual::prepare(&http, None, &settings, "dom", "1", 0).await.unwrap();
+    let destination = manual::Destination {
+        settings: &settings,
+        list_folder: None,
+        replace: None,
+    };
+    let page = Some("https://www.instagram.com/p/karn/");
+    let found = |images: Vec<manual::PageImage>| {
+        let (http, target, dir) = (&http, &target, dir.path());
+        async move { manual::import_from_page(http, None, target, destination, &images, page, dir).await }
+    };
+
+    // Largest first: the card scan and the other painting are passed over.
+    let images = vec![
+        image("avatar.jpg", 150, 150),
+        image("scan.jpg", 745, 1040),
+        image("other.jpg", 900, 675),
+        image("art.jpg", 1200, 900),
+    ];
+    let manual::FromPage::Saved { file, .. } = found(images).await.unwrap() else {
+        panic!("the art wasn't saved");
+    };
+    assert_eq!(
+        relative(&file.path, out.path()),
+        "web/Karn, Scion of Urza [DOM] {1}.jpg"
+    );
+    assert_eq!(file.page.as_deref(), page);
+    assert_eq!(file.size.map(|s| s.width), Some(1200));
+
+    // Only a card scan of the art: kept, to ask about.
+    let outcome = found(vec![image("other.jpg", 900, 675), image("scan.jpg", 745, 1040)]).await;
+    let manual::FromPage::Doubtful {
+        doubt,
+        image_url,
+        downloaded,
+    } = outcome.unwrap()
+    else {
+        panic!("the card scan wasn't kept");
+    };
+    assert_eq!(doubt, manual::Doubt::CardScan);
+    assert!(image_url.ends_with("/scan.jpg"));
+    assert!(downloaded.exists());
+
+    // Nothing of it.
+    let outcome = found(vec![image("other.jpg", 900, 675), image("missing.jpg", 2000, 1500)]).await;
+    assert_eq!(outcome.unwrap(), manual::FromPage::NoMatch { images: 2 });
+}

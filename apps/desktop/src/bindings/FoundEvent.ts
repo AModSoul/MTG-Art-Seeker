@@ -9,4 +9,5 @@ import type { SavedFile } from "./SavedFile";
 export type FoundEvent =
   | { event: "saved"; run: number; job: number; file: SavedFile; replaced?: string }
   | { event: "doubtful"; token: number; face: string; doubt: Doubt }
+  | { event: "noMatch"; face: string; images: number }
   | { event: "failed"; message: string };
