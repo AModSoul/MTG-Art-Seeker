@@ -31,15 +31,17 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      # The desktop crate embeds dist/ when it compiles.
-      - run: npm run build
+      # The desktop crate embeds apps/desktop/dist when it compiles.
+      - run: pnpm --filter desktop build
 
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
@@ -47,8 +49,8 @@ jobs:
 
       - name: TypeScript bindings match the Rust types
         run: |
-          npm run bindings
-          git diff --exit-code src/bindings || (echo "Run npm run bindings and commit the result." && exit 1)
+          pnpm bindings
+          git diff --exit-code apps/desktop/src/bindings || (echo "Run pnpm bindings and commit the result." && exit 1)
 
   frontend:
     name: Front end
@@ -56,18 +58,23 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
-      - run: npm run lint -- --format github
-      - run: npm run format:check
-      - run: npm run typecheck
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint --format github
+      - run: pnpm format:check
+      - run: pnpm typecheck
 
-      # Unit tests, and every story as a browser test in headless Chromium.
-      - run: npx playwright install --with-deps chromium
-      - run: npm test
+      # Unit tests, and every package's stories as browser tests in headless Chromium.
+      - run: pnpm --filter desktop exec playwright install --with-deps chromium
+      - run: pnpm test
 
-      - run: npm run build
+      # The site's prerender fetches the latest release; the token raises GitHub's rate limit.
+      - run: pnpm build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
