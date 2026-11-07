@@ -6,8 +6,8 @@ Guide for coding agents working in this repo. Read [README.md](README.md) for wh
 
 A Rust core does all the work; two thin shells drive it.
 
-- `crates/core` (`mtg-art-core`) — parsing, Scryfall, MTGPics, the run loop, settings. Nothing in it
-  knows about Tauri.
+- `crates/core` (`mtg-art-core`) — parsing, Scryfall and its card data (`carddb`), MTGPics, the run
+  loop, settings. Nothing in it knows about Tauri.
 - `crates/cli` (`mtg-art`) — prints the core's events.
 - `src-tauri` — Tauri commands over the core. A run reports progress on a `Channel<RunEvent>` passed
   to `start_run`.
@@ -36,6 +36,11 @@ clone.
   limits, and a gap between MTGPics requests), retries, 429 handling and the User-Agent. One `Http`
   is shared by a whole run, and by the whole app, so concurrent jobs share one limit. Never call
   `reqwest` directly.
+- **Look cards up in the card data before Scryfall.** `carddb` keeps Scryfall's `default_cards`
+  bulk file in SQLite, refreshed daily; a run gets it as `Option<&CardDb>`. Ask Scryfall's API only
+  for what it can't answer — searches, misspellings, cards newer than the copy, or no copy yet. A
+  change to its schema bumps `SCHEMA_VERSION`, so existing copies are rebuilt. `history` logs
+  where each printing's MTGPics art was found; both reach a run through `engine::Local`.
 - **Wrong art is worse than Scryfall's art.** When MTGPics can't be matched with confidence — the
   page's title must name the card and its credit must match the artist — fall back to Scryfall.
   Never match on a name alone: one set can print a name many times.

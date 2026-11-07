@@ -36,7 +36,7 @@ const FILTERS: { value: Filter; label: string; matches: (status: JobStatus) => b
 ];
 
 export function RunView() {
-  const { jobs, skipped, error, summary, running } = useRun();
+  const { jobs, skipped, error, summary, running, folder, listFolder } = useRun();
   const outputDir = useSettings((state) => state.settings?.outputDir);
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -70,9 +70,10 @@ export function RunView() {
   }
 
   async function openFolder() {
-    if (!outputDir) return;
+    const path = folder ?? outputDir;
+    if (!path) return;
     try {
-      await api.openFolder(outputDir);
+      await api.openFolder(path);
     } catch (error) {
       showError("Couldn't open the folder", error);
     }
@@ -121,7 +122,11 @@ export function RunView() {
                   size="sm"
                   variant="outline"
                   onClick={() =>
-                    void startRun({ kind: "list", text: failed.map((job) => job.line).join("\n") })
+                    void startRun({
+                      kind: "list",
+                      text: failed.map((job) => job.line).join("\n"),
+                      folder: listFolder,
+                    })
                   }
                 >
                   <LuRotateCcw /> Retry failed

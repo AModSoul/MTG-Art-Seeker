@@ -21,6 +21,9 @@ pub enum Error {
     #[error("{0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("card data: {0}")]
+    Database(#[from] rusqlite::Error),
+
     #[error("{0}")]
     Other(String),
 }

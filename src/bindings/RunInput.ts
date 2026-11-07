@@ -4,6 +4,6 @@
  * What to download.
  */
 export type RunInput =
-  | { kind: "list"; text: string }
+  | { kind: "list"; text: string; folder?: string }
   | { kind: "search"; query: string }
   | { kind: "preset"; id: string };

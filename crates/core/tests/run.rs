@@ -1,9 +1,15 @@
 //! End-to-end runs against mock Scryfall, MTGPics and image servers.
 
-use std::{path::Path, sync::Mutex, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+    time::Duration,
+};
 
 use mtg_art_core::{
-    engine::{run, ArtSource, JobStatus, RunEvent, RunInput, RunSummary},
+    carddb::CardData,
+    engine::{run, ArtSource, JobStatus, Local, RunEvent, RunInput, RunSummary},
+    history::History,
     http::{Endpoints, Http, HttpConfig},
     scryfall::{search, SearchOptions, Unique},
     settings::Settings,
@@ -94,7 +100,15 @@ fn settings(out: &Path) -> Settings {
 async fn run_to_end(http: &Http, input: RunInput, settings: &Settings) -> (RunSummary, Vec<(u32, JobStatus)>) {
     let events = Mutex::new(Vec::new());
     let emit = |event: RunEvent| events.lock().unwrap().push(event);
-    let summary = run(http, input, settings, &CancellationToken::new(), &emit).await;
+    let summary = run(
+        http,
+        input,
+        settings,
+        Local::default(),
+        &CancellationToken::new(),
+        &emit,
+    )
+    .await;
     let events = events.into_inner().unwrap();
     assert!(matches!(events.last(), Some(RunEvent::Finished { .. })));
     let mut finals: Vec<(u32, JobStatus)> = Vec::new();
@@ -162,7 +176,10 @@ async fn downloads_a_list_with_mtgpics_first_and_scryfall_for_what_it_lacks() {
     let text = "4 Karn, Scion of Urza (DOM) 1 *F*\nSideboard\nAgadeem's Awakening (ZNR) 90\n1 Nonexistent Card (dom)\n";
     let (summary, finals) = run_to_end(
         &servers.http(),
-        RunInput::List { text: text.into() },
+        RunInput::List {
+            text: text.into(),
+            folder: None,
+        },
         &settings(out.path()),
     )
     .await;
@@ -346,6 +363,7 @@ async fn reports_a_bad_search_with_scryfalls_explanation() {
         &servers.http(),
         input,
         &settings(out.path()),
+        Local::default(),
         &CancellationToken::new(),
         &emit,
     )
@@ -371,14 +389,329 @@ async fn a_cancelled_run_cancels_its_jobs() {
     let emit = |event: RunEvent| events.lock().unwrap().push(event);
     let input = RunInput::List {
         text: "Damnation\nSwamp\nIsland".into(),
+        folder: None,
     };
     let canceller = async {
         tokio::time::sleep(Duration::from_millis(200)).await;
         cancel.cancel();
     };
     let (http, settings) = (servers.http(), settings(out.path()));
-    let (summary, ()) = tokio::join!(run(&http, input, &settings, &cancel, &emit), canceller);
+    let (summary, ()) = tokio::join!(
+        run(&http, input, &settings, Local::default(), &cancel, &emit),
+        canceller
+    );
     assert_eq!((summary.jobs, summary.cancelled), (3, 3));
+}
+
+#[tokio::test]
+async fn saves_a_list_in_its_own_folder() {
+    let servers = Servers::start().await;
+    Mock::given(method("POST"))
+        .and(path("/cards/collection"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [servers.card("Karn")],
+            "not_found": [],
+        })))
+        .mount(&servers.scryfall)
+        .await;
+    servers.mtgpics_page("dom001", fixture("card_dom001.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/dom/001_1.jpg", JPEG).await;
+
+    let out = tempfile::tempdir().unwrap();
+    let settings = Settings {
+        list_folders: true,
+        ..settings(out.path())
+    };
+    let events = Mutex::new(Vec::new());
+    let emit = |event: RunEvent| events.lock().unwrap().push(event);
+    let input = RunInput::List {
+        text: "Karn, Scion of Urza (DOM) 1".into(),
+        // Made safe as a folder name: no slashes, so no folders above it.
+        folder: Some("../Karn: Superfriends".into()),
+    };
+    run(
+        &servers.http(),
+        input,
+        &settings,
+        Local::default(),
+        &CancellationToken::new(),
+        &emit,
+    )
+    .await;
+
+    let folder = out.path().join("..Karn Superfriends");
+    let events = events.into_inner().unwrap();
+    assert!(
+        matches!(&events[0], RunEvent::Planned { folder: planned, .. } if Path::new(planned) == folder),
+        "{events:?}"
+    );
+    let saved: Vec<_> = walk(out.path()).iter().map(|file| relative(file, out.path())).collect();
+    assert_eq!(saved, ["..Karn Superfriends/mtgpics/Karn, Scion of Urza [DOM] {1}.jpg"]);
+}
+
+#[tokio::test]
+async fn a_list_folder_needs_the_setting_and_a_name() {
+    let out = Path::new("out");
+    let list = |folder: &str| RunInput::List {
+        text: String::new(),
+        folder: Some(folder.into()),
+    };
+    let on = Settings {
+        list_folders: true,
+        ..settings(out)
+    };
+    let planned_folder = |input: RunInput, settings: Settings| async move {
+        let events = Mutex::new(Vec::new());
+        let emit = |event: RunEvent| events.lock().unwrap().push(event);
+        let http = Servers::start().await.http();
+        run(
+            &http,
+            input,
+            &settings,
+            Local::default(),
+            &CancellationToken::new(),
+            &emit,
+        )
+        .await;
+        match events.into_inner().unwrap().remove(0) {
+            RunEvent::Planned { folder, .. } => PathBuf::from(folder),
+            event => panic!("{event:?}"),
+        }
+    };
+    assert_eq!(planned_folder(list("Deck"), on.clone()).await, out.join("Deck"));
+    assert_eq!(planned_folder(list("Deck"), settings(out)).await, out);
+    assert_eq!(planned_folder(list("   "), on).await, out);
+}
+
+#[tokio::test]
+async fn saves_art_from_where_it_was_found_before() {
+    let servers = Servers::start().await;
+    Mock::given(method("POST"))
+        .and(path("/cards/collection"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [servers.card("Karn")],
+            "not_found": [],
+        })))
+        .mount(&servers.scryfall)
+        .await;
+    // Karn's MTGPics page is read once, on the first run; its art is saved on both.
+    Mock::given(method("GET"))
+        .and(path("/card"))
+        .and(query_param("ref", "dom001"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(fixture("card_dom001.html"), "text/html; charset=ISO-8859-1"),
+        )
+        .expect(1)
+        .mount(&servers.mtgpics)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/pics/art/dom/001_1.jpg"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(JPEG.to_vec(), "image/jpeg"))
+        .expect(2)
+        .mount(&servers.mtgpics)
+        .await;
+
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let local = Local {
+        cards: None,
+        history: Some(&history),
+    };
+    let out = tempfile::tempdir().unwrap();
+    let list = || RunInput::List {
+        text: "Karn, Scion of Urza (DOM) 1".into(),
+        folder: None,
+    };
+    for _ in 0..2 {
+        let summary = run(
+            &servers.http(),
+            list(),
+            &settings(out.path()),
+            local,
+            &CancellationToken::new(),
+            &|_| {},
+        )
+        .await;
+        assert_eq!((summary.done, summary.mtgpics_files), (1, 1));
+    }
+
+    let karn: mtg_art_core::card::Card = serde_json::from_value(servers.card("Karn")).unwrap();
+    let remembered = history.remembered(&karn, 1).unwrap().unwrap();
+    assert_eq!(
+        remembered.mtgpics,
+        [Some(format!("{}/pics/art/dom/001_1.jpg", servers.mtgpics.uri()))]
+    );
+}
+
+#[tokio::test]
+async fn finds_art_again_when_it_has_moved() {
+    let servers = Servers::start().await;
+    let karn_json = servers.card("Karn");
+    Mock::given(method("POST"))
+        .and(path("/cards/collection"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [karn_json],
+            "not_found": [],
+        })))
+        .mount(&servers.scryfall)
+        .await;
+    servers.mtgpics_page("dom001", fixture("card_dom001.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/dom/001_1.jpg", JPEG).await;
+
+    // The log has Karn's art somewhere MTGPics no longer has it.
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let karn: mtg_art_core::card::Card = serde_json::from_value(karn_json).unwrap();
+    let moved = format!("{}/pics/art/dom/old.jpg", servers.mtgpics.uri());
+    history
+        .remember(&karn, &[Some(moved)], std::time::SystemTime::now())
+        .unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    let local = Local {
+        cards: None,
+        history: Some(&history),
+    };
+    let input = RunInput::List {
+        text: "Karn, Scion of Urza (DOM) 1".into(),
+        folder: None,
+    };
+    let summary = run(
+        &servers.http(),
+        input,
+        &settings(out.path()),
+        local,
+        &CancellationToken::new(),
+        &|_| {},
+    )
+    .await;
+    assert_eq!((summary.done, summary.mtgpics_files), (1, 1));
+    assert_eq!(
+        history.remembered(&karn, 1).unwrap().unwrap().mtgpics,
+        [Some(format!("{}/pics/art/dom/001_1.jpg", servers.mtgpics.uri()))]
+    );
+}
+
+/// Real cards from Scryfall, gzipped as its bulk data files are, with their
+/// image links pointed at `cdn`.
+fn bulk_file(cdn: &str) -> Vec<u8> {
+    let jsonl = String::from_utf8(fixture("default_cards.jsonl"))
+        .unwrap()
+        .replace("https://cards.scryfall.io", cdn);
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    std::io::Write::write_all(&mut gz, jsonl.as_bytes()).unwrap();
+    gz.finish().unwrap()
+}
+
+/// Mounts Scryfall's bulk data list and file, as published at `updated_at`.
+async fn publish_bulk_data(servers: &Servers, updated_at: &str) {
+    Mock::given(method("GET"))
+        .and(path("/bulk-data/default_cards"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "object": "bulk_data",
+            "type": "default_cards",
+            "updated_at": updated_at,
+            "jsonl_download_uri": format!("{}/file/default-cards.jsonl.gz", servers.scryfall.uri()),
+        })))
+        .mount(&servers.scryfall)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/file/default-cards.jsonl.gz"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(bulk_file(&servers.cdn.uri()), "application/gzip"))
+        .expect(1)
+        .mount(&servers.scryfall)
+        .await;
+}
+
+#[tokio::test]
+async fn downloads_card_data_once_per_published_file() {
+    let servers = Servers::start().await;
+    publish_bulk_data(&servers, "2026-11-07T10:06:55.230+00:00").await;
+    let dir = tempfile::tempdir().unwrap();
+    let http = servers.http();
+
+    let data = CardData::open(dir.path().to_owned());
+    assert!(data.current().is_none());
+    assert!(data.refresh(&http).await.unwrap());
+    assert_eq!(data.status().cards, 27);
+    // The same file again isn't downloaded again — by this process or the next.
+    assert!(!data.refresh(&http).await.unwrap());
+    let next = CardData::open(dir.path().to_owned());
+    assert!(!next.refresh(&http).await.unwrap());
+    assert_eq!(next.current().unwrap().updated_at(), "2026-11-07T10:06:55.230+00:00");
+}
+
+#[tokio::test]
+async fn looks_a_list_up_in_the_card_data_without_asking_scryfall() {
+    let servers = Servers::start().await;
+    publish_bulk_data(&servers, "2026-11-07T10:06:55.230+00:00").await;
+    let dir = tempfile::tempdir().unwrap();
+    let http = servers.http();
+    let data = CardData::open(dir.path().to_owned());
+    data.refresh(&http).await.unwrap();
+
+    // Scryfall's lookups aren't asked: every card is in the data.
+    for at in ["/cards/collection", "/cards/search", "/cards/named"] {
+        Mock::given(path(at))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(0)
+            .mount(&servers.scryfall)
+            .await;
+    }
+    servers.mtgpics_page("dom001", fixture("card_dom001.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/dom/001_1.jpg", JPEG).await;
+    // Nothing else is on MTGPics, so the rest comes from Scryfall's images.
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(JPEG.to_vec(), "image/jpeg"))
+        .mount(&servers.cdn)
+        .await;
+
+    let out = tempfile::tempdir().unwrap();
+    let settings = Settings {
+        layout_folders: false,
+        ..settings(out.path())
+    };
+    let text =
+        "Karn, Scion of Urza (DOM) 1\nBlightsteel Colossus\n1 Agadeem's Awakening [znr] {90}\nLightning Bolt (lea)";
+    let cards = data.current().unwrap();
+    let events = Mutex::new(Vec::new());
+    let emit = |event: RunEvent| events.lock().unwrap().push(event);
+    let input = RunInput::List {
+        text: text.into(),
+        folder: None,
+    };
+    let summary = run(
+        &http,
+        input,
+        &settings,
+        Local {
+            cards: Some(&cards),
+            history: None,
+        },
+        &CancellationToken::new(),
+        &emit,
+    )
+    .await;
+    assert_eq!(
+        (summary.jobs, summary.done, summary.failed),
+        (4, 4, 0),
+        "{:?}",
+        events.lock().unwrap()
+    );
+
+    let mut saved: Vec<_> = walk(out.path()).iter().map(|file| relative(file, out.path())).collect();
+    saved.sort();
+    assert_eq!(
+        saved,
+        [
+            "mtgpics/Karn, Scion of Urza [DOM] {1}.jpg",
+            "scryfall/Agadeem's Awakening [ZNR] {90}.jpg",
+            "scryfall/Agadeem, the Undercrypt [ZNR] {90}.jpg",
+            // The newest printing of a name.
+            "scryfall/Blightsteel Colossus [SLD] {2223}.jpg",
+            "scryfall/Lightning Bolt [LEA] {161}.jpg",
+        ]
+    );
 }
 
 fn walk(dir: &Path) -> Vec<String> {

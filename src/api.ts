@@ -3,6 +3,8 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 
+import type { CardDataStatus } from "@/bindings/CardDataStatus";
+import type { ListFile } from "@/bindings/ListFile";
 import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
 import type { RunEvent } from "@/bindings/RunEvent";
@@ -16,10 +18,12 @@ export const api = {
   listPresets: () => invoke<PresetInfo[]>("list_presets"),
   countSearch: (query: string, settings: Settings) =>
     invoke<number>("count_search", { query, settings }),
-  readCardList: (path: string) => invoke<string>("read_card_list", { path }),
+  readCardList: (path: string) => invoke<ListFile>("read_card_list", { path }),
   cancelRun: (id: number) => invoke<void>("cancel_run", { id }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openFolder: (path: string) => invoke<void>("open_folder", { path }),
+  cardDataStatus: () => invoke<CardDataStatus>("card_data_status"),
+  openDiscord: () => invoke<void>("open_discord"),
 
   /** Starts a run; its events arrive on `onEvent`, ending with `finished`. */
   startRun: (input: RunInput, settings: Settings, onEvent: (event: RunEvent) => void) => {

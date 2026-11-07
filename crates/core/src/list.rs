@@ -1,7 +1,8 @@
 //! Reads a pasted or exported card list: one card per line, in the forms deck
-//! sites export — `Damnation`, `4 Damnation`, `4x Damnation (TSR) 106 *F*`.
+//! sites export — `Damnation`, `4 Damnation`, `4x Damnation (TSR) 106 *F*`,
+//! `Damnation [TSR] (106)`.
 
-use std::sync::LazyLock;
+use std::{path::Path, sync::LazyLock};
 
 use regex::Regex;
 use serde::Serialize;
@@ -69,6 +70,28 @@ pub struct ParsedList {
     pub skipped: Vec<SkippedLine>,
 }
 
+/// A card list read from a file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ListFile {
+    pub text: String,
+    /// The file's name without its extension: what the list's folder is called.
+    pub name: String,
+}
+
+impl ListFile {
+    pub fn read(path: &Path) -> std::io::Result<Self> {
+        Ok(Self {
+            text: std::fs::read_to_string(path)?,
+            name: path
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        })
+    }
+}
+
 /// Section headings deck sites put in their exports. A line that is one of
 /// these, with or without a trailing `:` or `(count)`, is skipped.
 const HEADINGS: &[&str] = &[
@@ -105,11 +128,20 @@ const HEADINGS: &[&str] = &[
 /// such as `1996 World Champion` keep their number.
 static QUANTITY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(?:SB:\s*)?\d{1,3}x?\s+(.+)$").unwrap());
 
-/// `Name (SET)` with an optional collector number; anything after it — foil
-/// markers, Archidekt categories and tags — is ignored. A set code has no
-/// spaces, so `B.F.M. (Big Furry Monster)` stays a name.
+/// `Name (SET)` with an optional collector number — `123`, `(123)` or
+/// `{123}`; anything after it — foil markers, Archidekt categories and tags —
+/// is ignored. A set code has no spaces, so `B.F.M. (Big Furry Monster)` stays
+/// a name.
 static SET_NUMBER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(.+?)\s+\(([A-Za-z0-9]{2,8})\)(?:\s+([^\s\[\^*]+))?(?:\s.*)?$").unwrap());
+
+/// `Name [SET] 123`, with the number bare, in `(…)` or in `{…}` as this app
+/// names its files. The number is required, so an Archidekt category such as
+/// `[Removal]` isn't read as a set; it must hold a digit, and anything after
+/// it is ignored.
+static BRACKET_SET_NUMBER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(.+?)\s+\[([A-Za-z0-9]{2,8})\]\s*([({]?[^\s\[\]^*(){}]*\d[^\s\[\]^*(){}]*[)}]?)(?:\s.*)?$").unwrap()
+});
 
 /// Trailing markers on a line without a set: `*F*`, `*E*`, `^tag^`, `[Category]`.
 static MARKERS: LazyLock<Regex> =
@@ -119,6 +151,8 @@ static HEADING_COUNT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*\(\d+\)
 
 pub fn parse_list(text: &str) -> ParsedList {
     let mut parsed = ParsedList::default();
+    // Files saved by Notepad and PowerShell start with a byte order mark.
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     for raw in text.lines() {
         let line = raw.trim();
         if line.is_empty() {
@@ -149,11 +183,12 @@ pub fn parse_line(line: &str) -> Option<CardLine> {
     if let Some(captures) = QUANTITY.captures(rest) {
         rest = captures.get(1).map_or(rest, |m| m.as_str());
     }
-    let (name, set, number) = match SET_NUMBER.captures(rest) {
+    let captures = BRACKET_SET_NUMBER.captures(rest).or_else(|| SET_NUMBER.captures(rest));
+    let (name, set, number) = match captures {
         Some(captures) => (
             captures[1].trim().to_owned(),
             Some(captures[2].to_lowercase()),
-            captures.get(3).map(|m| m.as_str().to_owned()),
+            captures.get(3).map(|m| unwrap_number(m.as_str())),
         ),
         None => (MARKERS.replace(rest, "").trim().to_owned(), None, None),
     };
@@ -163,6 +198,14 @@ pub fn parse_line(line: &str) -> Option<CardLine> {
         set,
         number,
     })
+}
+
+/// `106` from `(106)` or `{106}`.
+fn unwrap_number(number: &str) -> String {
+    number
+        .trim_start_matches(['(', '{'])
+        .trim_end_matches([')', '}'])
+        .to_owned()
 }
 
 fn is_heading(line: &str) -> bool {
@@ -223,6 +266,48 @@ mod tests {
     }
 
     #[test]
+    fn reads_bracketed_sets_and_numbers() {
+        assert_eq!(
+            parse("Damnation [TSR] (106)"),
+            card("Damnation", Some("tsr"), Some("106"))
+        );
+        assert_eq!(
+            parse("4x Sol Ring [PLST] (C21-263) *F*"),
+            card("Sol Ring", Some("plst"), Some("C21-263"))
+        );
+        assert_eq!(
+            parse("Bala Ged Recovery // Bala Ged Sanctuary [znr] (180)"),
+            card("Bala Ged Recovery // Bala Ged Sanctuary", Some("znr"), Some("180"))
+        );
+        assert_eq!(parse("Plains [UNF] (235★)"), card("Plains", Some("unf"), Some("235★")));
+        // A bare number, a number in braces as this app's file names have it,
+        // and no space before it.
+        let blightsteel = card("Blightsteel Colossus", Some("sld"), Some("1079"));
+        assert_eq!(parse("1 Blightsteel Colossus [sld] 1079"), blightsteel);
+        assert_eq!(parse("1 Blightsteel Colossus [sld] {1079}"), blightsteel);
+        assert_eq!(parse("1 Blightsteel Colossus [sld](1079)"), blightsteel);
+        assert_eq!(parse("1 Blightsteel Colossus [sld] 1079 *F*"), blightsteel);
+        // Without a number, brackets are a category.
+        assert_eq!(parse("1x Damnation [Removal]"), card("Damnation", None, None));
+        assert_eq!(
+            parse("1x Damnation [Removal] [Board Wipe]"),
+            card("Damnation", None, None)
+        );
+    }
+
+    #[test]
+    fn unwraps_numbers_after_a_set_in_parentheses() {
+        assert_eq!(
+            parse("Damnation (TSR) {106}"),
+            card("Damnation", Some("tsr"), Some("106"))
+        );
+        assert_eq!(
+            parse("Damnation (TSR) (106)"),
+            card("Damnation", Some("tsr"), Some("106"))
+        );
+    }
+
+    #[test]
     fn ignores_markers() {
         assert_eq!(
             parse("1 Damnation (TSR) 106 *F*"),
@@ -251,6 +336,20 @@ mod tests {
                 ("Sideboard (15):", SkipReason::Heading),
                 ("Creatures (2)", SkipReason::Heading),
             ]
+        );
+    }
+
+    #[test]
+    fn ignores_a_byte_order_mark() {
+        let parsed = parse_list("\u{feff}1 Blightsteel Colossus [sld] (1079)\n");
+        assert_eq!(
+            parsed.cards[0],
+            CardLine {
+                line: "1 Blightsteel Colossus [sld] (1079)".to_owned(),
+                name: "Blightsteel Colossus".to_owned(),
+                set: Some("sld".to_owned()),
+                number: Some("1079".to_owned()),
+            }
         );
     }
 

@@ -5,7 +5,15 @@ import type { RunSummary } from "./RunSummary";
 import type { SkippedLine } from "./SkippedLine";
 
 export type RunEvent =
-  | { event: "planned"; jobs: Array<JobInfo>; skipped: Array<SkippedLine> }
+  | {
+      event: "planned";
+      jobs: Array<JobInfo>;
+      skipped: Array<SkippedLine>;
+      /**
+       * The folder this run saves to.
+       */
+      folder: string;
+    }
   | { event: "job"; id: number; status: JobStatus }
   | { event: "error"; message: string }
   | { event: "finished"; summary: RunSummary };

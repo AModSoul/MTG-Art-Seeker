@@ -32,6 +32,10 @@ export type Settings = {
    */
   includeExtras: boolean;
   /**
+   * Save a card list's art in a folder of its own, named with the list.
+   */
+  listFolders: boolean;
+  /**
    * Save MTGPics and Scryfall art in folders of their own.
    */
   sourceFolders: boolean;

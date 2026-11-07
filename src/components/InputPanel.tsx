@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { LuDownload, LuFileText, LuFolderOpen, LuSquare } from "react-icons/lu";
 
 import { api } from "@/api";
+import type { ListFile } from "@/bindings/ListFile";
 import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
 import type { RunInput } from "@/bindings/RunInput";
@@ -46,14 +47,14 @@ Karn, Scion of Urza (DOM) 1
 1 Sol Ring (C21) 263 *F*`;
 
 export function InputPanel() {
-  const { tab, text, query, presetId, setInput } = useInput();
+  const { tab, text, folder, query, presetId, setInput } = useInput();
   const running = useRun((state) => state.running);
   const parsed = useParsedList(text);
 
   const input: RunInput | null =
     tab === "list"
       ? parsed && parsed.cards.length > 0
-        ? { kind: "list", text }
+        ? { kind: "list", text, folder }
         : null
       : tab === "search"
         ? query.trim()
@@ -87,7 +88,13 @@ export function InputPanel() {
         </Tabs.List>
 
         <Tabs.Content value="list" flex="1" display="flex" flexDirection="column" gap="2" minH="0">
-          <ListInput text={text} parsed={parsed} onChange={(text) => setInput({ text })} />
+          <ListInput
+            text={text}
+            parsed={parsed}
+            onChange={(text) => setInput({ text })}
+            onOpen={(file) => setInput({ text: file.text, folder: file.name })}
+          />
+          <ListFolder folder={folder} onChange={(folder) => setInput({ folder })} />
         </Tabs.Content>
         <Tabs.Content value="search">
           <SearchInput query={query} onChange={(query) => setInput({ query })} />
@@ -116,10 +123,12 @@ function ListInput({
   text,
   parsed,
   onChange,
+  onOpen,
 }: {
   text: string;
   parsed: ParsedList | null;
   onChange: (text: string) => void;
+  onOpen: (file: ListFile) => void;
 }) {
   async function openList() {
     const path = await open({
@@ -131,7 +140,7 @@ function ListInput({
     });
     if (typeof path !== "string") return;
     try {
-      onChange(await api.readCardList(path));
+      onOpen(await api.readCardList(path));
     } catch (error) {
       showError("Couldn't open the list", error);
     }
@@ -159,6 +168,27 @@ function ListInput({
         </Button>
       </HStack>
     </>
+  );
+}
+
+/** The folder a list's art goes in, shown when the setting for it is on. */
+function ListFolder({ folder, onChange }: { folder: string; onChange: (folder: string) => void }) {
+  const listFolders = useSettings((state) => state.settings?.listFolders);
+  if (!listFolders) return null;
+
+  return (
+    <Field
+      label="Folder for this list"
+      helperText="Inside the folder below. Leave it empty to save there directly."
+    >
+      <Input
+        value={folder}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Atraxa deck"
+        size="sm"
+        spellCheck={false}
+      />
+    </Field>
   );
 }
 

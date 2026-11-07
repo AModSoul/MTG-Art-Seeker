@@ -19,9 +19,13 @@ export type InputTab = "list" | "search" | "preset";
 interface InputState {
   tab: InputTab;
   text: string;
+  /** The folder a list's art goes in, when the setting for it is on. */
+  folder: string;
   query: string;
   presetId: string;
-  setInput: (patch: Partial<Pick<InputState, "tab" | "text" | "query" | "presetId">>) => void;
+  setInput: (
+    patch: Partial<Pick<InputState, "tab" | "text" | "folder" | "query" | "presetId">>,
+  ) => void;
 }
 
 export const useInput = create<InputState>()(
@@ -29,6 +33,7 @@ export const useInput = create<InputState>()(
     (set) => ({
       tab: "list",
       text: "",
+      folder: "",
       query: "",
       presetId: "edhrec-top-year",
       setInput: (patch) => set(patch),
@@ -89,6 +94,10 @@ interface RunState {
   skipped: SkippedLine[];
   error: string | null;
   summary: RunSummary | null;
+  /** The folder the run saves to, as the core reports it. */
+  folder: string | null;
+  /** The list folder name the run was started with, for retrying into it. */
+  listFolder: string | undefined;
 }
 
 const idle: RunState = {
@@ -98,6 +107,8 @@ const idle: RunState = {
   skipped: [],
   error: null,
   summary: null,
+  folder: null,
+  listFolder: undefined,
 };
 
 export const useRun = create<RunState>()(() => idle);
@@ -105,7 +116,7 @@ export const useRun = create<RunState>()(() => idle);
 /** Applies a batch of events. Job ids count up from 1, so a job is at `id - 1`. */
 function applyEvents(events: RunEvent[]) {
   useRun.setState((state) => {
-    let { jobs, skipped, error, summary, running } = state;
+    let { jobs, skipped, error, summary, running, folder } = state;
     let copied = false;
     for (const event of events) {
       switch (event.event) {
@@ -113,6 +124,7 @@ function applyEvents(events: RunEvent[]) {
           jobs = event.jobs.map((job) => ({ ...job, status: { state: "queued" } }));
           copied = true;
           skipped = event.skipped;
+          folder = event.folder;
           break;
         case "job": {
           const job = jobs[event.id - 1];
@@ -133,7 +145,7 @@ function applyEvents(events: RunEvent[]) {
           break;
       }
     }
-    return { jobs, skipped, error, summary, running };
+    return { jobs, skipped, error, summary, running, folder };
   });
 }
 
@@ -144,7 +156,11 @@ const BATCH_MS = 80;
 export async function startRun(input: RunInput) {
   const { settings } = useSettings.getState();
   if (!settings || useRun.getState().running) return;
-  useRun.setState({ ...idle, running: true });
+  useRun.setState({
+    ...idle,
+    running: true,
+    listFolder: input.kind === "list" ? input.folder : undefined,
+  });
 
   let queue: RunEvent[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;

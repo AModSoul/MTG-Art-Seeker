@@ -9,8 +9,11 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import { LuFolderOpen, LuSettings } from "react-icons/lu";
 
+import { api } from "@/api";
+import type { CardDataStatus } from "@/bindings/CardDataStatus";
 import type { Printing } from "@/bindings/Printing";
 import type { ScryfallImage } from "@/bindings/ScryfallImage";
 import type { Settings } from "@/bindings/Settings";
@@ -58,6 +61,11 @@ const SWITCHES: Record<
       key: "overwrite",
       label: "Replace files with the same name",
       help: "Otherwise a new file is numbered: Name (1).jpg",
+    },
+    {
+      key: "listFolders",
+      label: "A folder for each card list",
+      help: "Named under the list. Searches and presets aren't affected.",
     },
     { key: "sourceFolders", label: "Separate MTGPics and Scryfall folders" },
     {
@@ -196,6 +204,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
               onChange={(scryfallImage) => update({ scryfallImage })}
             />
           </Field>
+          <CardData />
         </Fieldset.Content>
       </Fieldset.Root>
 
@@ -223,6 +232,55 @@ function SettingsForm({ settings }: { settings: Settings }) {
       </Fieldset.Root>
     </Stack>
   );
+}
+
+/** How long between checks on the card data while the drawer is open. */
+const STATUS_POLL_MS = 2000;
+
+/** How current the local copy of Scryfall's card data is, kept up to date while shown. */
+function CardData() {
+  const [status, setStatus] = useState<CardDataStatus | null>(null);
+  useEffect(() => {
+    let current = true;
+    const check = () =>
+      api.cardDataStatus().then(
+        (result) => current && setStatus(result),
+        () => current && setStatus(null),
+      );
+    void check();
+    const timer = setInterval(() => void check(), STATUS_POLL_MS);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  return (
+    <Stack gap="1">
+      <Text fontSize="sm" fontWeight="medium">
+        Card data
+      </Text>
+      <Text fontSize="sm" color="fg.muted">
+        {status ? cardDataSummary(status) : "Checking…"}
+      </Text>
+      {status?.error && (
+        <Text fontSize="sm" color="fg.error">
+          The last update failed: {status.error}
+        </Text>
+      )}
+    </Stack>
+  );
+}
+
+function cardDataSummary({ updatedAt, cards, updating }: CardDataStatus): string {
+  if (!updatedAt) {
+    return updating
+      ? "Downloading Scryfall's card data. Until it's in, each card is looked up on Scryfall."
+      : "Not downloaded yet: each card is looked up on Scryfall.";
+  }
+  const published = new Date(updatedAt).toLocaleDateString(undefined, { dateStyle: "medium" });
+  const summary = `${cards.toLocaleString()} cards from Scryfall, published ${published}. Lists are looked up here; it's updated daily.`;
+  return updating ? `${summary} Downloading newer data…` : summary;
 }
 
 /** A native select over a union of strings, reporting the chosen value as that type. */

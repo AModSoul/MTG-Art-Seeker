@@ -5,8 +5,11 @@ use std::{path::PathBuf, process::ExitCode};
 
 use clap::{ArgGroup, Parser};
 use mtg_art_core::{
-    engine::{self, ArtSource, JobInfo, JobStatus, RunEvent, RunInput},
+    carddb::{default_card_data_dir, CardData},
+    engine::{self, ArtSource, JobInfo, JobStatus, Local, RunEvent, RunInput},
+    history::{default_history_path, History},
     http::{Http, HttpConfig},
+    list::ListFile,
     presets::presets,
     settings::{default_settings_path, Settings},
 };
@@ -35,9 +38,20 @@ struct Args {
     #[arg(long, short)]
     out: Option<PathBuf>,
 
+    /// Save the list's art in a folder of this name inside the output folder.
+    /// With "A folder for each list" on in the settings, the list file's name
+    /// is used when this isn't given.
+    #[arg(long, short, requires = "list")]
+    folder: Option<String>,
+
     /// Read settings from this file instead of the app's.
     #[arg(long)]
     settings: Option<PathBuf>,
+
+    /// Don't check for newer Scryfall card data before a list or preset; use
+    /// the copy already downloaded, if there is one.
+    #[arg(long)]
+    no_update: bool,
 }
 
 #[tokio::main]
@@ -69,9 +83,16 @@ async fn run(args: Args) -> Result<ExitCode, String> {
         settings.output_dir = out.to_string_lossy().into_owned();
     }
 
+    if args.folder.is_some() {
+        settings.list_folders = true;
+    }
+
     let input = if let Some(path) = args.list {
-        let text = std::fs::read_to_string(&path).map_err(|e| format!("can't read {}: {e}", path.display()))?;
-        RunInput::List { text }
+        let file = ListFile::read(&path).map_err(|e| format!("can't read {}: {e}", path.display()))?;
+        RunInput::List {
+            text: file.text,
+            folder: Some(args.folder.unwrap_or(file.name)),
+        }
     } else if let Some(query) = args.search {
         RunInput::Search { query }
     } else if let Some(id) = args.preset {
@@ -90,10 +111,35 @@ async fn run(args: Args) -> Result<ExitCode, String> {
         }
     });
 
-    println!("Saving to {}", settings.output_dir);
+    // A search is Scryfall's to answer; lists and presets are looked up in its
+    // card data, kept locally and updated when Scryfall has published newer.
+    let card_data = match input {
+        RunInput::Search { .. } => None,
+        _ => default_card_data_dir().map(CardData::open),
+    };
+    if let Some(data) = card_data.as_ref().filter(|_| !args.no_update) {
+        tokio::select! {
+            _ = cancel.cancelled() => return Ok(ExitCode::FAILURE),
+            () = update_card_data(&http, data) => {}
+        }
+    }
+    let cards = card_data.as_ref().and_then(CardData::current);
+    // Without the log, art is found afresh on MTGPics: slower, but no worse.
+    let history = default_history_path().and_then(|path| match History::open(&path) {
+        Ok(history) => Some(history),
+        Err(error) => {
+            eprintln!("warning: can't open the log of saved art: {error}");
+            None
+        }
+    });
+    let local = Local {
+        cards: cards.as_deref(),
+        history: history.as_ref(),
+    };
+
     let labels = std::sync::Mutex::new(std::collections::HashMap::<u32, String>::new());
     let on_event = |event: RunEvent| report(event, &labels);
-    let summary = engine::run(&http, input, &settings, &cancel, &on_event).await;
+    let summary = engine::run(&http, input, &settings, local, &cancel, &on_event).await;
 
     Ok(if summary.failed + summary.partial + summary.cancelled == 0 {
         ExitCode::SUCCESS
@@ -102,10 +148,36 @@ async fn run(args: Args) -> Result<ExitCode, String> {
     })
 }
 
+/// Downloads Scryfall's card data if it has published newer than the copy here.
+/// A failure only means Scryfall is asked about each card instead.
+async fn update_card_data(http: &Http, data: &CardData) {
+    let file = match CardData::latest(http).await {
+        Ok(file) => file,
+        Err(error) => {
+            eprintln!("warning: couldn't check for newer card data: {error}");
+            return;
+        }
+    };
+    if !data.is_older_than(&file) {
+        return;
+    }
+    println!("Downloading Scryfall's card data…");
+    let started = std::time::Instant::now();
+    match data.update_to(http, &file).await {
+        Ok(_) => println!(
+            "{} cards ready in {:.0}s",
+            data.status().cards,
+            started.elapsed().as_secs_f64()
+        ),
+        Err(error) => eprintln!("warning: couldn't update the card data: {error}"),
+    }
+}
+
 fn report(event: RunEvent, labels: &std::sync::Mutex<std::collections::HashMap<u32, String>>) {
     let mut labels = labels.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     match event {
-        RunEvent::Planned { jobs, skipped } => {
+        RunEvent::Planned { jobs, skipped, folder } => {
+            println!("Saving to {folder}");
             println!("{} cards to download", jobs.len());
             for line in skipped {
                 println!("  skipped: {}", line.line);

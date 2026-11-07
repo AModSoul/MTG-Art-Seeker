@@ -8,7 +8,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Mutex,
     },
-    time::Instant,
+    time::{Instant, SystemTime},
 };
 
 use futures::{stream, StreamExt};
@@ -18,11 +18,13 @@ use ts_rs::TS;
 
 use crate::{
     card::Card,
+    carddb::{CardDb, NameQuery},
     faces::{plan_faces, FacePlan},
+    history::{History, Remembered},
     http::Http,
     list::{parse_list, CardLine, SkippedLine},
-    mtgpics,
-    naming::{file_stem, NameParts},
+    mtgpics::{self, MtgpicsArt},
+    naming::{file_stem, sanitize, NameParts},
     presets::preset_names,
     scryfall::{self, Direction, Identifier, SearchOptions, Unique},
     settings::{Printing, Settings, SourceMode},
@@ -36,14 +38,22 @@ pub const CONCURRENCY: usize = 4;
 pub const MAX_SEARCH_CARDS: usize = 5000;
 /// The most printings fetched for one name (basic lands have hundreds of arts).
 const MAX_PRINTINGS: usize = 1750;
+/// How many cards a page of Scryfall search results holds.
+const SEARCH_PAGE: usize = 175;
 
 /// What to download.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
 pub enum RunInput {
-    /// A card list, one card per line.
-    List { text: String },
+    /// A card list, one card per line. With [`Settings::list_folders`] on, its
+    /// art is saved in a folder of this name inside the output folder.
+    List {
+        text: String,
+        #[serde(default)]
+        #[ts(optional)]
+        folder: Option<String>,
+    },
     /// Every card a Scryfall search matches.
     Search { query: String },
     /// A ready-made list, by [`crate::presets::PresetInfo::id`].
@@ -58,6 +68,8 @@ pub enum RunEvent {
     Planned {
         jobs: Vec<JobInfo>,
         skipped: Vec<SkippedLine>,
+        /// The folder this run saves to.
+        folder: String,
     },
     /// A job's status changed.
     Job { id: u32, status: JobStatus },
@@ -152,10 +164,29 @@ struct Job {
 struct Context<'a> {
     http: &'a Http,
     settings: &'a Settings,
+    /// Scryfall's card data, kept locally; asked before Scryfall itself is.
+    cards: Option<&'a CardDb>,
+    /// Where each printing's MTGPics art was found before.
+    history: Option<&'a History>,
+    /// The folder art is saved under: the output folder, or a list's folder in it.
+    output_dir: PathBuf,
     cache: mtgpics::Cache,
     paths: PathReserver,
     temp_ids: AtomicU64,
     emit: &'a (dyn Fn(RunEvent) + Sync),
+}
+
+/// What a run reads, and keeps, on disk between runs. Without either, it asks
+/// Scryfall and MTGPics about everything.
+#[derive(Clone, Copy, Default)]
+pub struct Local<'a> {
+    /// The local copy of Scryfall's card data. A list's cards are looked up in
+    /// it; Scryfall is asked about the rest: cards newer than the copy,
+    /// misspelt names, and every card when there's no copy yet.
+    pub cards: Option<&'a CardDb>,
+    /// The log of where each printing's MTGPics art was found, so it's saved
+    /// from there next time rather than found again.
+    pub history: Option<&'a History>,
 }
 
 /// Runs `input` to the end, or until `cancel` is cancelled, sending each change
@@ -164,10 +195,12 @@ pub async fn run(
     http: &Http,
     input: RunInput,
     settings: &Settings,
+    local: Local<'_>,
     cancel: &CancellationToken,
     emit: &(dyn Fn(RunEvent) + Sync),
 ) -> RunSummary {
     let started = Instant::now();
+    let output_dir = output_dir(&input, settings);
     let planned = tokio::select! {
         biased;
         _ = cancel.cancelled() => Ok(None),
@@ -186,17 +219,24 @@ pub async fn run(
     emit(RunEvent::Planned {
         jobs: jobs.iter().map(Job::info).collect(),
         skipped,
+        folder: output_dir.to_string_lossy().into_owned(),
     });
 
-    // Cards a list names a set for are looked up together, 75 to a request.
-    let batched: Vec<(usize, Identifier)> = jobs
-        .iter()
-        .enumerate()
-        .filter_map(|(index, job)| match &job.request {
-            Request::Line { line, .. } => identifier(line).map(|id| (index, id)),
-            Request::Card(_) => None,
-        })
-        .collect();
+    // Cards a list names a set for are found in the card data, and the rest
+    // looked up on Scryfall together, 75 to a request.
+    let mut batched: Vec<(usize, Identifier)> = Vec::new();
+    for (index, job) in jobs.iter_mut().enumerate() {
+        let Request::Line { line, card } = &mut job.request else {
+            continue;
+        };
+        let Some(id) = identifier(line) else {
+            continue;
+        };
+        match local.cards.and_then(|db| find_local(db, &id)) {
+            Some(found) => *card = Some(found),
+            None => batched.push((index, id)),
+        }
+    }
     if !batched.is_empty() {
         for (index, _) in &batched {
             emit(RunEvent::Job {
@@ -220,6 +260,9 @@ pub async fn run(
     let context = Context {
         http,
         settings,
+        cards: local.cards,
+        history: local.history,
+        output_dir,
         cache: mtgpics::Cache::default(),
         paths: PathReserver::default(),
         temp_ids: AtomicU64::new(0),
@@ -295,7 +338,7 @@ async fn plan(http: &Http, input: RunInput, settings: &Settings) -> Result<(Vec<
             .collect()
     };
     Ok(match input {
-        RunInput::List { text } => {
+        RunInput::List { text, .. } => {
             let parsed = parse_list(&text);
             (numbered(lines(parsed.cards)), parsed.skipped)
         }
@@ -330,6 +373,18 @@ impl Job {
     }
 }
 
+/// Where a run saves: the output folder, or for a list with
+/// [`Settings::list_folders`] on and a folder name, that folder inside it.
+fn output_dir(input: &RunInput, settings: &Settings) -> PathBuf {
+    let base = PathBuf::from(&settings.output_dir);
+    match input {
+        RunInput::List {
+            folder: Some(folder), ..
+        } if settings.list_folders && !folder.trim().is_empty() => base.join(sanitize(folder)),
+        _ => base,
+    }
+}
+
 /// What to batch-look-up a line as: lines that give a set.
 fn identifier(line: &CardLine) -> Option<Identifier> {
     let set = line.set.clone()?;
@@ -343,6 +398,18 @@ fn identifier(line: &CardLine) -> Option<Identifier> {
             set,
         },
     })
+}
+
+/// A line that gives a set, found in the card data. A miss, or a database
+/// that can't be read, leaves it to Scryfall.
+fn find_local(db: &CardDb, id: &Identifier) -> Option<Card> {
+    match id {
+        Identifier::SetNumber { set, collector_number } => db.by_number(set, collector_number),
+        Identifier::NameSet { name, set } => db.by_name_in_set(name, set),
+        Identifier::Name { .. } => return None,
+    }
+    .ok()
+    .flatten()
 }
 
 fn search_options(settings: &Settings, by_release: Option<Direction>) -> SearchOptions {
@@ -414,10 +481,30 @@ async fn resolve(line: &CardLine, context: &Context<'_>) -> Result<Vec<Card>> {
         Printing::Newest => Direction::Newest,
         Printing::Oldest => Direction::Oldest,
     };
-    let query = scryfall::exact_name_query(&line.name);
-    let mut cards = scryfall::search(http, &query, &search_options(settings, Some(direction)), MAX_PRINTINGS)
-        .await?
-        .cards;
+    let local = NameQuery {
+        unique_art: settings.unique_art,
+        include_extras: settings.include_extras,
+        newest_first: direction == Direction::Newest,
+    };
+    let mut cards = context
+        .cards
+        .and_then(|db| db.printings(&line.name, local).ok())
+        .unwrap_or_default();
+    if cards.is_empty() {
+        // Only as many as are kept: a basic land has hundreds of printings, at
+        // half a second a page.
+        let wanted = if settings.download_all {
+            MAX_PRINTINGS
+        } else if settings.exclude_full_art {
+            SEARCH_PAGE
+        } else {
+            1
+        };
+        let query = scryfall::exact_name_query(&line.name);
+        cards = scryfall::search(http, &query, &search_options(settings, Some(direction)), wanted)
+            .await?
+            .cards;
+    }
     if cards.is_empty() {
         cards.extend(scryfall::named_fuzzy(http, &line.name, None).await?);
     }
@@ -439,29 +526,30 @@ async fn download_card(
 ) {
     let settings = context.settings;
     let faces = plan_faces(card, settings);
-    let arts = if settings.sources == SourceMode::ScryfallOnly {
-        vec![None; faces.len()]
-    } else {
-        match mtgpics::find_arts(context.http, &context.cache, card, faces.len()).await {
-            Ok(arts) => arts,
-            Err(error) => {
-                errors.push(format!("MTGPics: {error}"));
-                vec![None; faces.len()]
-            }
-        }
+    let use_mtgpics = settings.sources != SourceMode::ScryfallOnly;
+    let history = context.history.filter(|_| use_mtgpics);
+    let remembered = history.and_then(|history| history.remembered(card, faces.len()).ok().flatten());
+    let mut arts = MtgpicsArts {
+        remembered: remembered.as_ref(),
+        found: None,
     };
+    // Per face, where its MTGPics art was saved from; `None` if it wasn't.
+    let mut log = Vec::with_capacity(faces.len());
+    let mut mtgpics_failed = false;
 
-    for (face, art) in faces.iter().zip(arts) {
-        if let Some(art) = art {
-            match save(card, face, ArtSource::Mtgpics, &art.url, context).await {
-                Ok(Some(file)) => {
+    for (index, face) in faces.iter().enumerate() {
+        if use_mtgpics {
+            match mtgpics_art(card, (index, face), faces.len(), &mut arts, context, errors).await {
+                FromMtgpics::Saved(file, url) => {
                     files.push(file);
+                    log.push(Some(url));
                     continue;
                 }
-                Ok(None) => {}
-                Err(error) => errors.push(format!("MTGPics: {error}")),
+                FromMtgpics::None => {}
+                FromMtgpics::Failed => mtgpics_failed = true,
             }
         }
+        log.push(None);
         if settings.sources != SourceMode::MtgpicsOnly {
             match &face.scryfall_url {
                 Some(url) => match save(card, face, ArtSource::Scryfall, url, context).await {
@@ -477,6 +565,80 @@ async fn download_card(
         }
         missing.push(face.name.clone());
     }
+
+    // Logged once MTGPics' answer for every face is known. A face it failed
+    // to answer for — a timeout, say — mustn't be logged as one it has no art for.
+    if let Some(history) = history.filter(|_| !mtgpics_failed) {
+        let checked_at = match (&arts.found, &remembered) {
+            (None, Some(remembered)) => remembered.checked_at,
+            _ => SystemTime::now(),
+        };
+        let _ = history.remember(card, &log, checked_at);
+    }
+}
+
+/// Where a card's MTGPics art is: remembered from an earlier run, or found by
+/// searching MTGPics, which happens at most once per card.
+struct MtgpicsArts<'r> {
+    remembered: Option<&'r Remembered>,
+    /// The search's result per face, once it has run; `Err` if it failed.
+    found: Option<std::result::Result<Vec<Option<MtgpicsArt>>, ()>>,
+}
+
+enum FromMtgpics {
+    Saved(SavedFile, String),
+    /// MTGPics has no art for the face.
+    None,
+    /// MTGPics couldn't be asked, or its image couldn't be saved.
+    Failed,
+}
+
+/// Saves a face's art from MTGPics: from where it was found before, if it's
+/// still there, otherwise from where a search finds it now.
+async fn mtgpics_art(
+    card: &Card,
+    (index, face): (usize, &FacePlan),
+    faces: usize,
+    arts: &mut MtgpicsArts<'_>,
+    context: &Context<'_>,
+    errors: &mut Vec<String>,
+) -> FromMtgpics {
+    let mut failed = false;
+    let remembered = arts.remembered.and_then(|r| r.mtgpics.get(index).cloned().flatten());
+    if let Some(url) = &remembered {
+        match save(card, face, ArtSource::Mtgpics, url, context).await {
+            Ok(Some(file)) => return FromMtgpics::Saved(file, url.clone()),
+            // Gone from there: look for it again.
+            Ok(None) => {}
+            Err(error) => {
+                errors.push(format!("MTGPics: {error}"));
+                failed = true;
+            }
+        }
+    } else if arts.remembered.is_some_and(Remembered::missing_is_recent) {
+        // MTGPics had no art for this face when it was last searched.
+        return FromMtgpics::None;
+    }
+
+    if arts.found.is_none() {
+        let found = mtgpics::find_arts(context.http, &context.cache, card, faces).await;
+        arts.found = Some(found.map_err(|error| errors.push(format!("MTGPics: {error}"))));
+    }
+    let art = match &arts.found {
+        Some(Ok(found)) => found.get(index).cloned().flatten(),
+        _ => return FromMtgpics::Failed,
+    };
+    let Some(art) = art.filter(|art| Some(&art.url) != remembered.as_ref()) else {
+        return if failed { FromMtgpics::Failed } else { FromMtgpics::None };
+    };
+    match save(card, face, ArtSource::Mtgpics, &art.url, context).await {
+        Ok(Some(file)) => FromMtgpics::Saved(file, art.url),
+        Ok(None) => FromMtgpics::None,
+        Err(error) => {
+            errors.push(format!("MTGPics: {error}"));
+            FromMtgpics::Failed
+        }
+    }
 }
 
 /// Downloads one image into place; `None` if it isn't there.
@@ -488,7 +650,7 @@ async fn save(
     context: &Context<'_>,
 ) -> Result<Option<SavedFile>> {
     let settings = context.settings;
-    let mut dir = PathBuf::from(&settings.output_dir);
+    let mut dir = context.output_dir.clone();
     if settings.source_folders {
         dir.push(match source {
             ArtSource::Mtgpics => "mtgpics",

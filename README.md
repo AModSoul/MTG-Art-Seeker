@@ -29,7 +29,11 @@ Damnation
 4 Lightning Bolt
 4x Karn, Scion of Urza (DOM) 1
 1 Sol Ring (C21) 263 *F*
+Damnation [TSR] (106)
 ```
+
+A set in brackets takes its collector number bare, in parentheses or in braces: `[TSR] 106`,
+`[TSR] (106)`, `[TSR] {106}`.
 
 Counts, foil and etched markers (`*F*`, `*E*`), and Archidekt categories and tags are ignored.
 Section headings (`Commander`, `Sideboard`, `Creatures (12)`) and comments (`#`, `//`) are skipped.
@@ -48,6 +52,10 @@ Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and 
 `Adventure`, `Saga`, `Basic`. A double-faced card is saved as one image per face. When a run ends,
 **Retry failed** runs the cards that failed again, and **Copy failed** copies them as a list.
 
+With **A folder for each list** on, a card list's art goes in a folder of its own inside the save
+folder, named in the field under the list. Opening a list file fills that field in with the file's
+name; leave it empty to save in the save folder itself.
+
 ### Settings
 
 <img alt="The settings drawer" src="docs/screenshots/settings-dark.png" width="700" />
@@ -63,6 +71,7 @@ Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and 
 | One printing per artwork  | On                             | skip reprints that reuse an art                    |
 | Skip full-art printings   | Off                            |                                                    |
 | Include extras            | On                             | Un-cards, oversized and championship cards         |
+| A folder for each list    | Off                            | named in a field under the card list               |
 | Folders                   | Source and layout              | a folder per card type can be added                |
 | Replace files of one name | On                             | otherwise the new file is numbered: `Name (1).jpg` |
 
@@ -78,15 +87,29 @@ mtg-art cards.txt                       # a card list file
 mtg-art --search "set:mh2 t:creature"   # a Scryfall search
 mtg-art --preset edhrec-top-year        # a preset; --presets lists them
 mtg-art cards.txt --out ./art           # somewhere other than the settings' folder
+mtg-art cards.txt --folder "Atraxa"     # in an Atraxa folder inside it
 ```
 
 Build it with `cargo build --release -p mtg-art-cli`; the binary is `target/release/mtg-art`.
 
 ## How it finds art
 
-Cards are looked up on Scryfall — lines with a set 75 at a time — within
-[Scryfall's rate limits](https://scryfall.com/docs/api/rate-limits), which every request goes
-through, however many cards are in flight.
+Cards are looked up in a local copy of Scryfall's card data: its
+[`default_cards` bulk file](https://scryfall.com/docs/api/bulk-data), every printing in English,
+about 80 MB. The app downloads it in the background when it starts and whenever Scryfall publishes
+a new one, which is daily; the command line tool checks before a list or preset (`--no-update`
+skips that). It's kept in the app's local data folder
+(`%LOCALAPPDATA%\io.github.amodsoul.mtg-art-downloader\card-data` on Windows), shared by both.
+
+Scryfall itself is asked only about what the copy can't answer: a search, a misspelt name, a card
+newer than the copy, and every card until the first copy is in. Those requests keep to
+[Scryfall's rate limits](https://scryfall.com/docs/api/rate-limits) — lines with a set are looked up
+75 at a time — however many cards are in flight.
+
+A name gets the printings Scryfall's `!"name"` search would, except that a card with only a back
+face of that name — a creature whose prepared spell is Demonic Tutor — is passed over when there's
+a card of the name itself. A name no card has is tried as a flavor name, which some deck sites
+export instead: `Megatron` is the Secret Lair Blightsteel Colossus, and is saved under that name.
 
 MTGPics has no API, so its pages are read. A card is looked for at the page its set code and
 collector number give (`dom001`), which must name the card and credit its artist. When it doesn't —
@@ -94,6 +117,12 @@ MTGPics numbers some sets its own way — the set's checklist is read, once per 
 card's page by number, or by name and artist. Promos are found in MTGPics' promo lists by name and
 artist. Whatever MTGPics lacks, including a double-faced card's back when MTGPics only has its
 front, comes from Scryfall.
+
+Every printing whose art is saved is logged, with where on MTGPics each face's art was found, in
+`history.sqlite` beside the card data. The next time that printing is asked for, its art is
+downloaded from there without searching MTGPics again; only if the image is gone from that address
+is MTGPics searched afresh. A face MTGPics had no art for is looked for again after 30 days, in case
+it has been added.
 
 ## Development
 
@@ -106,13 +135,13 @@ npm run tauri-dev      # the desktop app, reloading as you edit
 cargo test --workspace # the core's tests; none reach the network
 ```
 
-| Path           | What's in it                                                                       |
-| -------------- | ---------------------------------------------------------------------------------- |
-| `crates/core`  | Everything that finds and saves art: list parsing, Scryfall, MTGPics, the run loop |
-| `crates/cli`   | The `mtg-art` command line tool                                                    |
-| `src-tauri`    | The desktop app's Tauri commands, over the core                                    |
-| `src`          | The desktop app's interface: React and Chakra UI, showing what the core reports    |
-| `src/bindings` | TypeScript types generated from the core's Rust types                              |
+| Path           | What's in it                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| `crates/core`  | Everything that finds and saves art: list parsing, Scryfall and its card data, MTGPics, the run loop |
+| `crates/cli`   | The `mtg-art` command line tool                                                                      |
+| `src-tauri`    | The desktop app's Tauri commands, over the core                                                      |
+| `src`          | The desktop app's interface: React and Chakra UI, showing what the core reports                      |
+| `src/bindings` | TypeScript types generated from the core's Rust types                                                |
 
 After changing a type the interface uses, regenerate its TypeScript with `npm run bindings`. CI
 fails if they're out of date.

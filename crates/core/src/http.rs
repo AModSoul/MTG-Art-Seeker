@@ -72,6 +72,9 @@ const SCRYFALL_SLOW_SPACING: Duration = Duration::from_millis(500);
 /// Every other Scryfall endpoint's limit, and the floor between any two calls.
 const SCRYFALL_SPACING: Duration = Duration::from_millis(100);
 
+/// How long a large download, such as Scryfall's card data, has to finish.
+const LARGE_FILE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
 /// The longest `Retry-After` honoured, so a bad header can't stall a run.
 const MAX_RETRY_AFTER: Duration = Duration::from_secs(120);
 
@@ -141,7 +144,33 @@ impl Http {
     /// Streams an image to `dest`; `None` for a 404. Fails, leaving whatever
     /// was written, if the body isn't a JPEG or PNG.
     pub async fn download(&self, url: &str, dest: &Path) -> Result<Option<ImageKind>> {
-        let Some(response) = ok_or_missing(url, self.get(url).await?).await? else {
+        let Some(head) = self.stream_to(url, dest, None).await? else {
+            return Ok(None);
+        };
+        ImageKind::sniff(&head).map(Some).ok_or_else(|| Error::Invalid {
+            url: url.to_owned(),
+            reason: "the response is not a JPEG or PNG image".into(),
+        })
+    }
+
+    /// Streams a large file to `dest`, with longer to finish than other
+    /// requests get; `false` for a 404.
+    pub async fn download_file(&self, url: &str, dest: &Path) -> Result<bool> {
+        Ok(self.stream_to(url, dest, Some(LARGE_FILE_TIMEOUT)).await?.is_some())
+    }
+
+    /// Streams a response to `dest`, returning its first few bytes; `None` for a 404.
+    async fn stream_to(&self, url: &str, dest: &Path, timeout: Option<Duration>) -> Result<Option<Vec<u8>>> {
+        let response = self
+            .send(url, |client| {
+                let request = client.get(url);
+                match timeout {
+                    Some(timeout) => request.timeout(timeout),
+                    None => request,
+                }
+            })
+            .await?;
+        let Some(response) = ok_or_missing(url, response).await? else {
             return Ok(None);
         };
         let mut file = tokio::fs::File::create(dest).await?;
@@ -155,11 +184,7 @@ impl Http {
             file.write_all(&chunk).await?;
         }
         file.flush().await?;
-        drop(file);
-        ImageKind::sniff(&head).map(Some).ok_or_else(|| Error::Invalid {
-            url: url.to_owned(),
-            reason: "the response is not a JPEG or PNG image".into(),
-        })
+        Ok(Some(head))
     }
 
     async fn send(&self, url: &str, build: impl Fn(&Client) -> RequestBuilder) -> Result<Response> {

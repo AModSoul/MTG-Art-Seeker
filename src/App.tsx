@@ -1,6 +1,7 @@
 import { Box, Center, Flex, Grid, Heading, HStack, Spinner } from "@chakra-ui/react";
 import { useEffect } from "react";
 
+import { DiscordButton } from "@/components/DiscordButton";
 import { InputPanel } from "@/components/InputPanel";
 import { RunView } from "@/components/RunView";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
@@ -23,6 +24,7 @@ export function App() {
           MTG Art Downloader
         </Heading>
         <UpdateButton />
+        <DiscordButton />
         <ColorModeButton />
         <SettingsDrawer />
       </HStack>

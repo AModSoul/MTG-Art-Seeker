@@ -1,9 +1,12 @@
 //! The parts of a Scryfall card object this app reads.
 //! See <https://scryfall.com/docs/api/cards>.
+//!
+//! Cards are written back out, with only these fields, by the local card
+//! database ([`crate::carddb`]).
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Card {
     #[serde(default)]
     pub id: String,
@@ -18,34 +21,49 @@ pub struct Card {
     pub set_type: String,
     #[serde(default)]
     pub collector_number: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub released_at: Option<String>,
+    /// The name a crossover printing shows instead of its own — "Megatron" on
+    /// a Secret Lair Blightsteel Colossus — which some deck sites export.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flavor_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artist: Option<String>,
-    #[serde(default)]
+    /// Which artwork this printing has; reprints of one art share it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub illustration_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub type_line: Option<String>,
     #[serde(default)]
     pub full_art: bool,
     #[serde(default)]
+    pub oversized: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_uris: Option<ImageUris>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub card_faces: Vec<CardFace>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CardFace {
     pub name: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flavor_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artist: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub illustration_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub type_line: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_uris: Option<ImageUris>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ImageUris {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub art_crop: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub png: Option<String>,
 }
 
@@ -65,6 +83,25 @@ impl Card {
     /// (split, adventure, flip).
     pub fn has_face_images(&self) -> bool {
         self.card_faces.len() >= 2 && self.card_faces.iter().all(|face| face.image_uris.is_some())
+    }
+
+    /// The artwork on the card's front, for telling reprints of one art apart
+    /// from new art.
+    pub fn front_illustration(&self) -> Option<&str> {
+        self.illustration_id
+            .as_deref()
+            .or_else(|| self.card_faces.first()?.illustration_id.as_deref())
+    }
+
+    /// What Scryfall's searches leave out unless asked for extras: tokens,
+    /// emblems, planes and schemes, art series, oversized cards, and
+    /// memorabilia such as championship decks.
+    pub fn is_extra(&self) -> bool {
+        matches!(
+            self.layout.as_str(),
+            "token" | "double_faced_token" | "emblem" | "art_series" | "planar" | "scheme" | "vanguard"
+        ) || matches!(self.set_type.as_str(), "token" | "memorabilia" | "minigame")
+            || self.oversized
     }
 }
 

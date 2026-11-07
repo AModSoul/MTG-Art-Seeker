@@ -6,9 +6,11 @@
 //! through a callback.
 
 pub mod card;
+pub mod carddb;
 pub mod engine;
 pub mod error;
 pub mod faces;
+pub mod history;
 pub mod http;
 pub mod list;
 pub mod mtgpics;

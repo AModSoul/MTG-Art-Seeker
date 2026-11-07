@@ -27,6 +27,8 @@ pub struct Settings {
     pub exclude_full_art: bool,
     /// Include extras in searches: Un-cards, oversized and championship cards, and the like.
     pub include_extras: bool,
+    /// Save a card list's art in a folder of its own, named with the list.
+    pub list_folders: bool,
     /// Save MTGPics and Scryfall art in folders of their own.
     pub source_folders: bool,
     /// Save each layout (MDFC Front, Adventure, Saga…) in a folder of its own.
@@ -76,6 +78,7 @@ impl Default for Settings {
             unique_art: true,
             exclude_full_art: false,
             include_extras: true,
+            list_folders: false,
             source_folders: true,
             layout_folders: true,
             type_folders: false,
