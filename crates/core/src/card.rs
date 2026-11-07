@@ -85,6 +85,27 @@ impl Card {
         self.card_faces.len() >= 2 && self.card_faces.iter().all(|face| face.image_uris.is_some())
     }
 
+    /// The artwork of one of the card's images, numbered as
+    /// [`crate::faces::FacePlan::index`] numbers them.
+    pub fn illustration(&self, image: usize) -> Option<&str> {
+        if self.has_face_images() {
+            self.card_faces.get(image)?.illustration_id.as_deref()
+        } else {
+            self.front_illustration()
+        }
+    }
+
+    /// Scryfall's art crop of one of the card's images, numbered as
+    /// [`crate::faces::FacePlan::index`] numbers them.
+    pub fn art_crop(&self, image: usize) -> Option<&str> {
+        let uris = if self.has_face_images() {
+            self.card_faces.get(image)?.image_uris.as_ref()
+        } else {
+            self.image_uris.as_ref()
+        };
+        uris?.art_crop.as_deref()
+    }
+
     /// The artwork on the card's front, for telling reprints of one art apart
     /// from new art.
     pub fn front_illustration(&self) -> Option<&str> {

@@ -8,6 +8,10 @@ export type SavedFile = {
    * The name of the face this is the art of.
    */
   face: string;
+  /**
+   * Which of the card's images it is, from 0; see [`FacePlan::index`].
+   */
+  faceIndex: number;
   source: ArtSource;
   set: string;
   number: string;
@@ -16,4 +20,8 @@ export type SavedFile = {
    * The image's size in pixels, if its header could be read.
    */
   size: ImageSize | null;
+  /**
+   * The page a [`ArtSource::Web`] image was saved from.
+   */
+  page?: string;
 };

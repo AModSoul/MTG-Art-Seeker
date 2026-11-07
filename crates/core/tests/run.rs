@@ -9,8 +9,9 @@ use std::{
 use mtg_art_core::{
     carddb::CardData,
     engine::{run, ArtSource, JobStatus, Local, RunEvent, RunInput, RunSummary},
-    history::History,
+    history::{FoundByHand, History},
     http::{Endpoints, Http, HttpConfig},
+    manual,
     scryfall::{search, SearchOptions, Unique},
     settings::Settings,
 };
@@ -725,4 +726,255 @@ fn walk(dir: &Path) -> Vec<String> {
         }
     }
     found
+}
+
+// --- Art the user found themselves ------------------------------------------
+
+/// A made-up painting: overlapping ellipses of random sizes and colours, as
+/// `verify`'s own tests draw them. Tests never use real art.
+fn painting(width: u32, height: u32, seed: u32) -> image::DynamicImage {
+    let mut state = u64::from(seed).wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+    let mut random = move || {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        (state >> 33) as f32 / (1u64 << 31) as f32
+    };
+    let mut image = image::RgbImage::from_pixel(width, height, image::Rgb([70, 80, 90]));
+    for _ in 0..60 {
+        let (cx, cy) = (random() * width as f32, random() * height as f32);
+        let (rx, ry) = (
+            (0.02 + random() * 0.15) * width as f32,
+            (0.02 + random() * 0.15) * height as f32,
+        );
+        let colour = image::Rgb([random(), random(), random()].map(|c| (c * 255.0) as u8));
+        let span = |c: f32, r: f32, max: u32| ((c - r).max(0.0) as u32)..((c + r).ceil() as u32).min(max);
+        for y in span(cy, ry, height) {
+            for x in span(cx, rx, width) {
+                let (dx, dy) = ((x as f32 - cx) / rx, (y as f32 - cy) / ry);
+                if dx * dx + dy * dy <= 1.0 {
+                    image.put_pixel(x, y, colour);
+                }
+            }
+        }
+    }
+    image::DynamicImage::ImageRgb8(image)
+}
+
+fn jpeg(image: &image::DynamicImage) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    image
+        .to_rgb8()
+        .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Jpeg)
+        .unwrap();
+    bytes
+}
+
+/// Karn's art, uncropped, with Scryfall's art crop of it on the mock CDN;
+/// and Karn on the mock Scryfall.
+async fn karn_with_art(servers: &Servers) -> image::DynamicImage {
+    let art = painting(1200, 900, 1);
+    let crop =
+        art.crop_imm(120, 100, 960, 960 * 457 / 626)
+            .resize_exact(626, 457, image::imageops::FilterType::Triangle);
+    Servers::image(
+        &servers.cdn,
+        "/art_crop/front/0/7/07a3d9e8-8597-498b-869c-cff79e0df516.jpg",
+        &jpeg(&crop),
+    )
+    .await;
+    Mock::given(method("POST"))
+        .and(path("/cards/collection"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [servers.card("Karn")],
+            "not_found": [],
+        })))
+        .mount(&servers.scryfall)
+        .await;
+    art
+}
+
+const KARN_ART: &str = "792b699f-87ea-4608-aac5-e6d5e96feacb";
+
+#[tokio::test]
+async fn saves_a_larger_copy_the_user_found_in_place_of_scryfalls() {
+    let servers = Servers::start().await;
+    let art = karn_with_art(&servers).await;
+    let http = servers.http();
+    let out = tempfile::tempdir().unwrap();
+    let settings = settings(out.path());
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+
+    // What the run saved, and what the user saved in the Lens window.
+    let scryfall_file = out.path().join("scryfall/Karn, Scion of Urza [DOM] {1}.jpg");
+    std::fs::create_dir_all(scryfall_file.parent().unwrap()).unwrap();
+    std::fs::write(&scryfall_file, JPEG).unwrap();
+    let downloaded = dir.path().join("lens-0.part");
+    std::fs::write(&downloaded, jpeg(&art)).unwrap();
+
+    let target = manual::prepare(&http, None, &settings, "DOM", "1", 0).await.unwrap();
+    assert_eq!(target.face.name, "Karn, Scion of Urza");
+    let found = manual::Found {
+        image_url: "https://cdna.artstation.com/p/assets/images/karn/4k/karn.jpg",
+        page: Some("https://www.artstation.com/artwork/karn"),
+    };
+    let destination = manual::Destination {
+        settings: &settings,
+        list_folder: None,
+        replace: Some(&scryfall_file),
+    };
+    let imported = manual::import(&http, Some(&history), &target, destination, &downloaded, found, false)
+        .await
+        .unwrap();
+
+    let manual::Imported::Saved { file, replaced } = imported else {
+        panic!("not saved: {imported:?}");
+    };
+    assert_eq!(
+        relative(&file.path, out.path()),
+        "web/Karn, Scion of Urza [DOM] {1}.jpg"
+    );
+    assert_eq!(file.source, ArtSource::Web);
+    assert_eq!(file.page.as_deref(), found.page);
+    assert_eq!(file.size.map(|s| (s.width, s.height)), Some((1200, 900)));
+    assert_eq!(replaced.as_deref(), Some(scryfall_file.to_string_lossy().as_ref()));
+    assert!(!scryfall_file.exists(), "Scryfall's file is replaced");
+    assert!(downloaded.exists(), "the download is left for the caller");
+    assert_eq!(
+        history.found_by_hand(KARN_ART).unwrap().map(|f| f.url),
+        Some(found.image_url.to_owned())
+    );
+}
+
+#[tokio::test]
+async fn asks_before_saving_an_image_that_is_not_the_art() {
+    let servers = Servers::start().await;
+    karn_with_art(&servers).await;
+    let http = servers.http();
+    let out = tempfile::tempdir().unwrap();
+    let settings = settings(out.path());
+    let dir = tempfile::tempdir().unwrap();
+    let downloaded = dir.path().join("lens-0.part");
+    std::fs::write(&downloaded, jpeg(&painting(1200, 900, 2))).unwrap();
+    let target = manual::prepare(&http, None, &settings, "dom", "1", 0).await.unwrap();
+    let found = manual::Found {
+        image_url: "https://example.com/other.jpg",
+        page: None,
+    };
+    let destination = manual::Destination {
+        settings: &settings,
+        list_folder: None,
+        replace: None,
+    };
+
+    let imported = manual::import(&http, None, &target, destination, &downloaded, found, false).await;
+    assert_eq!(imported.unwrap(), manual::Imported::Doubtful(manual::Doubt::Different));
+    assert!(!out.path().join("web").exists(), "nothing is saved");
+
+    // The user says to save it anyway.
+    let imported = manual::import(&http, None, &target, destination, &downloaded, found, true).await;
+    assert!(matches!(
+        imported.unwrap(),
+        manual::Imported::Saved { replaced: None, .. }
+    ));
+    assert_eq!(walk(out.path()).len(), 1);
+
+    // Not an image at all.
+    std::fs::write(&downloaded, b"<html>").unwrap();
+    let imported = manual::import(&http, None, &target, destination, &downloaded, found, true).await;
+    assert!(imported.is_err());
+}
+
+#[tokio::test]
+async fn later_runs_save_the_users_copy_from_where_they_found_it() {
+    let servers = Servers::start().await;
+    karn_with_art(&servers).await;
+    Servers::image(&servers.cdn, "/found/karn.jpg", JPEG).await;
+    // MTGPics isn't asked about a face the user found art for.
+    Mock::given(method("GET"))
+        .and(path("/card"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(0)
+        .mount(&servers.mtgpics)
+        .await;
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let found = FoundByHand {
+        url: format!("{}/found/karn.jpg", servers.cdn.uri()),
+        page: Some("https://example.com/karn".into()),
+    };
+    history.remember_found_by_hand(KARN_ART, &found).unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    let events = Mutex::new(Vec::new());
+    let summary = run(
+        &servers.http(),
+        RunInput::List {
+            text: "Karn, Scion of Urza (DOM) 1".into(),
+            folder: None,
+        },
+        &settings(out.path()),
+        Local {
+            cards: None,
+            history: Some(&history),
+        },
+        &CancellationToken::new(),
+        &|event| events.lock().unwrap().push(event),
+    )
+    .await;
+    assert_eq!((summary.done, summary.web_files), (1, 1));
+    let files: Vec<_> = events
+        .into_inner()
+        .unwrap()
+        .into_iter()
+        .filter_map(|event| match event {
+            RunEvent::Job {
+                status: JobStatus::Done { files, .. },
+                ..
+            } => Some(files),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(files.len(), 1);
+    assert_eq!(
+        relative(&files[0].path, out.path()),
+        "web/Karn, Scion of Urza [DOM] {1}.jpg"
+    );
+    assert_eq!(files[0].page, found.page);
+}
+
+#[tokio::test]
+async fn forgets_the_users_copy_once_it_is_gone() {
+    let servers = Servers::start().await;
+    karn_with_art(&servers).await;
+    servers.mtgpics_page("dom001", fixture("card_dom001.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/dom/001_1.jpg", JPEG).await;
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let gone = FoundByHand {
+        url: format!("{}/gone.jpg", servers.cdn.uri()),
+        page: None,
+    };
+    history.remember_found_by_hand(KARN_ART, &gone).unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    let summary = run(
+        &servers.http(),
+        RunInput::List {
+            text: "Karn, Scion of Urza (DOM) 1".into(),
+            folder: None,
+        },
+        &settings(out.path()),
+        Local {
+            cards: None,
+            history: Some(&history),
+        },
+        &CancellationToken::new(),
+        &|_| {},
+    )
+    .await;
+    assert_eq!((summary.done, summary.web_files, summary.mtgpics_files), (1, 0, 1));
+    assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
 }

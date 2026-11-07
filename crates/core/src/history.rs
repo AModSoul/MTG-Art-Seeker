@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS fetched (
   checked_at INTEGER NOT NULL, -- when MTGPics was last searched for it
   fetched_at INTEGER NOT NULL  -- when its art was last saved
 );
+CREATE TABLE IF NOT EXISTS found_by_hand (
+  illustration_id TEXT PRIMARY KEY, -- Scryfall's id for the artwork
+  url TEXT NOT NULL,           -- where the user saved a larger copy from
+  page TEXT,                   -- the page it was on
+  saved_at INTEGER NOT NULL
+);
 ";
 
 /// The log's version, kept in SQLite's `user_version`. Opening an older log
@@ -43,6 +49,13 @@ pub fn default_history_path() -> Option<PathBuf> {
 
 pub struct History {
     conn: Mutex<Connection>,
+}
+
+/// A larger copy of an artwork the user found and saved themselves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoundByHand {
+    pub url: String,
+    pub page: Option<String>,
 }
 
 /// What the log knows of a printing.
@@ -120,6 +133,41 @@ impl History {
                 secs(checked_at),
                 secs(SystemTime::now()),
             ])?;
+        Ok(())
+    }
+
+    /// Where the user found a larger copy of the artwork `illustration`, if
+    /// they have. Every printing of the art is saved from there.
+    pub fn found_by_hand(&self, illustration: &str) -> Result<Option<FoundByHand>> {
+        Ok(self
+            .lock()
+            .prepare_cached("SELECT url, page FROM found_by_hand WHERE illustration_id = ?1")?
+            .query_row([illustration], |row| {
+                Ok(FoundByHand {
+                    url: row.get(0)?,
+                    page: row.get(1)?,
+                })
+            })
+            .optional()?)
+    }
+
+    pub fn remember_found_by_hand(&self, illustration: &str, found: &FoundByHand) -> Result<()> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(i64::MAX));
+        self.lock()
+            .prepare_cached(
+                "INSERT INTO found_by_hand (illustration_id, url, page, saved_at) VALUES (?1, ?2, ?3, ?4) \
+                 ON CONFLICT (illustration_id) DO UPDATE SET url = ?2, page = ?3, saved_at = ?4",
+            )?
+            .execute(params![illustration, found.url, found.page, now])?;
+        Ok(())
+    }
+
+    pub fn forget_found_by_hand(&self, illustration: &str) -> Result<()> {
+        self.lock()
+            .prepare_cached("DELETE FROM found_by_hand WHERE illustration_id = ?1")?
+            .execute([illustration])?;
         Ok(())
     }
 

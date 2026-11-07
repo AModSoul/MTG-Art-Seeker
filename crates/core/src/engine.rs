@@ -117,6 +117,9 @@ pub enum JobStatus {
 pub enum ArtSource {
     Mtgpics,
     Scryfall,
+    /// An image the user found themselves, anywhere on the web, and saved in
+    /// place of Scryfall's; see [`crate::manual`].
+    Web,
 }
 
 impl ArtSource {
@@ -125,6 +128,7 @@ impl ArtSource {
         match self {
             Self::Mtgpics => "mtgpics",
             Self::Scryfall => "scryfall",
+            Self::Web => "web",
         }
     }
 }
@@ -136,12 +140,18 @@ pub struct SavedFile {
     pub path: String,
     /// The name of the face this is the art of.
     pub face: String,
+    /// Which of the card's images it is, from 0; see [`FacePlan::index`].
+    pub face_index: u32,
     pub source: ArtSource,
     pub set: String,
     pub number: String,
     pub artist: String,
     /// The image's size in pixels, if its header could be read.
     pub size: Option<ImageSize>,
+    /// The page a [`ArtSource::Web`] image was saved from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub page: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, TS)]
@@ -157,6 +167,8 @@ pub struct RunSummary {
     pub cancelled: u32,
     pub mtgpics_files: u32,
     pub scryfall_files: u32,
+    /// Images the user found themselves, saved again from where they were.
+    pub web_files: u32,
     pub seconds: f64,
 }
 
@@ -327,6 +339,7 @@ fn finish(statuses: Vec<JobStatus>, started: Instant, emit: &(dyn Fn(RunEvent) +
                     match file.source {
                         ArtSource::Mtgpics => summary.mtgpics_files += 1,
                         ArtSource::Scryfall => summary.scryfall_files += 1,
+                        ArtSource::Web => summary.web_files += 1,
                     }
                 }
             }
@@ -558,6 +571,20 @@ async fn download_card(
     let mut mtgpics_failed = false;
 
     for (index, face) in faces.iter().enumerate() {
+        // An image the user picked themselves comes before anything found for them.
+        if let Some(file) = found_by_hand(card, face, context, errors).await {
+            files.push(file);
+            // MTGPics wasn't asked about this face: log what was known, or,
+            // with nothing known, don't log the card as MTGPics having none.
+            match remembered.as_ref() {
+                Some(remembered) => log.push(remembered.mtgpics.get(index).cloned().flatten()),
+                None => {
+                    log.push(None);
+                    mtgpics_failed = true;
+                }
+            }
+            continue;
+        }
         if use_mtgpics {
             match mtgpics_art(card, (index, face), faces.len(), &mut arts, context, errors).await {
                 FromMtgpics::Saved(file, url) => {
@@ -594,6 +621,36 @@ async fn download_card(
             _ => SystemTime::now(),
         };
         let _ = history.remember(card, &log, checked_at);
+    }
+}
+
+/// Saves a face's art from where the user found it before, if they did and
+/// it's still there. Gone from there, it's forgotten.
+async fn found_by_hand(
+    card: &Card,
+    face: &FacePlan,
+    context: &Context<'_>,
+    errors: &mut Vec<String>,
+) -> Option<SavedFile> {
+    if context.settings.sources == SourceMode::ScryfallOnly {
+        return None;
+    }
+    let history = context.history?;
+    let art = card.illustration(face.index)?;
+    let found = history.found_by_hand(art).ok().flatten()?;
+    match save(card, face, ArtSource::Web, &found.url, context).await {
+        Ok(Some(file)) => Some(SavedFile {
+            page: found.page,
+            ..file
+        }),
+        Ok(None) => {
+            let _ = history.forget_found_by_hand(art);
+            None
+        }
+        Err(error) => {
+            errors.push(format!("The image you found: {error}"));
+            None
+        }
     }
 }
 
@@ -722,11 +779,13 @@ pub(crate) async fn place(
     Ok(SavedFile {
         path: path.to_string_lossy().into_owned(),
         face: face.name.clone(),
+        face_index: face.index as u32,
         source,
         set: card.set.to_uppercase(),
         number: card.collector_number.clone(),
         artist: face.artist.clone(),
         size,
+        page: None,
     })
 }
 

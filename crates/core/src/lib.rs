@@ -14,6 +14,7 @@ pub mod history;
 pub mod http;
 pub mod imagesize;
 pub mod list;
+pub mod manual;
 pub mod mtgpics;
 pub mod naming;
 pub mod presets;

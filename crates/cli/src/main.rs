@@ -192,6 +192,7 @@ fn report(event: RunEvent, labels: &std::sync::Mutex<std::collections::HashMap<u
                         let source = match file.source {
                             ArtSource::Mtgpics => "MTGPICS ",
                             ArtSource::Scryfall => "SCRYFALL",
+                            ArtSource::Web => "WEB     ",
                         };
                         let size = file
                             .size
@@ -210,7 +211,7 @@ fn report(event: RunEvent, labels: &std::sync::Mutex<std::collections::HashMap<u
         RunEvent::Finished { summary } => {
             println!(
                 "\n{} cards in {:.1}s: {} done, {} partly done, {} failed, {} cancelled \
-                 ({} from MTGPics, {} from Scryfall)",
+                 ({} from MTGPics, {} from Scryfall, {} you found)",
                 summary.jobs,
                 summary.seconds,
                 summary.done,
@@ -219,6 +220,7 @@ fn report(event: RunEvent, labels: &std::sync::Mutex<std::collections::HashMap<u
                 summary.cancelled,
                 summary.mtgpics_files,
                 summary.scryfall_files,
+                summary.web_files,
             );
         }
     }

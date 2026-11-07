@@ -281,6 +281,7 @@ function StatusBadge({ status }: { status: JobStatus }) {
 const SOURCE_LOOK: Record<ArtSource, { palette: string; label: string }> = {
   mtgpics: { palette: "purple", label: "MTGPics" },
   scryfall: { palette: "teal", label: "Scryfall" },
+  web: { palette: "blue", label: "Found" },
 };
 
 function SourceBadge({ source }: { source: ArtSource }) {

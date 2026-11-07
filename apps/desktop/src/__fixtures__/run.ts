@@ -10,6 +10,7 @@ const dir = "/home/user/Pictures/MTG Art";
 export const karnFile: SavedFile = {
   path: `${dir}/MTGPics/Karn, Scion of Urza (Chase Stone) [DOM] {1}.jpg`,
   face: "Karn, Scion of Urza",
+  faceIndex: 0,
   source: "mtgpics",
   set: "dom",
   number: "1",
@@ -20,6 +21,7 @@ export const karnFile: SavedFile = {
 export const boltFile: SavedFile = {
   path: `${dir}/Scryfall/Lightning Bolt (Christopher Moeller) [M10] {146}.jpg`,
   face: "Lightning Bolt",
+  faceIndex: 0,
   source: "scryfall",
   set: "m10",
   number: "146",
@@ -89,6 +91,7 @@ export const finishedSummary: RunSummary = {
   cancelled: 0,
   mtgpicsFiles: 1,
   scryfallFiles: 4,
+  webFiles: 0,
   seconds: 12.4,
 };
 
