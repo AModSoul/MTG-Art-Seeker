@@ -74,8 +74,8 @@ export function RunView() {
     if (!path) return;
     try {
       await api.openFolder(path);
-    } catch (error) {
-      showError("Couldn't open the folder", error);
+    } catch (cause) {
+      showError("Couldn't open the folder", cause);
     }
   }
 

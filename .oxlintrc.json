@@ -1,0 +1,101 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jsx-a11y", "import", "unicorn", "oxc", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": ["**/*.css"]
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@chakra-ui/react",
+            "importNames": [
+              "Accordion",
+              "ActionBar",
+              "Alert",
+              "Avatar",
+              "Blockquote",
+              "Breadcrumb",
+              "Carousel",
+              "Checkbox",
+              "CheckboxCard",
+              "Clipboard",
+              "CloseButton",
+              "ColorPicker",
+              "Combobox",
+              "DataList",
+              "Dialog",
+              "Drawer",
+              "EmptyState",
+              "Field",
+              "FileUpload",
+              "HoverCard",
+              "Menu",
+              "NativeSelect",
+              "NumberInput",
+              "Pagination",
+              "PinInput",
+              "Popover",
+              "Progress",
+              "ProgressCircle",
+              "QrCode",
+              "RadioCard",
+              "RadioGroup",
+              "RatingGroup",
+              "SegmentGroup",
+              "Select",
+              "Skeleton",
+              "Slider",
+              "Splitter",
+              "Status",
+              "Steps",
+              "Switch",
+              "Tag",
+              "TagsInput",
+              "Timeline",
+              "Toaster",
+              "Toggle",
+              "Tooltip"
+            ],
+            "message": "Use the snippet from @/components/ui instead (e.g. @/components/ui/tooltip for Tooltip). If it's missing, add it with `npx @chakra-ui/cli snippet add <name> --tsx --outdir src/components/ui`."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/components/ui/**"],
+      "rules": {
+        "eslint/no-shadow": "off",
+        "jsx-a11y/prefer-tag-over-role": "off",
+        "react/exhaustive-effect-dependencies": "off",
+        "react/immutability": "off",
+        "react/set-state-in-effect": "off",
+        "react-hooks/exhaustive-deps": "off",
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/theme.ts", ".storybook/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "ignorePatterns": ["dist", "target", "src-tauri", "crates", "src/bindings", "storybook-static"]
+}
