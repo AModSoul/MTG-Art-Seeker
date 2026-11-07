@@ -1,0 +1,1 @@
+npm run agents:sync --silent --if-present
