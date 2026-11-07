@@ -31,3 +31,5 @@ catalog:
 
 allowBuilds:
   esbuild: true
+  # Wrangler's local runtime; only `wrangler dev` runs it, and the site only deploys.
+  workerd: false

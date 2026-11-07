@@ -1,5 +1,5 @@
 // Runs in Node after `vite build` (vite-prerender-plugin), once per page: it renders the page to
-// HTML and reports the same-site links it found, which are prerendered in turn.
+// HTML and reports the links it found, which are prerendered in turn.
 
 import createCache from "@emotion/cache";
 import { CacheProvider } from "@emotion/react";
@@ -11,7 +11,7 @@ import { documentTitleFromMatches } from "./document-title";
 import { fetchLatestRelease, type Release } from "./downloads/github";
 import { SNAPSHOT_ELEMENT_ID, setPrerenderedRelease, snapshotJson } from "./downloads/snapshot";
 import { createAppRouter } from "./router";
-import { APP_NAME, BASE_PATH } from "./site-config";
+import { APP_NAME } from "./site-config";
 
 /** vite-prerender-plugin's head element, which it doesn't export. */
 type HeadElement = { type: string; props: Record<string, string>; children?: string };
@@ -33,9 +33,6 @@ function latestRelease(): Promise<Release | null> {
   return release;
 }
 
-/** The plugin names pages from the site's root; the router and the HTML include the base path. */
-const withBase = (url: string) => BASE_PATH + url.replace(/^\//, "");
-
 /** A route's `<meta>` entry as attributes, which are all strings. */
 function stringProps(entry: object): Record<string, string> {
   return Object.fromEntries(
@@ -43,18 +40,12 @@ function stringProps(entry: object): Record<string, string> {
   );
 }
 
-function withoutBase(href: string): string | null {
-  const { pathname, origin } = new URL(href, "http://localhost");
-  if (origin !== "http://localhost" || !pathname.startsWith(BASE_PATH)) return null;
-  return `/${pathname.slice(BASE_PATH.length)}`;
-}
-
 export async function prerender({ url }: PrerenderArguments): Promise<PrerenderResult> {
   const snapshot = RELEASE_PAGES.has(url) ? await latestRelease() : null;
   setPrerenderedRelease(snapshot);
 
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: [withBase(url)] }),
+    history: createMemoryHistory({ initialEntries: [url] }),
     isServer: true,
   });
   // The server render path never mounts the router's Transitioner, so nothing matches until the
@@ -70,12 +61,8 @@ export async function prerender({ url }: PrerenderArguments): Promise<PrerenderR
   );
 
   const { parseLinks } = await import("vite-prerender-plugin/parse");
-  const links = new Set(
-    parseLinks(html).flatMap((href) => {
-      const page = withoutBase(href);
-      return page ? [page] : [];
-    }),
-  );
+  // The plugin skips links to other sites itself.
+  const links = new Set(parseLinks(html));
 
   const meta = router.state.matches.flatMap((match) => match.meta ?? []);
   const elements = new Set<HeadElement>(

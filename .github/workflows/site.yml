@@ -1,0 +1,84 @@
+# Builds the marketing site (apps/site) and deploys it to Cloudflare Pages, at
+# getmtg.art: when the site or what it's built from changes on trunk, when an
+# app release is published (so the download page's snapshot of it is
+# current), or by hand.
+#
+# The site has no versions and never creates a release or a v* tag. The
+# app's updater and the download page both read releases/latest, which must
+# always be the app's.
+#
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN, a token with the
+# account's "Cloudflare Pages: Edit" permission, and CLOUDFLARE_ACCOUNT_ID.
+name: Site
+
+on:
+  push:
+    branches: [trunk]
+    paths:
+      - apps/site/**
+      - packages/ui/**
+      - docs/screenshots/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/site.yml
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: site
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  HUSKY: 0
+  PROJECT: getmtg-art
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      # A release's tag can be older than trunk; the site is always built from
+      # trunk so publishing a release never rolls it back.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'release' && 'trunk' || '' }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The prerender fetches the latest release; the token raises GitHub's rate limit.
+      - run: pnpm --filter site build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create the Pages project if it doesn't exist
+        working-directory: apps/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if ! pnpm exec wrangler pages project list | grep -qw "$PROJECT"; then
+            pnpm exec wrangler pages project create "$PROJECT" --production-branch trunk
+          fi
+
+      # Deploying as trunk makes it the production deployment; a hand-run
+      # deploy from another branch gets a preview URL instead.
+      - name: Deploy
+        working-directory: apps/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: ${{ github.event_name == 'release' && 'trunk' || github.ref_name }}
+        run: >-
+          pnpm exec wrangler pages deploy dist --project-name "$PROJECT" --branch "$BRANCH"
+          --commit-hash "$(git rev-parse HEAD)"
