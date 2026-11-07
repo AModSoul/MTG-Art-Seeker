@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { api } from "@/api";
+import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { JobInfo } from "@/bindings/JobInfo";
 import type { JobStatus } from "@/bindings/JobStatus";
 import type { RunEvent } from "@/bindings/RunEvent";
@@ -10,7 +11,7 @@ import type { RunInput } from "@/bindings/RunInput";
 import type { RunSummary } from "@/bindings/RunSummary";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
-import { errorText, showError } from "@/notify";
+import { errorText, showError, showSuccess } from "@/notify";
 
 // --- What the user is about to download, remembered between launches -------
 
@@ -87,6 +88,10 @@ export async function chooseOutputDir() {
 
 export type JobView = JobInfo & { status: JobStatus };
 
+/** An image the user saved in the Lens window that didn't look like a larger
+ * copy of the art, waiting for them to say whether to save it anyway. */
+export type FoundDoubt = Extract<FoundEvent, { event: "doubtful" }>;
+
 interface RunState {
   runId: number | null;
   running: boolean;
@@ -98,6 +103,8 @@ interface RunState {
   folder: string | null;
   /** The list folder name the run was started with, for retrying into it. */
   listFolder: string | undefined;
+  /** Found images waiting on the user, oldest first. They outlast a run. */
+  doubts: FoundDoubt[];
 }
 
 const idle: RunState = {
@@ -109,6 +116,7 @@ const idle: RunState = {
   summary: null,
   folder: null,
   listFolder: undefined,
+  doubts: [],
 };
 
 export const useRun = create<RunState>()(() => idle);
@@ -156,11 +164,12 @@ const BATCH_MS = 80;
 export async function startRun(input: RunInput) {
   const { settings } = useSettings.getState();
   if (!settings || useRun.getState().running) return;
-  useRun.setState({
+  useRun.setState((state) => ({
     ...idle,
     running: true,
     listFolder: input.kind === "list" ? input.folder : undefined,
-  });
+    doubts: state.doubts,
+  }));
 
   let queue: RunEvent[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -184,4 +193,66 @@ export async function startRun(input: RunInput) {
 export function cancelRun() {
   const { runId } = useRun.getState();
   if (runId !== null) void api.cancelRun(runId);
+}
+
+// --- Larger copies the user finds in the Lens window ------------------------
+
+/** Opens Google Lens on face `face` of job `job` of the current run. */
+export async function findLargerCopy(job: number, face: number) {
+  const { runId } = useRun.getState();
+  if (runId === null) return;
+  try {
+    await api.findLargerCopy(runId, job, face, onFound);
+  } catch (error) {
+    showError("Couldn't open Google Lens", error);
+  }
+}
+
+/** Opens the page a found image was saved from. */
+export async function openFoundPage(job: number, face: number) {
+  const { runId } = useRun.getState();
+  if (runId === null) return;
+  try {
+    await api.openFoundPage(runId, job, face);
+  } catch (error) {
+    showError("Couldn't open the page", error);
+  }
+}
+
+/** Answers the oldest waiting image: saves it anyway, or throws it away. */
+export async function answerDoubt(save: boolean) {
+  const [first, ...rest] = useRun.getState().doubts;
+  if (!first) return;
+  useRun.setState({ doubts: rest });
+  try {
+    await api.confirmFoundArt(first.token, save);
+  } catch (error) {
+    showError("Couldn't save the image", error);
+  }
+}
+
+function onFound(event: FoundEvent) {
+  switch (event.event) {
+    case "saved":
+      useRun.setState((state) => {
+        const job = state.jobs[event.job - 1];
+        if (state.runId !== event.run || !job || job.status.state !== "done") return {};
+        // The found image takes its face's place in the job's files.
+        const files = job.status.files
+          .filter((file) => file.faceIndex !== event.file.faceIndex)
+          .concat(event.file)
+          .toSorted((a, b) => a.faceIndex - b.faceIndex);
+        const jobs = state.jobs.slice();
+        jobs[event.job - 1] = { ...job, status: { ...job.status, files } };
+        return { jobs };
+      });
+      showSuccess(`Saved the larger copy of ${event.file.face}`);
+      break;
+    case "doubtful":
+      useRun.setState((state) => ({ doubts: [...state.doubts, event] }));
+      break;
+    case "failed":
+      showError("Couldn't save the image", event.message);
+      break;
+  }
 }

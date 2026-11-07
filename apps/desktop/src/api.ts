@@ -4,6 +4,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 
 import type { CardDataStatus } from "@/bindings/CardDataStatus";
+import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { ListFile } from "@/bindings/ListFile";
 import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
@@ -24,6 +25,23 @@ export const api = {
   openFolder: (path: string) => invoke<void>("open_folder", { path }),
   cardDataStatus: () => invoke<CardDataStatus>("card_data_status"),
   openDiscord: () => invoke<void>("open_discord"),
+
+  confirmFoundArt: (token: number, save: boolean) =>
+    invoke<void>("confirm_found_art", { token, save }),
+  openFoundPage: (run: number, job: number, face: number) =>
+    invoke<void>("open_found_page", { run, job, face }),
+
+  /** Opens Google Lens, in a window of its own, on a saved face's art. What
+   * becomes of each image the user saves there arrives on `onEvent`. */
+  findLargerCopy: (
+    run: number,
+    job: number,
+    face: number,
+    onEvent: (event: FoundEvent) => void,
+  ) => {
+    const channel = new Channel<FoundEvent>(onEvent);
+    return invoke<void>("find_larger_copy", { run, job, face, onEvent: channel });
+  },
 
   /** Starts a run; its events arrive on `onEvent`, ending with `finished`. */
   startRun: (input: RunInput, settings: Settings, onEvent: (event: RunEvent) => void) => {

@@ -335,10 +335,29 @@ async fn import_found(state: &AppState, search: &Search, saved: &lens::Saved, fo
         Err(error) => {
             let _ = std::fs::remove_file(&saved.path);
             FoundEvent::Failed {
-                message: format!("Couldn't save that image: {error}"),
+                message: error.to_string(),
             }
         }
     }
+}
+
+/// Opens, in the system's browser, the page face `face` of job `job` in run
+/// `run` was saved from, when it's an image the user found.
+#[tauri::command]
+fn open_found_page(app: AppHandle, state: State<AppState>, run: u32, job: u32, face: u32) -> CommandResult<()> {
+    let page = lock(&state.records)
+        .get(&run)
+        .and_then(|record| record.files.get(&job))
+        .and_then(|files| files.iter().find(|file| file.face_index == face))
+        .and_then(|file| file.page.clone())
+        .ok_or("There's no page for that image.")?;
+    let url = tauri::Url::parse(&page).map_err(|e| e.to_string())?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(format!("{page} isn't a web page."));
+    }
+    app.opener()
+        .open_url(url.as_str(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 /// Shows a saved file in the system's file manager.
@@ -445,6 +464,7 @@ pub fn run() {
             open_discord,
             find_larger_copy,
             confirm_found_art,
+            open_found_page,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

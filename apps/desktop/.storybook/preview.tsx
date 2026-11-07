@@ -41,6 +41,9 @@ const preview: Preview = {
     mocked(api.revealFile).mockResolvedValue();
     mocked(api.openFolder).mockResolvedValue();
     mocked(api.startRun).mockResolvedValue(1);
+    mocked(api.findLargerCopy).mockResolvedValue();
+    mocked(api.confirmFoundArt).mockResolvedValue();
+    mocked(api.openFoundPage).mockResolvedValue();
     // Saved art lives on disk, which Storybook can't read; show a local stand-in.
     mocked(convertFileSrc).mockReturnValue(PLACEHOLDER_ART);
     mocked(open).mockResolvedValue(null);

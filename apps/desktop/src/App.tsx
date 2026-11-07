@@ -2,6 +2,7 @@ import { Box, Center, Flex, Grid, Heading, HStack, Spinner } from "@chakra-ui/re
 import { useEffect } from "react";
 
 import { DiscordButton } from "@/components/DiscordButton";
+import { FoundArtDialog } from "@/components/FoundArtDialog";
 import { InputPanel } from "@/components/InputPanel";
 import { RunView } from "@/components/RunView";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
@@ -42,6 +43,7 @@ export function App() {
           <Spinner />
         </Center>
       )}
+      <FoundArtDialog />
     </Flex>
   );
 }

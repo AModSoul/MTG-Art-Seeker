@@ -29,6 +29,15 @@ export const boltFile: SavedFile = {
   size: { width: 626, height: 457 },
 };
 
+/** A larger copy the user found in the Lens window, saved in place of Scryfall's. */
+export const foundBoltFile: SavedFile = {
+  ...boltFile,
+  path: `${dir}/Web/Lightning Bolt (Christopher Moeller) [M10] {146}.jpg`,
+  source: "web",
+  size: { width: 2400, height: 1752 },
+  page: "https://www.artstation.com/artwork/lightning-bolt",
+};
+
 /** One job in each state a run can show. */
 export const mixedJobs: JobView[] = [
   {

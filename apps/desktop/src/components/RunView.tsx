@@ -4,6 +4,7 @@ import {
   Button,
   Flex,
   HStack,
+  IconButton,
   Image,
   Spinner,
   Stack,
@@ -13,20 +14,36 @@ import {
 } from "@chakra-ui/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { memo, useState } from "react";
-import { LuClipboardCopy, LuFolderOpen, LuImageDown, LuRotateCcw } from "react-icons/lu";
+import {
+  LuClipboardCopy,
+  LuExternalLink,
+  LuFolderOpen,
+  LuImageDown,
+  LuRotateCcw,
+  LuScanSearch,
+} from "react-icons/lu";
 
 import { api } from "@/api";
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { JobStatus } from "@/bindings/JobStatus";
+import type { SavedFile } from "@/bindings/SavedFile";
 import { Alert } from "@mtg-art/ui/alert";
 import { EmptyState } from "@mtg-art/ui/empty-state";
 import { ProgressBar, ProgressLabel, ProgressRoot } from "@mtg-art/ui/progress";
 import { SegmentedControl } from "@mtg-art/ui/segmented-control";
+import { Tooltip } from "@mtg-art/ui/tooltip";
 import { showError, showSuccess } from "@/notify";
-import { type JobView, startRun, useRun, useSettings } from "@/store";
+import {
+  findLargerCopy,
+  type JobView,
+  openFoundPage,
+  startRun,
+  useRun,
+  useSettings,
+} from "@/store";
 import { findOption } from "@/utils/options";
 
-type Filter = "all" | "failed" | "scryfall" | "mtgpics";
+type Filter = "all" | "failed" | "scryfall" | "mtgpics" | "web";
 
 /** The table's filters, each with the jobs it shows. */
 const FILTERS: { value: Filter; label: string; matches: (status: JobStatus) => boolean }[] = [
@@ -34,6 +51,7 @@ const FILTERS: { value: Filter; label: string; matches: (status: JobStatus) => b
   { value: "failed", label: "Failed", matches: (status) => isFailed(status) },
   { value: "scryfall", label: "Scryfall", matches: (status) => hasSource(status, "scryfall") },
   { value: "mtgpics", label: "MTGPics", matches: (status) => hasSource(status, "mtgpics") },
+  { value: "web", label: "Found", matches: (status) => hasSource(status, "web") },
 ];
 
 export function RunView() {
@@ -229,18 +247,21 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
       <Table.Cell>
         <Stack gap="1">
           {files.map((file) => (
-            <HStack
-              key={file.path}
-              h={FILE_LINE}
-              gap="2"
-              cursor="pointer"
-              title={`${file.path}\nClick to show it in its folder`}
-              onClick={() => void api.revealFile(file.path)}
-            >
-              <SourceBadge source={file.source} />
-              <Text fontSize="sm" truncate>
-                {file.face} · {file.artist}
-              </Text>
+            <HStack key={file.path} h={FILE_LINE} gap="1">
+              <HStack
+                flex="1"
+                minW="0"
+                gap="2"
+                cursor="pointer"
+                title={`${file.path}\nClick to show it in its folder`}
+                onClick={() => void api.revealFile(file.path)}
+              >
+                <SourceBadge source={file.source} />
+                <Text fontSize="sm" truncate>
+                  {file.face} · {file.artist}
+                </Text>
+              </HStack>
+              <FileAction job={job.id} file={file} />
             </HStack>
           ))}
         </Stack>
@@ -248,6 +269,40 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
     </Table.Row>
   );
 });
+
+/** What can be done with a saved image beyond showing it: look for a larger
+ * copy of Scryfall's art, or open the page a found image came from. */
+function FileAction({ job, file }: { job: number; file: SavedFile }) {
+  if (file.source === "scryfall") {
+    return (
+      <Tooltip content="Find a larger copy with Google Lens">
+        <IconButton
+          size="2xs"
+          variant="ghost"
+          aria-label={`Find a larger copy of ${file.face}`}
+          onClick={() => void findLargerCopy(job, file.faceIndex)}
+        >
+          <LuScanSearch />
+        </IconButton>
+      </Tooltip>
+    );
+  }
+  if (file.source === "web" && file.page) {
+    return (
+      <Tooltip content="Open the page it came from">
+        <IconButton
+          size="2xs"
+          variant="ghost"
+          aria-label={`Open the page ${file.face}'s art came from`}
+          onClick={() => void openFoundPage(job, file.faceIndex)}
+        >
+          <LuExternalLink />
+        </IconButton>
+      </Tooltip>
+    );
+  }
+  return null;
+}
 
 /** How each status is shown: its badge colour and words, and whether it's under way. */
 function statusLook(status: JobStatus): { palette: string; label: string; busy?: boolean } {

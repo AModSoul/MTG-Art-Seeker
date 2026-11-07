@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, mocked, screen, userEvent, waitFor } from "storybook/test";
 
 import {
+  boltFile,
   finishedJobs,
   finishedSummary,
+  foundBoltFile,
   karnFile,
   mixedJobs,
   skippedLines,
@@ -173,5 +175,84 @@ export const Cancelled: Story = {
     await expect(canvas.queryByText("Finished")).not.toBeInTheDocument();
     // The progress label plus one badge per cancelled job.
     await expect(canvas.getAllByText("Cancelled")).toHaveLength(5);
+  },
+};
+
+/** A card that got Scryfall's art has a button to look for a larger copy in Google Lens. */
+export const FindLargerCopy: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+  },
+  play: async ({ canvas }) => {
+    // MTGPics' art has no such button.
+    await expect(
+      canvas.queryByRole("button", { name: "Find a larger copy of Karn, Scion of Urza" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+    );
+    await expect(api.findLargerCopy).toHaveBeenCalledWith(3, 2, 0, expect.any(Function));
+  },
+};
+
+/** An image the user saves in the Lens window takes the place of Scryfall's in its row. */
+export const SavesAFoundCopy: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.findLargerCopy).mockImplementation(async (run, job, _face, onEvent) => {
+      onEvent({ event: "saved", run, job, file: foundBoltFile, replaced: boltFile.path });
+    });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Saved the larger copy of Lightning Bolt")).toBeVisible(),
+    );
+    await expect(canvas.getByText("2400 × 1752")).toBeVisible();
+    await userEvent.click(canvas.getByRole("radio", { name: "Found 1" }));
+    await expect(canvas.getByText("Lightning Bolt")).toBeVisible();
+  },
+};
+
+/** Found art is badged as such, and links to the page it came from. */
+export const FoundArt: Story = {
+  beforeEach: () => {
+    useRun.setState({
+      runId: 3,
+      jobs: finishedJobs.map((job) =>
+        job.id === 2
+          ? { ...job, status: { state: "done", files: [foundBoltFile], missing: [] } }
+          : job,
+      ),
+      summary: finishedSummary,
+    });
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("Found")).toBeVisible();
+    await expect(
+      canvas.queryByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Open the page Lightning Bolt's art came from" }),
+    );
+    await expect(api.openFoundPage).toHaveBeenCalledWith(3, 2, 0);
+  },
+};
+
+/** Lens can't open: the error shows as a toast. */
+export const FindLargerCopyFails: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.findLargerCopy).mockRejectedValue("Scryfall has no art crop of Lightning Bolt");
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+    );
+    await waitFor(() => expect(screen.getByText("Couldn't open Google Lens")).toBeVisible());
   },
 };
