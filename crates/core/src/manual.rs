@@ -227,6 +227,9 @@ pub enum Doubt {
 #[serde(tag = "event", rename_all = "camelCase")]
 #[ts(export)]
 pub enum FoundEvent {
+    /// An image the user saved for `face`, or with `page`, the images of the
+    /// page they're on, are being checked. Something else follows.
+    Checking { face: String, page: bool },
     /// It's saved as the face's art: in `job` of run `run`, `file` takes the
     /// place of the file at `replaced`.
     Saved {

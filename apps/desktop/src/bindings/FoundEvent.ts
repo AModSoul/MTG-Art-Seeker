@@ -7,6 +7,7 @@ import type { SavedFile } from "./SavedFile";
  * larger copy.
  */
 export type FoundEvent =
+  | { event: "checking"; face: string; page: boolean }
   | { event: "saved"; run: number; job: number; file: SavedFile; replaced?: string }
   | { event: "doubtful"; token: number; face: string; doubt: Doubt }
   | { event: "noMatch"; face: string; images: number }

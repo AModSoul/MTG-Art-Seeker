@@ -19,7 +19,7 @@ use mtg_art_core::{
     history::{default_history_path, History},
     http::{Http, HttpConfig},
     list::{parse_list, ListFile, ParsedList},
-    manual::{self, Destination, Found, FoundEvent, FromPage, Imported, PageImage, Site, Target},
+    manual::{self, Destination, Doubt, Found, FoundEvent, FromPage, Imported, PageImage, Site, Target},
     mtgpics::Artists,
     presets::{presets, PresetInfo},
     settings::{default_settings_path, Settings},
@@ -70,6 +70,50 @@ struct Search {
     job: u32,
     target: Target,
     events: Channel<FoundEvent>,
+}
+
+/// Tells the front end about an image the user saved, and the user, who is
+/// likely looking at the finder window, with a toast there. A question that
+/// needs an answer is asked in the main window, whose taskbar icon flashes.
+fn report(app: &AppHandle, search: &Search, event: FoundEvent) {
+    let (kind, text) = match &event {
+        FoundEvent::Checking { face, page: true } => ("loading", format!("Looking for {face}'s art on this page…")),
+        FoundEvent::Checking { page: false, .. } => ("loading", "Checking the image you saved…".to_owned()),
+        FoundEvent::Saved { file, .. } => (
+            "success",
+            match file.size {
+                Some(size) => format!("Saved {}'s art: {} × {}", file.face, size.width, size.height),
+                None => format!("Saved {}'s art", file.face),
+            },
+        ),
+        FoundEvent::Doubtful { face, doubt, .. } => {
+            let what = match doubt {
+                Doubt::Smaller => format!("That copy of {face}'s art is no bigger than Scryfall's."),
+                Doubt::CardScan => format!("That's the card, not {face}'s art on its own."),
+                Doubt::Different => format!("That doesn't look like {face}'s art."),
+            };
+            (
+                "warning",
+                format!("{what} Save it anyway? Answer in MTG Art Downloader."),
+            )
+        }
+        FoundEvent::NoMatch { face, images: 0 } => (
+            "warning",
+            format!("No image on this page is large enough to be {face}'s art."),
+        ),
+        FoundEvent::NoMatch { face, .. } => (
+            "warning",
+            format!("None of the images on this page look like {face}'s art."),
+        ),
+        FoundEvent::Failed { message } => ("error", format!("Couldn't save that image: {message}")),
+    };
+    finder::toast(app, kind, &text);
+    if matches!(event, FoundEvent::Doubtful { .. }) {
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.request_user_attention(Some(tauri::UserAttentionType::Informational));
+        }
+    }
+    let _ = search.events.send(event);
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -249,13 +293,13 @@ async fn find_larger_copy(
 /// Saves an image that didn't look like a larger copy of the art, or with
 /// `save` false, throws it away.
 #[tauri::command]
-async fn confirm_found_art(state: State<'_, AppState>, token: u32, save: bool) -> CommandResult<()> {
+async fn confirm_found_art(app: AppHandle, state: State<'_, AppState>, token: u32, save: bool) -> CommandResult<()> {
     let (search, saved) = lock(&state.doubtful)
         .remove(&token)
         .ok_or("That image is gone. Save it from the search window again.")?;
     if save {
         let event = import_found(&state, &search, &saved, true).await;
-        let _ = search.events.send(event);
+        report(&app, &search, event);
     } else {
         let _ = std::fs::remove_file(&saved.path);
     }
@@ -273,8 +317,16 @@ fn on_saved(app: &AppHandle, saved: finder::Saved) {
             let _ = std::fs::remove_file(&saved.path);
             return;
         };
+        report(
+            &app,
+            &search,
+            FoundEvent::Checking {
+                face: search.target.face.name.clone(),
+                page: false,
+            },
+        );
         let event = import_found(&state, &search, &saved, false).await;
-        let _ = search.events.send(event);
+        report(&app, &search, event);
     });
 }
 
@@ -288,8 +340,16 @@ fn on_page(app: &AppHandle, images: Vec<PageImage>, page: Option<tauri::Url>) {
         let Some(search) = search else {
             return;
         };
+        report(
+            &app,
+            &search,
+            FoundEvent::Checking {
+                face: search.target.face.name.clone(),
+                page: true,
+            },
+        );
         let event = import_page(&app, &state, &search, &images, page).await;
-        let _ = search.events.send(event);
+        report(&app, &search, event);
     });
 }
 

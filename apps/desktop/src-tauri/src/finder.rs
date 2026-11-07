@@ -6,7 +6,9 @@
 //! handed on. The app reads a page only when the user asks, from the window's
 //! menu, to find the art on it, and then reads only the addresses and sizes
 //! of its images ([`PAGE_IMAGES`]); it never clicks, scrolls or navigates for
-//! them. The pages, and every site the user goes on to, get none of the
+//! them. What came of an image is shown in a small toast of the app's own in
+//! the page's corner ([`toast`]), kept apart from the page's content and
+//! styles. The pages, and every site the user goes on to, get none of the
 //! app's commands: the capabilities in `capabilities/` name only `main`.
 
 use std::{
@@ -91,6 +93,52 @@ pub struct Saved {
     pub page: Option<Url>,
     /// Where it was saved: a file of its own in [`downloads_dir`].
     pub path: PathBuf,
+}
+
+/// Draws the app's toast in the corner of the page: `kind` (`loading`,
+/// `success`, `warning` or `error`) colours it, and `text` is set as text, not
+/// markup. It sits in a shadow root, so the page's styles don't reach it, and
+/// goes after a few seconds unless it's `loading`. Another replaces it.
+const TOAST: &str = r##"((kind, text) => {
+  const id = "mtg-art-downloader-toast";
+  let host = document.getElementById(id);
+  if (!host) {
+    host = document.createElement("div");
+    host.id = id;
+    host.style.cssText =
+      "all: initial; position: fixed; right: 16px; bottom: 16px; z-index: 2147483647;";
+    host.attachShadow({ mode: "open" });
+    (document.body || document.documentElement).appendChild(host);
+  }
+  const colours = {
+    loading: "#3b82f6", success: "#22c55e", warning: "#f59e0b", error: "#ef4444",
+  };
+  const box = document.createElement("div");
+  box.setAttribute("role", "status");
+  box.textContent = text;
+  box.style.cssText = [
+    "font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif",
+    "color: #f9fafb", "background: #1f2937", "max-width: 380px",
+    "padding: 10px 14px", "border-radius: 6px",
+    `border-left: 4px solid ${colours[kind] || colours.loading}`,
+    "box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35)",
+  ].join("; ");
+  host.shadowRoot.replaceChildren(box);
+  clearTimeout(host.hideAfter);
+  if (kind !== "loading") host.hideAfter = setTimeout(() => host.remove(), 7000);
+})"##;
+
+/// Shows `text` in the window's toast; see [`TOAST`]. Nothing if the window
+/// is closed.
+pub fn toast(app: &AppHandle, kind: &str, text: &str) {
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    // Both arguments go in as JSON strings, so neither can be read as script.
+    let (Ok(kind), Ok(text)) = (serde_json::to_string(kind), serde_json::to_string(text)) else {
+        return;
+    };
+    let _ = window.eval(format!("{TOAST}({kind}, {text})"));
 }
 
 /// Where the window's downloads go until they're dealt with.

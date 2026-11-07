@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { api } from "@/api";
+import { toaster } from "@/components/ui/toaster";
 import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { JobInfo } from "@/bindings/JobInfo";
 import type { JobStatus } from "@/bindings/JobStatus";
@@ -12,7 +13,7 @@ import type { RunSummary } from "@/bindings/RunSummary";
 import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
-import { errorText, showError, showInfo, showSuccess } from "@/notify";
+import { errorText, showError, showInfo, showLoading, showSuccess } from "@/notify";
 
 // --- What the user is about to download, remembered between launches -------
 
@@ -233,8 +234,20 @@ export async function answerDoubt(save: boolean) {
   }
 }
 
+/** The toast that says what the finder window's images came to: one at a time,
+ * a spinner while they're checked and then the result. */
+const FOUND_TOAST = "found";
+
 function onFound(event: FoundEvent) {
   switch (event.event) {
+    case "checking":
+      showLoading(
+        event.page
+          ? `Looking for ${event.face}'s art on the page…`
+          : `Checking the image you saved for ${event.face}…`,
+        FOUND_TOAST,
+      );
+      break;
     case "saved":
       useRun.setState((state) => {
         const job = state.jobs[event.job - 1];
@@ -248,9 +261,11 @@ function onFound(event: FoundEvent) {
         jobs[event.job - 1] = { ...job, status: { ...job.status, files } };
         return { jobs };
       });
-      showSuccess(`Saved the larger copy of ${event.file.face}`);
+      showSuccess(`Saved the larger copy of ${event.file.face}`, FOUND_TOAST);
       break;
     case "doubtful":
+      // The dialog asks; the spinner has nothing left to say.
+      toaster.dismiss(FOUND_TOAST);
       useRun.setState((state) => ({ doubts: [...state.doubts, event] }));
       break;
     case "noMatch":
@@ -259,10 +274,11 @@ function onFound(event: FoundEvent) {
         event.images === 0
           ? "The page has no images large enough."
           : `Looked at the ${event.images === 1 ? "one image" : `${event.images} largest images`} it has.`,
+        FOUND_TOAST,
       );
       break;
     case "failed":
-      showError("Couldn't save the image", event.message);
+      showError("Couldn't save the image", event.message, FOUND_TOAST);
       break;
   }
 }
