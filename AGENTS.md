@@ -62,6 +62,14 @@ The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` onc
   Never match on a name alone: one set can print a name many times.
 - **The front end never passes URLs or file paths to download.** It sends text input and settings;
   the core builds every URL and path, and file names go through `naming::sanitize`.
+- **The Lens window is the user's to drive.** `src-tauri/src/lens.rs` opens Google Lens on an art
+  crop and then only listens for downloads: no injected scripts, no reading pages, no clicking for
+  the user. Images saved there reach the core from `src-tauri` (`manual::import`), never from
+  React, and an image `verify` doesn't accept is only saved if the user says so. Its pages get no
+  capabilities: `capabilities/` names only `main`.
+- **Art from anywhere but MTGPics and Scryfall goes through `verify`**, which checks it's Scryfall's
+  art and larger. Tune its thresholds with `cargo run --release -p mtg-art-core --example verify`
+  on real images kept outside the repo; the tests use generated ones.
 - **Types the front end reads derive `TS` with `#[ts(export)]`.** After changing one, run
   `pnpm bindings` and commit `apps/desktop/src/bindings`. Don't edit those files by hand.
 - **Tests don't touch the network.** Unit tests read saved pages in `crates/core/tests/fixtures`

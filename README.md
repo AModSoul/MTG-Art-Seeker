@@ -48,13 +48,22 @@ many first.
 **Presets.** EDHREC's lists of the most-played Commander cards.
 
 Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and by default go in
-`mtgpics/` and `scryfall/` folders, with a folder for each layout: `MDFC Front` and `MDFC Back`,
-`Adventure`, `Saga`, `Basic`. A double-faced card is saved as one image per face. When a run ends,
-**Retry failed** runs the cards that failed again, and **Copy failed** copies them as a list.
+`mtgpics/` and `scryfall/` folders (and `web/` for copies you find), with a folder for each layout:
+`MDFC Front` and `MDFC Back`, `Adventure`, `Saga`, `Basic`. A double-faced card is saved as one
+image per face. When a run ends, **Retry failed** runs the cards that failed again, and **Copy
+failed** copies them as a list.
 
 With **A folder for each list** on, a card list's art goes in a folder of its own inside the save
 folder, named in the field under the list. Opening a list file fills that field in with the file's
 name; leave it empty to save in the save folder itself.
+
+**Find a larger copy.** Scryfall's art is small. Next to each image that came from Scryfall, the
+search button opens Google Lens on that art in a window of its own. Look through the results,
+open the largest copy you can find (an artist's ArtStation page, say) and choose **Save image**.
+The app checks it's the same art and larger than Scryfall's, then saves it in place of Scryfall's
+file, in a `web/` folder, marked **Found** in the results with a link to the page it came from. If
+it doesn't look like a larger copy of the art (a card scan, a smaller copy, or another painting),
+the app asks before saving it. Every later download of that art gets your copy.
 
 ### Settings
 
@@ -123,6 +132,13 @@ Every printing whose art is saved is logged, with where on MTGPics each face's a
 downloaded from there without searching MTGPics again; only if the image is gone from that address
 is MTGPics searched afresh. A face MTGPics had no art for is looked for again after 30 days, in case
 it has been added.
+
+An image you save in the Lens window is checked against Scryfall's art crop: the crop has to be
+found inside it, at any size, and it has to be at least 10% wider than the crop. A match that covers
+too little of the image, where the picture stops at the match's edges as at a card's frame, is a
+card scan. Where you saved it from is logged by artwork, so every printing of the art is saved from
+there, before MTGPics is asked; if the image is gone from there, it's forgotten. The app only opens
+Lens and listens for what you save: it doesn't search, click or read pages for you.
 
 ## Development
 
