@@ -7,7 +7,6 @@ const SITE_BUILD_PLUGINS = new Set([
   "serve-prerendered-html",
   "drop-prerender-chunks",
   "exit-after-build",
-  "cname",
 ]);
 
 function withoutSiteBuildPlugins(plugins: PluginOption[] | undefined): PluginOption[] {

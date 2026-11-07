@@ -1,11 +1,11 @@
 /**
  * Everything about where the site lives and what it links to.
  *
- * Until `CUSTOM_DOMAIN` is set, the site is served from GitHub Pages' project URL, under the
- * repository's name. Setting it serves the site from the domain's root and writes a `CNAME` file
- * into the build; the domain's DNS and the repository's Pages settings have to point at it too.
+ * With `CUSTOM_DOMAIN` set, the site is served from the domain's root; set to `null`, from GitHub
+ * Pages' project URL, under the repository's name. The domain itself is configured in the
+ * repository's Pages settings and the domain's DNS: a deploy from Actions ignores `CNAME` files.
  */
-export const CUSTOM_DOMAIN: string | null = null;
+export const CUSTOM_DOMAIN: string | null = "getmtg.art";
 
 /** The repository whose Releases ship the desktop app. */
 export const GITHUB_OWNER = "AModSoul";

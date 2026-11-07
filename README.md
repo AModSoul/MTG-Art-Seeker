@@ -171,9 +171,10 @@ its own and never makes a release. Its download page lists whatever files the la
 sorted by the rules in `apps/site/src/downloads/artifacts.ts`; a file no rule knows is still
 offered, under "Other files".
 
-It's served from `https://amodsoul.github.io/mtg-art-downloader-rust/` until `CUSTOM_DOMAIN` is set
-in `apps/site/src/site-config.ts`; then point the domain's DNS at GitHub Pages and set it in the
-repository's Pages settings. Pages' source must be **GitHub Actions**.
+It's served at [getmtg.art](https://getmtg.art), the `CUSTOM_DOMAIN` in
+`apps/site/src/site-config.ts`. The domain is set in the repository's Pages settings, whose source
+must be **GitHub Actions**, and its DNS points at GitHub Pages. Setting `CUSTOM_DOMAIN` to `null`
+serves the site from `https://amodsoul.github.io/mtg-art-downloader-rust/` instead.
 
 ### Agent instructions
 

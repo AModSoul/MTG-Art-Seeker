@@ -94,9 +94,10 @@ The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` onc
 - **The site never creates a GitHub release or a `v*` tag.** The app's updater and the download
   page read `releases/latest`, which must always be the app's. The site deploys from `trunk` on
   its own (`.github/workflows/pages.yml`); the app ships by tag (`release.yml`).
-- **The site's base path comes from `apps/site/src/site-config.ts`.** It's the repository's name on
-  GitHub Pages until `CUSTOM_DOMAIN` is set. Link with the router's `Link` and build public file
-  URLs from `import.meta.env.BASE_URL`, never a hard-coded `/`.
+- **The site's base path comes from `apps/site/src/site-config.ts`.** It's `/` while
+  `CUSTOM_DOMAIN` (`getmtg.art`) is set, and the repository's name on GitHub Pages' project URL
+  without it. Link with the router's `Link` and build public file URLs from
+  `import.meta.env.BASE_URL`, never a hard-coded `/`.
 - **Types over casts** in TypeScript: narrow with a guard instead of `as`.
 
 ## Agent config and MCP servers
