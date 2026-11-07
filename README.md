@@ -124,6 +124,10 @@ fails if they're out of date.
 3. The Release workflow builds the installers and attaches them to a draft release. Publish it, and
    installed apps offer the update.
 
+To build one platform's installer without a tag — to try a release out — run the Release workflow
+by hand from the Actions tab and pick the platform. It goes into the same draft release, named for
+the version in `tauri.conf.json`.
+
 Update bundles are signed. The workflow needs two repository secrets: `TAURI_SIGNING_PRIVATE_KEY`,
 the private key whose public half is in `tauri.conf.json`, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 (empty if the key has none). Losing the private key means installed apps can't update to a build
