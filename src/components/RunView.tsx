@@ -9,6 +9,7 @@ import {
   Stack,
   Table,
   Text,
+  VisuallyHidden,
 } from "@chakra-ui/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { memo, useState } from "react";
@@ -152,7 +153,9 @@ export function RunView() {
         <Table.Root size="sm" stickyHeader interactive>
           <Table.Header>
             <Table.Row>
-              <Table.ColumnHeader w="20" />
+              <Table.ColumnHeader w="20">
+                <VisuallyHidden>Art</VisuallyHidden>
+              </Table.ColumnHeader>
               <Table.ColumnHeader>Card</Table.ColumnHeader>
               <Table.ColumnHeader w="32">Status</Table.ColumnHeader>
               <Table.ColumnHeader w="28">Resolution</Table.ColumnHeader>
