@@ -21,7 +21,7 @@ use crate::{
     carddb::{CardDb, NameQuery},
     faces::{plan_faces, FacePlan},
     history::{History, Remembered},
-    http::Http,
+    http::{Http, ImageKind},
     imagesize::{image_size, ImageSize},
     list::{parse_list, CardLine, SkippedLine},
     mtgpics::{self, MtgpicsArt},
@@ -117,6 +117,16 @@ pub enum JobStatus {
 pub enum ArtSource {
     Mtgpics,
     Scryfall,
+}
+
+impl ArtSource {
+    /// The folder its art goes in, with [`Settings::source_folders`] on.
+    fn folder(self) -> &'static str {
+        match self {
+            Self::Mtgpics => "mtgpics",
+            Self::Scryfall => "scryfall",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -379,11 +389,18 @@ impl Job {
 /// Where a run saves: the output folder, or for a list with
 /// [`Settings::list_folders`] on and a folder name, that folder inside it.
 fn output_dir(input: &RunInput, settings: &Settings) -> PathBuf {
-    let base = PathBuf::from(&settings.output_dir);
     match input {
-        RunInput::List {
-            folder: Some(folder), ..
-        } if settings.list_folders && !folder.trim().is_empty() => base.join(sanitize(folder)),
+        RunInput::List { folder, .. } => output_dir_for(folder.as_deref(), settings),
+        _ => output_dir_for(None, settings),
+    }
+}
+
+/// Where a run with these settings saves, for a list named `list_folder` or
+/// for any other input.
+pub fn output_dir_for(list_folder: Option<&str>, settings: &Settings) -> PathBuf {
+    let base = PathBuf::from(&settings.output_dir);
+    match list_folder {
+        Some(folder) if settings.list_folders && !folder.trim().is_empty() => base.join(sanitize(folder)),
         _ => base,
     }
 }
@@ -653,56 +670,77 @@ async fn save(
     context: &Context<'_>,
 ) -> Result<Option<SavedFile>> {
     let settings = context.settings;
-    let mut dir = context.output_dir.clone();
-    if settings.source_folders {
-        dir.push(match source {
-            ArtSource::Mtgpics => "mtgpics",
-            ArtSource::Scryfall => "scryfall",
-        });
-    }
-    dir.extend(&face.folders);
+    let dir = face_dir(&context.output_dir, settings, source, face);
     tokio::fs::create_dir_all(&dir).await?;
 
     // Downloaded beside its final place, and only moved there whole: a run
     // cancelled mid-download leaves no half image behind.
-    let temp = TempFile(Some(dir.join(format!(
-        ".download-{}-{}.part",
-        std::process::id(),
-        context.temp_ids.fetch_add(1, Ordering::Relaxed)
-    ))));
+    let temp = TempFile::beside(&dir, context.temp_ids.fetch_add(1, Ordering::Relaxed));
     let Some(kind) = context.http.download(url, temp.path()).await? else {
         return Ok(None);
     };
-    let size = image_size(temp.path(), kind);
-    let set = card.set.to_uppercase();
-    let stem = file_stem(
+    let stem = face_stem(settings, card, face);
+    let path = context.paths.reserve(&dir, &stem, kind.extension(), settings.overwrite);
+    Ok(Some(place(temp, kind, &path, card, face, source).await?))
+}
+
+/// The folder a face's art from `source` goes in, inside `output_dir`.
+pub(crate) fn face_dir(output_dir: &Path, settings: &Settings, source: ArtSource, face: &FacePlan) -> PathBuf {
+    let mut dir = output_dir.to_path_buf();
+    if settings.source_folders {
+        dir.push(source.folder());
+    }
+    dir.extend(&face.folders);
+    dir
+}
+
+/// The name a face's art is saved under, without its extension.
+pub(crate) fn face_stem(settings: &Settings, card: &Card, face: &FacePlan) -> String {
+    file_stem(
         &settings.naming,
         &NameParts {
             name: &face.name,
             artist: &face.artist,
-            set: &set,
+            set: &card.set.to_uppercase(),
             number: &card.collector_number,
         },
-    );
-    let path = context.paths.reserve(&dir, &stem, kind.extension(), settings.overwrite);
-    tokio::fs::rename(temp.path(), &path).await?;
+    )
+}
+
+/// Moves a downloaded image to `path`, in the same folder, and says what it is.
+pub(crate) async fn place(
+    temp: TempFile,
+    kind: ImageKind,
+    path: &Path,
+    card: &Card,
+    face: &FacePlan,
+    source: ArtSource,
+) -> Result<SavedFile> {
+    let size = image_size(temp.path(), kind);
+    tokio::fs::rename(temp.path(), path).await?;
     temp.keep();
-    Ok(Some(SavedFile {
+    Ok(SavedFile {
         path: path.to_string_lossy().into_owned(),
         face: face.name.clone(),
         source,
-        set,
+        set: card.set.to_uppercase(),
         number: card.collector_number.clone(),
         artist: face.artist.clone(),
         size,
-    }))
+    })
 }
 
 /// A partly downloaded file, deleted when dropped unless kept.
-struct TempFile(Option<PathBuf>);
+pub(crate) struct TempFile(Option<PathBuf>);
 
 impl TempFile {
-    fn path(&self) -> &Path {
+    /// A hidden file in `dir`, named so no other download in this process,
+    /// or any other, takes the same name.
+    pub(crate) fn beside(dir: &Path, id: u64) -> Self {
+        Self(Some(dir.join(format!(".download-{}-{id}.part", std::process::id()))))
+    }
+
+    pub(crate) fn path(&self) -> &Path {
         self.0.as_deref().expect("not yet kept")
     }
 
@@ -721,14 +759,14 @@ impl Drop for TempFile {
 
 /// Hands out file paths, so two jobs in one run can't both claim a name.
 #[derive(Default)]
-struct PathReserver {
+pub(crate) struct PathReserver {
     taken: Mutex<HashSet<PathBuf>>,
 }
 
 impl PathReserver {
     /// `dir/stem.ext`, or with `overwrite` off, the first of `stem (1).ext`,
     /// `stem (2).ext`… that's neither on disk nor handed out already.
-    fn reserve(&self, dir: &Path, stem: &str, extension: &str, overwrite: bool) -> PathBuf {
+    pub(crate) fn reserve(&self, dir: &Path, stem: &str, extension: &str, overwrite: bool) -> PathBuf {
         let mut taken = self.taken.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let first = dir.join(format!("{stem}.{extension}"));
         if overwrite {
