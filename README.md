@@ -9,6 +9,11 @@ A desktop app for Windows, macOS and Linux, and a command line tool, both built 
 It's a rewrite of [MTG Art Downloader](https://github.com/MrTeferi/MTG-Art-Downloader) by Mr Teferi,
 by way of [Alex Taxiera's fork](https://github.com/alex-taxiera/mtg-art-downloader).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/results-dark.png" />
+  <img alt="The app after downloading a deck list: each card with a thumbnail of its art, where the art came from, and the artist" src="docs/screenshots/results-light.png" />
+</picture>
+
 ## Install
 
 Download the installer for your system from the
@@ -44,6 +49,8 @@ Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and 
 **Retry failed** runs the cards that failed again, and **Copy failed** copies them as a list.
 
 ### Settings
+
+<img alt="The settings drawer" src="docs/screenshots/settings-dark.png" width="700" />
 
 | Setting                   | Default                        |                                                    |
 | ------------------------- | ------------------------------ | -------------------------------------------------- |
