@@ -19,7 +19,11 @@
     "prepare": "husky && npm run typegen",
     "agents:sync": "node scripts/sync-agents.ts",
     "postinstall": "npm run agents:sync",
-    "typegen": "chakra typegen src/theme.ts"
+    "typegen": "chakra typegen src/theme.ts",
+    "test": "vitest run",
+    "storybook": "storybook dev -p 6008",
+    "ci-storybook": "storybook dev -p 6008 --quiet --ci",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.38.0",
@@ -36,17 +40,27 @@
   },
   "devDependencies": {
     "@chakra-ui/cli": "^3.38.0",
+    "@storybook/addon-a11y": "^10.6.6",
+    "@storybook/addon-docs": "^10.6.6",
+    "@storybook/addon-mcp": "^10.6.6",
+    "@storybook/addon-themes": "^10.6.6",
+    "@storybook/addon-vitest": "^10.6.6",
+    "@storybook/react-vite": "^10.6.6",
     "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
+    "@vitest/browser-playwright": "^5.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "oxfmt": "^0.73.0",
     "oxlint": "^1.92.0",
+    "playwright": "^1.65.0",
+    "storybook": "^10.6.6",
     "typescript": "^6.0.3",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}": [
@@ -55,5 +69,8 @@
     ],
     "*.{json,jsonc,md,mdx,css,yml,yaml,html,toml}": "oxfmt --no-error-on-unmatched-pattern",
     "*.rs": "cargo fmt --"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
