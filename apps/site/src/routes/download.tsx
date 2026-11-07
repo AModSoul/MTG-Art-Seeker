@@ -1,7 +1,9 @@
-import { Button, Container, Heading, Stack, Text } from "@chakra-ui/react";
+import { Container, Heading, Stack, Text } from "@chakra-ui/react";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { APP_NAME, GITHUB_RELEASES_URL } from "@/site-config";
+import { DownloadPanel } from "@/components/DownloadPanel";
+import { useLatestRelease, useVisitorPlatform } from "@/downloads/hooks";
+import { APP_NAME } from "@/site-config";
 
 export const Route = createFileRoute("/download")({
   component: Download,
@@ -9,16 +11,22 @@ export const Route = createFileRoute("/download")({
 });
 
 function Download() {
+  const state = useLatestRelease();
+  const { os, arch } = useVisitorPlatform();
+
   return (
     <Container maxW="4xl" py={{ base: 10, md: 16 }}>
-      <Stack gap={4} align="flex-start">
-        <Heading as="h1" size="3xl">
-          Download
-        </Heading>
-        <Text color="fg.muted">Installers for Windows, macOS and Linux are on GitHub.</Text>
-        <Button asChild colorPalette="blue" size="lg">
-          <a href={`${GITHUB_RELEASES_URL}/latest`}>Latest release</a>
-        </Button>
+      <Stack gap={8}>
+        <Stack gap={2}>
+          <Heading as="h1" size="3xl">
+            Download
+          </Heading>
+          <Text color="fg.muted" fontSize="lg">
+            The desktop app for Windows, macOS and Linux. It checks for new versions when it starts
+            and offers to update itself.
+          </Text>
+        </Stack>
+        <DownloadPanel state={state} os={os} arch={arch} />
       </Stack>
     </Container>
   );

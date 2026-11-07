@@ -8,11 +8,30 @@ import { renderToString } from "react-dom/server";
 import type { PrerenderArguments, PrerenderResult } from "vite-prerender-plugin";
 
 import { documentTitleFromMatches } from "./document-title";
+import { fetchLatestRelease, type Release } from "./downloads/github";
+import { SNAPSHOT_ELEMENT_ID, setPrerenderedRelease, snapshotJson } from "./downloads/snapshot";
 import { createAppRouter } from "./router";
 import { APP_NAME, BASE_PATH } from "./site-config";
 
 /** vite-prerender-plugin's head element, which it doesn't export. */
-type HeadElement = { type: string; props: Record<string, string> };
+type HeadElement = { type: string; props: Record<string, string>; children?: string };
+
+/** Pages that show the latest release, and so carry a snapshot of it. */
+const RELEASE_PAGES = new Set(["/download"]);
+
+let release: Promise<Release | null> | undefined;
+
+/**
+ * The latest release, fetched once per build. A build that can't reach GitHub still succeeds: the
+ * page then loads the release in the browser. CI passes GITHUB_TOKEN for a higher rate limit.
+ */
+function latestRelease(): Promise<Release | null> {
+  release ??= fetchLatestRelease({ token: process.env.GITHUB_TOKEN }).catch((error: unknown) => {
+    console.warn(`Prerendering without a release snapshot: ${String(error)}`);
+    return null;
+  });
+  return release;
+}
 
 /** The plugin names pages from the site's root; the router and the HTML include the base path. */
 const withBase = (url: string) => BASE_PATH + url.replace(/^\//, "");
@@ -31,6 +50,9 @@ function withoutBase(href: string): string | null {
 }
 
 export async function prerender({ url }: PrerenderArguments): Promise<PrerenderResult> {
+  const snapshot = RELEASE_PAGES.has(url) ? await latestRelease() : null;
+  setPrerenderedRelease(snapshot);
+
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [withBase(url)] }),
     isServer: true,
@@ -62,6 +84,14 @@ export async function prerender({ url }: PrerenderArguments): Promise<PrerenderR
       entry && !("title" in entry) ? [{ type: "meta", props: stringProps(entry) }] : [],
     ),
   );
+  if (snapshot) {
+    elements.add({
+      type: "script",
+      props: { type: "application/json", id: SNAPSHOT_ELEMENT_ID },
+      children: snapshotJson(snapshot),
+    });
+  }
+  setPrerenderedRelease(null);
 
   return {
     html,
