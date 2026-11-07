@@ -17,7 +17,7 @@ drive it. A marketing site sits beside them.
     its own: no fetching, no parsing, no file writes.
 - `packages/ui` (`@mtg-art/ui`) — the Chakra snippets, theme, provider and shared Storybook preview
   both apps use. Source only, no build step: import `@mtg-art/ui/<snippet>`, `@mtg-art/ui/theme`.
-- `apps/site` (package `site`) — the marketing site on GitHub Pages: Vite, TanStack Router, and
+- `apps/site` (package `site`) — the marketing site at getmtg.art, on Cloudflare Pages: Vite, TanStack Router, and
   `vite-prerender-plugin`, which renders every page to static HTML after the build.
 
 ## Commands
@@ -93,11 +93,7 @@ The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` onc
   asset name or version in a component.
 - **The site never creates a GitHub release or a `v*` tag.** The app's updater and the download
   page read `releases/latest`, which must always be the app's. The site deploys from `trunk` on
-  its own (`.github/workflows/pages.yml`); the app ships by tag (`release.yml`).
-- **The site's base path comes from `apps/site/src/site-config.ts`.** It's `/` while
-  `CUSTOM_DOMAIN` (`getmtg.art`) is set, and the repository's name on GitHub Pages' project URL
-  without it. Link with the router's `Link` and build public file URLs from
-  `import.meta.env.BASE_URL`, never a hard-coded `/`.
+  its own (`.github/workflows/site.yml`); the app ships by tag (`release.yml`).
 - **Types over casts** in TypeScript: narrow with a guard instead of `as`.
 
 ## Agent config and MCP servers

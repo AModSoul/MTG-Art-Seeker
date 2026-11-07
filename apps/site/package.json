@@ -12,7 +12,8 @@
     "test": "vitest run",
     "storybook": "storybook dev -p 6010",
     "ci-storybook": "storybook dev -p 6010 --quiet --ci",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "deploy": "wrangler pages deploy dist --project-name getmtg-art"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
@@ -43,6 +44,7 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-prerender-plugin": "^0.5.13",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "^4.156.0"
   }
 }

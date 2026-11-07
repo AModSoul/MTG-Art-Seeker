@@ -10,8 +10,6 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, type Plugin } from "vite";
 import { vitePrerenderPlugin } from "vite-prerender-plugin";
 
-import { BASE_PATH } from "./src/site-config";
-
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const PRERENDER_SCRIPT = path.join(dirname, "src/prerender.tsx");
 
@@ -73,7 +71,6 @@ function exitAfterBuild(): Plugin {
 }
 
 export default defineConfig(({ command }) => ({
-  base: BASE_PATH,
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
