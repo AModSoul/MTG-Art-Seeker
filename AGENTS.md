@@ -63,10 +63,12 @@ The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` onc
 - **The front end never passes URLs or file paths to download.** It sends text input and settings;
   the core builds every URL and path, and file names go through `naming::sanitize`.
 - **The finder window is the user's to drive.** `src-tauri/src/finder.rs` opens the page the core
-  chose (`manual::Target::search_url`: Google Lens on an art crop, or an artist search on
-  ArtStation, DeviantArt or Pixiv) and then only listens for downloads: no injected scripts, no
-  reading pages, no clicking for the user. Images saved there reach the core from `src-tauri` (`manual::import`), never from
-  React, and an image `verify` doesn't accept is only saved if the user says so. Its pages get no
+  chose (`manual::site_url`: Google Lens on an art crop, a search for the artist, or the website
+  MTGPics links for them) and then listens for downloads. It reads a page only when the user picks
+  **Find the art on this page** from the window's menu, and then only the addresses and sizes of its
+  images (`PAGE_IMAGES`); it never clicks, scrolls or navigates for the user, and reads nothing
+  else. Images reach the core from `src-tauri` (`manual::import`, `manual::import_from_page`), never
+  from React, and one `verify` doesn't accept is only saved if the user says so. Its pages get no
   capabilities: `capabilities/` names only `main`.
 - **Art from anywhere but MTGPics and Scryfall goes through `verify`**, which checks it's Scryfall's
   art and larger. Tune its thresholds with `cargo run --release -p mtg-art-core --example verify`

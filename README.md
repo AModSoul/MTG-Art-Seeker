@@ -57,14 +57,20 @@ With **A folder for each list** on, a card list's art goes in a folder of its ow
 folder, named in the field under the list. Opening a list file fills that field in with the file's
 name; leave it empty to save in the save folder itself.
 
-**Find a larger copy.** Scryfall's art is small. Next to each image that came from Scryfall, four
+**Find a larger copy.** Scryfall's art is small. Next to each image that came from Scryfall, six
 buttons open a window of the app's own to look for a bigger one: Google Lens, searching for that
-art, or a search for the card's artist on ArtStation, DeviantArt or Pixiv. Find the largest copy you
-can, open it, and choose **Save image**. The app checks it's the same art and larger than
-Scryfall's, then saves it in place of Scryfall's file, in a `web/` folder, marked **Found** in the
-results with a link to the page it came from. If it doesn't look like a larger copy of the art (a
-card scan, a smaller copy, or another painting), the app asks before saving it. Every later download
-of that art gets your copy.
+art; a search for the card's artist on ArtStation, DeviantArt or Pixiv, or on Instagram through
+Google; and the artist's own website, when their MTGPics page links one (most don't). Find the
+largest copy you can, open it, and choose **Save image**. The app checks it's the same art and
+larger than Scryfall's, then saves it in place of Scryfall's file, in a `web/` folder, marked
+**Found** in the results with a link to the page it came from. If it doesn't look like a larger copy
+of the art (a card scan, a smaller copy, or another painting), the app asks before saving it. Every
+later download of that art gets your copy.
+
+Some sites, Instagram among them, cover their images so they can't be saved. On those, open the post
+and choose **Find the art on this page** from the window's menu: the app looks at the images the
+page has, largest first, and saves the one that's the art. It reads the page only when you ask, and
+only its images. You can sign in to a site in that window; **Sign out of sites** forgets it.
 
 ### Settings
 
@@ -134,13 +140,15 @@ downloaded from there without searching MTGPics again; only if the image is gone
 is MTGPics searched afresh. A face MTGPics had no art for is looked for again after 30 days, in case
 it has been added.
 
-An image you save in that window is checked against Scryfall's art crop: the crop has to be
-found inside it, at any size, and it has to be at least 10% wider than the crop. A match that covers
-too little of the image, where the picture stops at the match's edges as at a card's frame, is a
-card scan. Where you saved it from is logged by artwork, so every printing of the art is saved from
-there, before MTGPics is asked; if the image is gone from there, it's forgotten. The app only opens
-the page and listens for what you save: it doesn't search, click or read pages for you. Pixiv's
-artist search needs an account, so its button searches Pixiv for the artist's name instead.
+An image you save in that window is checked against Scryfall's art crop: the crop has to be found
+inside it, at any size, and it has to be at least 10% wider than the crop. A match that covers too
+little of the image, where the picture stops at the match's edges as at a card's frame, is a card
+scan. Where you saved it from is logged by artwork, so every printing of the art is saved from
+there, before MTGPics is asked; if the image is gone from there, it's forgotten. The app opens the
+page and listens for what you save; it doesn't search or click for you, and reads a page only when
+you choose **Find the art on this page**, and then only its images. A website is the one the
+artist's MTGPics page links, kept for a month. Pixiv's artist search needs an account, so its button
+searches Pixiv for the artist's name instead.
 
 ## Development
 
