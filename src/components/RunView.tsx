@@ -1,131 +1,116 @@
 import {
-  Alert,
   Badge,
   Box,
   Button,
-  EmptyState,
   Flex,
   HStack,
   Image,
-  Progress,
-  SegmentGroup,
   Spinner,
   Stack,
   Table,
   Text,
-  VStack,
 } from "@chakra-ui/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { memo, useState } from "react";
 import { LuClipboardCopy, LuFolderOpen, LuImageDown, LuRotateCcw } from "react-icons/lu";
 
-import { api, errorText } from "@/api";
+import { api } from "@/api";
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { JobStatus } from "@/bindings/JobStatus";
-import { toaster } from "@/components/ui/toaster";
+import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ProgressBar, ProgressLabel, ProgressRoot } from "@/components/ui/progress";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { showError, showSuccess } from "@/notify";
 import { type JobView, startRun, useRun, useSettings } from "@/store";
+import { findOption } from "@/utils/options";
 
-const FILTERS = ["All", "Failed", "Scryfall", "MTGPics"] as const;
-type Filter = (typeof FILTERS)[number];
+type Filter = "all" | "failed" | "scryfall" | "mtgpics";
 
-function isFilter(value: string | null): value is Filter {
-  return (FILTERS as readonly (string | null)[]).includes(value);
-}
+/** The table's filters, each with the jobs it shows. */
+const FILTERS: { value: Filter; label: string; matches: (status: JobStatus) => boolean }[] = [
+  { value: "all", label: "All", matches: () => true },
+  { value: "failed", label: "Failed", matches: (status) => isFailed(status) },
+  { value: "scryfall", label: "Scryfall", matches: (status) => hasSource(status, "scryfall") },
+  { value: "mtgpics", label: "MTGPics", matches: (status) => hasSource(status, "mtgpics") },
+];
 
 export function RunView() {
   const { jobs, skipped, error, summary, running } = useRun();
   const outputDir = useSettings((state) => state.settings?.outputDir);
-  const [filter, setFilter] = useState<Filter>("All");
+  const [filter, setFilter] = useState<Filter>("all");
 
   if (jobs.length === 0 && !error) {
     return (
-      <EmptyState.Root h="full">
-        <EmptyState.Content>
-          <EmptyState.Indicator>{running ? <Spinner /> : <LuImageDown />}</EmptyState.Indicator>
-          <VStack textAlign="center">
-            <EmptyState.Title>
-              {running ? "Getting the list ready…" : "Nothing downloaded yet"}
-            </EmptyState.Title>
-            <EmptyState.Description>
-              {running
-                ? "Looking up the cards to download."
-                : "Paste a card list, search Scryfall, or pick a preset, then download its art."}
-            </EmptyState.Description>
-          </VStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <EmptyState
+        h="full"
+        icon={running ? <Spinner /> : <LuImageDown />}
+        title={running ? "Getting the list ready…" : "Nothing downloaded yet"}
+        description={
+          running
+            ? "Looking up the cards to download."
+            : "Paste a card list, search Scryfall, or pick a preset, then download its art."
+        }
+      />
     );
   }
 
   const finished = jobs.filter((job) => isFinal(job.status)).length;
-  const failed = jobs.filter((job) => job.status.state === "failed" || isPartial(job.status));
-  const fromScryfall = jobs.filter((job) => hasSource(job.status, "scryfall")).length;
-  const fromMtgpics = jobs.filter((job) => hasSource(job.status, "mtgpics")).length;
-  const shown = jobs.filter((job) => matchesFilter(job, filter));
+  const failed = jobs.filter((job) => isFailed(job.status));
+  const active = FILTERS.find((option) => option.value === filter) ?? FILTERS[0];
+  const shown = active ? jobs.filter((job) => active.matches(job.status)) : jobs;
+  const filterItems = FILTERS.map((option) => ({
+    value: option.value,
+    label: `${option.label} ${jobs.filter((job) => option.matches(job.status)).length}`,
+  }));
 
   async function copyFailed() {
     await navigator.clipboard.writeText(failed.map((job) => job.line).join("\n"));
-    toaster.create({ type: "success", title: `Copied ${failed.length} failed cards` });
+    showSuccess(`Copied ${failed.length} failed ${failed.length === 1 ? "card" : "cards"}`);
   }
 
   async function openFolder() {
     if (!outputDir) return;
     try {
       await api.openFolder(outputDir);
-    } catch (e) {
-      toaster.create({
-        type: "error",
-        title: "Couldn't open the folder",
-        description: errorText(e),
-      });
+    } catch (error) {
+      showError("Couldn't open the folder", error);
     }
   }
 
   return (
     <Flex direction="column" h="full" p="5" gap="4">
       {error && (
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>The download couldn&apos;t start</Alert.Title>
-            <Alert.Description>{error}</Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Alert status="error" title="The download couldn't start">
+          {error}
+        </Alert>
       )}
 
       {jobs.length > 0 && (
         <Stack gap="3">
-          <Progress.Root value={finished} max={jobs.length} size="sm" colorPalette="blue">
+          <ProgressRoot value={finished} max={jobs.length} size="sm" colorPalette="blue">
             <HStack justify="space-between" mb="1">
-              <Progress.Label>
+              <ProgressLabel>
                 {running ? "Downloading" : summary?.cancelled ? "Cancelled" : "Finished"}
-              </Progress.Label>
+              </ProgressLabel>
               <Text fontSize="sm" color="fg.muted">
                 {finished} of {jobs.length} cards
                 {summary && !running && ` in ${formatSeconds(summary.seconds)}`}
               </Text>
             </HStack>
-            <Progress.Track>
-              <Progress.Range />
-            </Progress.Track>
-          </Progress.Root>
+            <ProgressBar />
+          </ProgressRoot>
 
           <HStack gap="3" wrap="wrap">
-            <SegmentGroup.Root
+            <SegmentedControl
               size="sm"
               value={filter}
-              onValueChange={(event) => isFilter(event.value) && setFilter(event.value)}
-            >
-              <SegmentGroup.Indicator />
-              <SegmentGroup.Items
-                items={[
-                  { value: "All", label: `All ${jobs.length}` },
-                  { value: "Failed", label: `Failed ${failed.length}` },
-                  { value: "Scryfall", label: `Scryfall ${fromScryfall}` },
-                  { value: "MTGPics", label: `MTGPics ${fromMtgpics}` },
-                ]}
-              />
-            </SegmentGroup.Root>
+              items={filterItems}
+              onValueChange={(event) => {
+                const chosen = findOption(FILTERS, event.value);
+                if (chosen) setFilter(chosen);
+              }}
+            />
             <Box flex="1" />
             {!running && failed.length > 0 && (
               <>
@@ -239,43 +224,45 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
   );
 });
 
-function StatusBadge({ status }: { status: JobStatus }) {
+/** How each status is shown: its badge colour and words, and whether it's under way. */
+function statusLook(status: JobStatus): { palette: string; label: string; busy?: boolean } {
   switch (status.state) {
     case "queued":
-      return <Badge>Queued</Badge>;
+      return { palette: "gray", label: "Queued" };
     case "resolving":
-      return (
-        <Badge colorPalette="blue">
-          <Spinner size="xs" /> Looking up
-        </Badge>
-      );
+      return { palette: "blue", label: "Looking up", busy: true };
     case "downloading":
-      return (
-        <Badge colorPalette="blue">
-          <Spinner size="xs" /> Downloading
-        </Badge>
-      );
+      return { palette: "blue", label: "Downloading", busy: true };
     case "done":
-      return status.missing.length > 0 ? (
-        <Badge colorPalette="orange">Partly done</Badge>
-      ) : (
-        <Badge colorPalette="green">Done</Badge>
-      );
+      return status.missing.length > 0
+        ? { palette: "orange", label: "Partly done" }
+        : { palette: "green", label: "Done" };
     case "failed":
-      return <Badge colorPalette="red">Failed</Badge>;
+      return { palette: "red", label: "Failed" };
     case "cancelled":
-      return <Badge>Cancelled</Badge>;
+      return { palette: "gray", label: "Cancelled" };
   }
 }
 
-function SourceBadge({ source }: { source: ArtSource }) {
-  return source === "mtgpics" ? (
-    <Badge colorPalette="purple" variant="subtle">
-      MTGPics
+function StatusBadge({ status }: { status: JobStatus }) {
+  const { palette, label, busy } = statusLook(status);
+  return (
+    <Badge colorPalette={palette}>
+      {busy && <Spinner size="xs" />} {label}
     </Badge>
-  ) : (
-    <Badge colorPalette="teal" variant="subtle">
-      Scryfall
+  );
+}
+
+const SOURCE_LOOK: Record<ArtSource, { palette: string; label: string }> = {
+  mtgpics: { palette: "purple", label: "MTGPics" },
+  scryfall: { palette: "teal", label: "Scryfall" },
+};
+
+function SourceBadge({ source }: { source: ArtSource }) {
+  const { palette, label } = SOURCE_LOOK[source];
+  return (
+    <Badge colorPalette={palette} variant="subtle">
+      {label}
     </Badge>
   );
 }
@@ -284,25 +271,13 @@ function isFinal(status: JobStatus): boolean {
   return status.state === "done" || status.state === "failed" || status.state === "cancelled";
 }
 
-function isPartial(status: JobStatus): boolean {
-  return status.state === "done" && status.missing.length > 0;
+/** Failed outright, or done with some faces missing. */
+function isFailed(status: JobStatus): boolean {
+  return status.state === "failed" || (status.state === "done" && status.missing.length > 0);
 }
 
 function hasSource(status: JobStatus, source: ArtSource): boolean {
   return status.state === "done" && status.files.some((file) => file.source === source);
-}
-
-function matchesFilter(job: JobView, filter: Filter): boolean {
-  switch (filter) {
-    case "All":
-      return true;
-    case "Failed":
-      return job.status.state === "failed" || isPartial(job.status);
-    case "Scryfall":
-      return hasSource(job.status, "scryfall");
-    case "MTGPics":
-      return hasSource(job.status, "mtgpics");
-  }
 }
 
 function formatSeconds(seconds: number): string {

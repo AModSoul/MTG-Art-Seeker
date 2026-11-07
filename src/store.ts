@@ -1,7 +1,8 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { api, errorText } from "@/api";
+import { api } from "@/api";
 import type { JobInfo } from "@/bindings/JobInfo";
 import type { JobStatus } from "@/bindings/JobStatus";
 import type { RunEvent } from "@/bindings/RunEvent";
@@ -9,16 +10,11 @@ import type { RunInput } from "@/bindings/RunInput";
 import type { RunSummary } from "@/bindings/RunSummary";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
-import { toaster } from "@/components/ui/toaster";
+import { errorText, showError } from "@/notify";
 
 // --- What the user is about to download, remembered between launches -------
 
-export const INPUT_TABS = ["list", "search", "preset"] as const;
-export type InputTab = (typeof INPUT_TABS)[number];
-
-export function isInputTab(value: string): value is InputTab {
-  return (INPUT_TABS as readonly string[]).includes(value);
-}
+export type InputTab = "list" | "search" | "preset";
 
 interface InputState {
   tab: InputTab;
@@ -57,11 +53,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
     try {
       set({ settings: await api.getSettings() });
     } catch (error) {
-      toaster.create({
-        type: "error",
-        title: "Couldn't read settings",
-        description: errorText(error),
-      });
+      showError("Couldn't read settings", error);
     }
   },
   update: (patch) => {
@@ -72,16 +64,19 @@ export const useSettings = create<SettingsState>()((set, get) => ({
     // Typing in a field saves once it pauses, not on every key.
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      api.saveSettings(settings).catch((error: unknown) => {
-        toaster.create({
-          type: "error",
-          title: "Couldn't save settings",
-          description: errorText(error),
-        });
-      });
+      api
+        .saveSettings(settings)
+        .catch((error: unknown) => showError("Couldn't save settings", error));
     }, 300);
   },
 }));
+
+/** Asks for the folder art is saved to, starting from the current one. */
+export async function chooseOutputDir() {
+  const { settings, update } = useSettings.getState();
+  const dir = await open({ directory: true, defaultPath: settings?.outputDir });
+  if (typeof dir === "string") update({ outputDir: dir });
+}
 
 // --- The current run, fed by its event channel -----------------------------
 

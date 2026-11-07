@@ -50,6 +50,14 @@ clone.
   `colorPalette`. Check an unfamiliar component's API with the `chakra-ui` MCP server before using
   it — it's configured in `.mcp.json`, `.vscode/mcp.json` and `.cursor/mcp.json`; keep the three in
   step.
+- **Reach for a snippet before a compound component.** `src/components/ui` holds Chakra's snippets
+  (`Field`, `Switch`, `Radio`, `NativeSelect*`, `SegmentedControl`, `Drawer*`, `EmptyState`,
+  `Alert`, `Progress*`, `Tooltip`…), so a component writes `<Switch checked>Label</Switch>`, not the
+  five parts behind it. Add a missing one with
+  `npx @chakra-ui/cli snippet add <name> --tsx --outdir src/components/ui`, then convert it to
+  React 19 style: `ref` as a prop, no `forwardRef`, no `"use client"`.
+- **Errors go through `showError`** (`src/notify.ts`), and a select, segmented control or tab list
+  over a string union narrows its value with `findOption` (`src/utils/options.ts`).
 - **Types over casts** in TypeScript: narrow with a guard instead of `as`.
 
 ## Commits

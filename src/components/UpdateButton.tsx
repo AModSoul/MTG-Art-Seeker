@@ -4,8 +4,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useEffect, useState } from "react";
 import { LuDownload } from "react-icons/lu";
 
-import { errorText } from "@/api";
-import { toaster } from "@/components/ui/toaster";
+import { showError } from "@/notify";
 
 /** Checks GitHub for a newer release once at start-up, and offers to install it.
  * Development builds don't check. */
@@ -36,7 +35,7 @@ export function UpdateButton() {
       await relaunch();
     } catch (error) {
       setInstalling(false);
-      toaster.create({ type: "error", title: "The update failed", description: errorText(error) });
+      showError("The update failed", error);
     }
   }
 

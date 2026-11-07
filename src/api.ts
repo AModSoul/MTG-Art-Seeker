@@ -28,8 +28,3 @@ export const api = {
     return invoke<number>("start_run", { input, settings, onEvent: channel });
   },
 };
-
-/** A Tauri command's error as text: commands reject with the Rust error's message. */
-export function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

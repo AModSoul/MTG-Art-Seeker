@@ -1,88 +1,142 @@
 import {
   Button,
-  CloseButton,
   Code,
-  Drawer,
-  Field,
   Fieldset,
   HStack,
   IconButton,
   Input,
-  NativeSelect,
-  Portal,
-  SegmentGroup,
+  Span,
   Stack,
-  Switch,
   Text,
 } from "@chakra-ui/react";
-import { open } from "@tauri-apps/plugin-dialog";
-import type { ReactNode } from "react";
 import { LuFolderOpen, LuSettings } from "react-icons/lu";
 
 import type { Printing } from "@/bindings/Printing";
 import type { ScryfallImage } from "@/bindings/ScryfallImage";
 import type { Settings } from "@/bindings/Settings";
 import type { SourceMode } from "@/bindings/SourceMode";
-import { useSettings } from "@/store";
+import {
+  DrawerBody,
+  DrawerCloseTrigger,
+  DrawerContent,
+  DrawerHeader,
+  DrawerRoot,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { Field } from "@/components/ui/field";
+import { NativeSelectField, NativeSelectRoot } from "@/components/ui/native-select";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip } from "@/components/ui/tooltip";
+import { chooseOutputDir, useSettings } from "@/store";
+import { findOption, type Option } from "@/utils/options";
 
-const SOURCES: { value: SourceMode; label: string }[] = [
+const SOURCES: Option<SourceMode>[] = [
   { value: "mtgpicsThenScryfall", label: "MTGPics, then Scryfall" },
   { value: "mtgpicsOnly", label: "MTGPics only" },
   { value: "scryfallOnly", label: "Scryfall only" },
 ];
 
-const SCRYFALL_IMAGES: { value: ScryfallImage; label: string }[] = [
+const SCRYFALL_IMAGES: Option<ScryfallImage>[] = [
   { value: "artCrop", label: "Art crop (JPEG)" },
   { value: "fullCard", label: "Full card scan (PNG)" },
 ];
 
-const PRINTINGS: { value: Printing; label: string }[] = [
+const PRINTINGS: Option<Printing>[] = [
   { value: "newest", label: "Newest" },
   { value: "oldest", label: "Oldest" },
 ];
 
+/** The on/off settings, in the order they're shown, by section. */
+const SWITCHES: Record<
+  "files" | "printings" | "searching",
+  { key: BooleanSetting; label: string; help?: string }[]
+> = {
+  files: [
+    {
+      key: "overwrite",
+      label: "Replace files with the same name",
+      help: "Otherwise a new file is numbered: Name (1).jpg",
+    },
+    { key: "sourceFolders", label: "Separate MTGPics and Scryfall folders" },
+    {
+      key: "layoutFolders",
+      label: "A folder for each layout",
+      help: "MDFC Front, MDFC Back, Adventure, Saga, Basic…",
+    },
+    { key: "typeFolders", label: "A folder for each card type", help: "Creature, Land, Instant…" },
+  ],
+  printings: [
+    {
+      key: "downloadAll",
+      label: "Download every printing's art",
+      help: "Instead of one printing per card",
+    },
+  ],
+  searching: [
+    {
+      key: "uniqueArt",
+      label: "One printing per artwork",
+      help: "Skip reprints that reuse the same art",
+    },
+    { key: "excludeFullArt", label: "Skip full-art printings" },
+    {
+      key: "includeExtras",
+      label: "Include extras",
+      help: "Un-cards, oversized cards, championship cards and the like",
+    },
+  ],
+};
+
+type BooleanSetting = {
+  [K in keyof Settings]: Settings[K] extends boolean ? K : never;
+}[keyof Settings];
+
 export function SettingsDrawer() {
   const settings = useSettings((state) => state.settings);
-  const update = useSettings((state) => state.update);
 
   return (
-    <Drawer.Root size="md">
-      <Drawer.Trigger asChild>
-        <IconButton variant="ghost" size="sm" aria-label="Settings" disabled={!settings}>
-          <LuSettings />
-        </IconButton>
-      </Drawer.Trigger>
-      <Portal>
-        <Drawer.Backdrop />
-        <Drawer.Positioner>
-          <Drawer.Content>
-            <Drawer.Header>
-              <Drawer.Title>Settings</Drawer.Title>
-            </Drawer.Header>
-            <Drawer.Body>
-              {settings && <SettingsForm settings={settings} update={update} />}
-            </Drawer.Body>
-            <Drawer.CloseTrigger asChild>
-              <CloseButton size="sm" />
-            </Drawer.CloseTrigger>
-          </Drawer.Content>
-        </Drawer.Positioner>
-      </Portal>
-    </Drawer.Root>
+    <DrawerRoot size="md">
+      <Tooltip content="Settings">
+        <DrawerTrigger asChild>
+          <IconButton variant="ghost" size="sm" aria-label="Settings" disabled={!settings}>
+            <LuSettings />
+          </IconButton>
+        </DrawerTrigger>
+      </Tooltip>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Settings</DrawerTitle>
+        </DrawerHeader>
+        <DrawerBody>{settings && <SettingsForm settings={settings} />}</DrawerBody>
+        <DrawerCloseTrigger />
+      </DrawerContent>
+    </DrawerRoot>
   );
 }
 
-function SettingsForm({
-  settings,
-  update,
-}: {
-  settings: Settings;
-  update: (patch: Partial<Settings>) => void;
-}) {
-  async function chooseFolder() {
-    const dir = await open({ directory: true, defaultPath: settings.outputDir });
-    if (typeof dir === "string") update({ outputDir: dir });
-  }
+function SettingsForm({ settings }: { settings: Settings }) {
+  const update = useSettings((state) => state.update);
+  const switches = (section: keyof typeof SWITCHES) =>
+    SWITCHES[section].map(({ key, label, help }) => (
+      <Field
+        key={key}
+        // Lined up under the switch's label, not its track.
+        helperText={help && <Span ps="11">{help}</Span>}
+      >
+        <Switch
+          checked={settings[key]}
+          onCheckedChange={(event) => {
+            const patch: Partial<Settings> = {};
+            patch[key] = event.checked;
+            update(patch);
+          }}
+        >
+          {label}
+        </Switch>
+      </Field>
+    ));
 
   return (
     <Stack gap="8" pb="6">
@@ -93,178 +147,105 @@ function SettingsForm({
       <Fieldset.Root>
         <Fieldset.Legend>Files</Fieldset.Legend>
         <Fieldset.Content>
-          <Field.Root>
-            <Field.Label>Save art to</Field.Label>
+          <Field label="Save art to">
             <HStack w="full">
               <Input value={settings.outputDir} readOnly flex="1" />
-              <Button variant="outline" onClick={() => void chooseFolder()}>
+              <Button variant="outline" onClick={() => void chooseOutputDir()}>
                 <LuFolderOpen /> Choose…
               </Button>
             </HStack>
-          </Field.Root>
-          <Field.Root>
-            <Field.Label>File names</Field.Label>
+          </Field>
+          <Field
+            label="File names"
+            helperText={
+              <>
+                <Code size="sm">NAME</Code>, <Code size="sm">ARTIST</Code>,{" "}
+                <Code size="sm">SET</Code> and <Code size="sm">NUMBER</Code> are filled in. For
+                example: {namePreview(settings.naming)}
+              </>
+            }
+          >
             <Input
               value={settings.naming}
               onChange={(event) => update({ naming: event.target.value })}
               fontFamily="mono"
               spellCheck={false}
             />
-            <Field.HelperText>
-              <Code size="sm">NAME</Code>, <Code size="sm">ARTIST</Code>, <Code size="sm">SET</Code>{" "}
-              and <Code size="sm">NUMBER</Code> are filled in. For example:{" "}
-              <Text as="span">{namePreview(settings.naming)}</Text>
-            </Field.HelperText>
-          </Field.Root>
-          <Toggle
-            label="Replace files with the same name"
-            help="Otherwise a new file is numbered: Name (1).jpg"
-            checked={settings.overwrite}
-            onChange={(overwrite) => update({ overwrite })}
-          />
-          <Toggle
-            label="Separate MTGPics and Scryfall folders"
-            checked={settings.sourceFolders}
-            onChange={(sourceFolders) => update({ sourceFolders })}
-          />
-          <Toggle
-            label="A folder for each layout"
-            help="MDFC Front, MDFC Back, Adventure, Saga, Basic…"
-            checked={settings.layoutFolders}
-            onChange={(layoutFolders) => update({ layoutFolders })}
-          />
-          <Toggle
-            label="A folder for each card type"
-            help="Creature, Land, Instant…"
-            checked={settings.typeFolders}
-            onChange={(typeFolders) => update({ typeFolders })}
-          />
+          </Field>
+          {switches("files")}
         </Fieldset.Content>
       </Fieldset.Root>
 
       <Fieldset.Root>
         <Fieldset.Legend>Sources</Fieldset.Legend>
         <Fieldset.Content>
-          <Field.Root>
-            <Field.Label>Where art comes from</Field.Label>
-            <NativeSelect.Root>
-              <NativeSelect.Field
-                value={settings.sources}
-                onChange={(event) => {
-                  const sources = SOURCES.find((s) => s.value === event.target.value);
-                  if (sources) update({ sources: sources.value });
-                }}
-              >
-                {SOURCES.map((source) => (
-                  <option key={source.value} value={source.value}>
-                    {source.label}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-            <Field.HelperText>
-              MTGPics has larger, uncropped art; Scryfall has every card.
-            </Field.HelperText>
-          </Field.Root>
-          <Field.Root>
-            <Field.Label>Scryfall image</Field.Label>
-            <NativeSelect.Root>
-              <NativeSelect.Field
-                value={settings.scryfallImage}
-                onChange={(event) => {
-                  const image = SCRYFALL_IMAGES.find((i) => i.value === event.target.value);
-                  if (image) update({ scryfallImage: image.value });
-                }}
-              >
-                {SCRYFALL_IMAGES.map((image) => (
-                  <option key={image.value} value={image.value}>
-                    {image.label}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </Field.Root>
+          <Field
+            label="Where art comes from"
+            helperText="MTGPics has larger, uncropped art; Scryfall has every card."
+          >
+            <OptionSelect
+              value={settings.sources}
+              options={SOURCES}
+              onChange={(sources) => update({ sources })}
+            />
+          </Field>
+          <Field label="Scryfall image">
+            <OptionSelect
+              value={settings.scryfallImage}
+              options={SCRYFALL_IMAGES}
+              onChange={(scryfallImage) => update({ scryfallImage })}
+            />
+          </Field>
         </Fieldset.Content>
       </Fieldset.Root>
 
       <Fieldset.Root>
         <Fieldset.Legend>Cards named without a set</Fieldset.Legend>
         <Fieldset.Content>
-          <Field.Root>
-            <Field.Label>Printing</Field.Label>
-            <SegmentGroup.Root
+          <Field label="Printing">
+            <SegmentedControl
               size="sm"
               value={settings.printing}
+              items={PRINTINGS}
               onValueChange={(event) => {
-                const printing = PRINTINGS.find((p) => p.value === event.value);
-                if (printing) update({ printing: printing.value });
+                const printing = findOption(PRINTINGS, event.value);
+                if (printing) update({ printing });
               }}
-            >
-              <SegmentGroup.Indicator />
-              <SegmentGroup.Items items={PRINTINGS} />
-            </SegmentGroup.Root>
-          </Field.Root>
-          <Toggle
-            label="Download every printing's art"
-            help="Instead of one printing per card"
-            checked={settings.downloadAll}
-            onChange={(downloadAll) => update({ downloadAll })}
-          />
+            />
+          </Field>
+          {switches("printings")}
         </Fieldset.Content>
       </Fieldset.Root>
 
       <Fieldset.Root>
         <Fieldset.Legend>Searching</Fieldset.Legend>
-        <Fieldset.Content>
-          <Toggle
-            label="One printing per artwork"
-            help="Skip reprints that reuse the same art"
-            checked={settings.uniqueArt}
-            onChange={(uniqueArt) => update({ uniqueArt })}
-          />
-          <Toggle
-            label="Skip full-art printings"
-            checked={settings.excludeFullArt}
-            onChange={(excludeFullArt) => update({ excludeFullArt })}
-          />
-          <Toggle
-            label="Include extras"
-            help="Un-cards, oversized cards, championship cards and the like"
-            checked={settings.includeExtras}
-            onChange={(includeExtras) => update({ includeExtras })}
-          />
-        </Fieldset.Content>
+        <Fieldset.Content>{switches("searching")}</Fieldset.Content>
       </Fieldset.Root>
     </Stack>
   );
 }
 
-function Toggle({
-  label,
-  help,
-  checked,
+/** A native select over a union of strings, reporting the chosen value as that type. */
+function OptionSelect<T extends string>({
+  value,
+  options,
   onChange,
 }: {
-  label: string;
-  help?: ReactNode;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
+  value: T;
+  options: Option<T>[];
+  onChange: (value: T) => void;
 }) {
   return (
-    <Stack gap="0.5">
-      <Switch.Root checked={checked} onCheckedChange={(event) => onChange(event.checked)}>
-        <Switch.HiddenInput />
-        <Switch.Control />
-        <Switch.Label>{label}</Switch.Label>
-      </Switch.Root>
-      {help && (
-        <Text fontSize="xs" color="fg.muted" ps="11">
-          {help}
-        </Text>
-      )}
-    </Stack>
+    <NativeSelectRoot>
+      <NativeSelectField
+        value={value}
+        items={options}
+        onChange={(event) => {
+          const chosen = findOption(options, event.target.value);
+          if (chosen) onChange(chosen);
+        }}
+      />
+    </NativeSelectRoot>
   );
 }
 
@@ -273,17 +254,9 @@ const SAMPLE = { NAME: "Karn, Scion of Urza", ARTIST: "Chase Stone", SET: "DOM",
 /** What a template makes of a sample card. The Rust side has the final say:
  * it also removes characters a file name can't have. */
 function namePreview(template: string): string {
-  const filled = template.replace(/NAME|ARTIST|SET|NUMBER/g, (placeholder) => {
-    switch (placeholder) {
-      case "NAME":
-        return SAMPLE.NAME;
-      case "ARTIST":
-        return SAMPLE.ARTIST;
-      case "SET":
-        return SAMPLE.SET;
-      default:
-        return SAMPLE.NUMBER;
-    }
-  });
+  const filled = template.replace(
+    /NAME|ARTIST|SET|NUMBER/g,
+    (placeholder) => Object.entries(SAMPLE).find(([key]) => key === placeholder)?.[1] ?? "",
+  );
   return `${filled.trim() || "card"}.jpg`;
 }

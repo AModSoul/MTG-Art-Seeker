@@ -1,5 +1,4 @@
 import { Tooltip as ChakraTooltip, Portal } from "@chakra-ui/react";
-import * as React from "react";
 
 export interface TooltipProps extends ChakraTooltip.RootProps {
   showArrow?: boolean;
@@ -8,20 +7,20 @@ export interface TooltipProps extends ChakraTooltip.RootProps {
   content: React.ReactNode;
   contentProps?: ChakraTooltip.ContentProps;
   disabled?: boolean;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(function Tooltip(props, ref) {
-  const {
-    showArrow,
-    children,
-    disabled,
-    portalled = true,
-    content,
-    contentProps,
-    portalRef,
-    ...rest
-  } = props;
-
+export function Tooltip({
+  ref,
+  showArrow,
+  children,
+  disabled,
+  portalled = true,
+  content,
+  contentProps,
+  portalRef,
+  ...rest
+}: TooltipProps) {
   if (disabled) return children;
 
   return (
@@ -41,4 +40,4 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(function T
       </Portal>
     </ChakraTooltip.Root>
   );
-});
+}
