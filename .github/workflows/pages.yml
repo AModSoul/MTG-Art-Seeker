@@ -1,0 +1,70 @@
+# Builds the marketing site (apps/site) and deploys it to GitHub Pages: when
+# the site or what it's built from changes on trunk, when an app release is
+# published (so the download page's snapshot of it is current), or by hand.
+#
+# The site has no versions and never creates a release or a v* tag. The
+# app's updater and the download page both read releases/latest, which must
+# always be the app's.
+name: Pages
+
+on:
+  push:
+    branches: [trunk]
+    paths:
+      - apps/site/**
+      - packages/ui/**
+      - docs/screenshots/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/pages.yml
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  HUSKY: 0
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The prerender fetches the latest release; the token raises GitHub's rate limit.
+      - run: pnpm --filter site build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: apps/site/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
