@@ -1,4 +1,4 @@
-import { toaster } from "@/components/ui/toaster";
+import { toaster } from "@mtg-art/ui/toaster";
 
 /** A Tauri command's error as text: commands reject with the Rust error's message. */
 export function errorText(error: unknown): string {

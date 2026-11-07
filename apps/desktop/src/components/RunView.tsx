@@ -18,10 +18,10 @@ import { LuClipboardCopy, LuFolderOpen, LuImageDown, LuRotateCcw } from "react-i
 import { api } from "@/api";
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { JobStatus } from "@/bindings/JobStatus";
-import { Alert } from "@/components/ui/alert";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ProgressBar, ProgressLabel, ProgressRoot } from "@/components/ui/progress";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Alert } from "@mtg-art/ui/alert";
+import { EmptyState } from "@mtg-art/ui/empty-state";
+import { ProgressBar, ProgressLabel, ProgressRoot } from "@mtg-art/ui/progress";
+import { SegmentedControl } from "@mtg-art/ui/segmented-control";
 import { showError, showSuccess } from "@/notify";
 import { type JobView, startRun, useRun, useSettings } from "@/store";
 import { findOption } from "@/utils/options";

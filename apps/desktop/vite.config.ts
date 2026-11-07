@@ -47,7 +47,7 @@ export default defineConfig({
         plugins: [
           storybookTest({
             configDir: fileURLToPath(new URL("./.storybook", import.meta.url)),
-            storybookUrl: "http://localhost:6008",
+            storybookUrl: "http://localhost:6009",
           }),
         ],
         test: {

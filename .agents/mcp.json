@@ -4,9 +4,13 @@
       "command": "npx",
       "args": ["-y", "@chakra-ui/react-mcp"]
     },
-    "storybook": {
+    "storybook-ui": {
       "type": "http",
       "url": "http://localhost:6008/mcp"
+    },
+    "storybook-desktop": {
+      "type": "http",
+      "url": "http://localhost:6009/mcp"
     }
   }
 }

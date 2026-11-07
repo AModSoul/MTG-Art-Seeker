@@ -26,12 +26,12 @@ import {
   DrawerRoot,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer";
-import { Field } from "@/components/ui/field";
-import { NativeSelectField, NativeSelectRoot } from "@/components/ui/native-select";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Switch } from "@/components/ui/switch";
-import { Tooltip } from "@/components/ui/tooltip";
+} from "@mtg-art/ui/drawer";
+import { Field } from "@mtg-art/ui/field";
+import { NativeSelectField, NativeSelectRoot } from "@mtg-art/ui/native-select";
+import { SegmentedControl } from "@mtg-art/ui/segmented-control";
+import { Switch } from "@mtg-art/ui/switch";
+import { Tooltip } from "@mtg-art/ui/tooltip";
 import { chooseOutputDir, useSettings } from "@/store";
 import { findOption, type Option } from "@/utils/options";
 
