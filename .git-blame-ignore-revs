@@ -1,0 +1,4 @@
+# Mechanical commits (formatting, codemods). Use with: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format with oxfmt
+69546ea56715da117b7c0204382de54adbca91ae

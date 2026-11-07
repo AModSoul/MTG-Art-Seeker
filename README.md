@@ -146,6 +146,25 @@ cargo test --workspace # the core's tests; none reach the network
 After changing a type the interface uses, regenerate its TypeScript with `npm run bindings`. CI
 fails if they're out of date.
 
+### Front end
+
+```sh
+npm run storybook  # every component and state, on port 6008
+npm test           # unit tests, and every story as a browser test
+npm run lint       # oxlint; npm run format runs oxfmt
+```
+
+Run `npx playwright install chromium` once before `npm test`. Git hooks lint and format staged
+files on commit.
+
+### Agent instructions
+
+[`AGENTS.md`](AGENTS.md), `.agents/skills/` and `.agents/mcp.json` are the sources of truth for
+coding agents. `npm install` copies them to where Claude Code, Cursor and VS Code look for them
+(`CLAUDE.md`, `.claude/skills/`, `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`); those copies
+are gitignored. The MCP servers are Chakra UI's docs and Storybook's, which VS Code starts when the
+folder opens.
+
 ### Releasing
 
 1. Bump the version in `src-tauri/tauri.conf.json`, `Cargo.toml` and `package.json`.
