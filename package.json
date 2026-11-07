@@ -5,8 +5,8 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "dev": "npm run typegen && vite",
-    "build": "npm run typegen && tsc --noEmit && vite build",
+    "dev": "pnpm run typegen && vite",
+    "build": "pnpm run typegen && tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri-dev": "tauri dev",
@@ -16,9 +16,9 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky && npm run typegen",
+    "prepare": "husky && pnpm run typegen",
     "agents:sync": "node scripts/sync-agents.ts",
-    "postinstall": "npm run agents:sync",
+    "postinstall": "pnpm run agents:sync",
     "typegen": "chakra typegen src/theme.ts",
     "test": "vitest run",
     "storybook": "storybook dev -p 6008",
@@ -26,41 +26,41 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.38.0",
-    "@emotion/react": "^11.14.0",
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.14.1",
-    "next-themes": "^0.4.6",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "react-icons": "^5.7.0",
+    "next-themes": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-icons": "catalog:",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
-    "@chakra-ui/cli": "^3.38.0",
-    "@storybook/addon-a11y": "^10.6.6",
-    "@storybook/addon-docs": "^10.6.6",
-    "@storybook/addon-mcp": "^10.6.6",
-    "@storybook/addon-themes": "^10.6.6",
-    "@storybook/addon-vitest": "^10.6.6",
-    "@storybook/react-vite": "^10.6.6",
+    "@chakra-ui/cli": "catalog:",
+    "@storybook/addon-a11y": "catalog:",
+    "@storybook/addon-docs": "catalog:",
+    "@storybook/addon-mcp": "catalog:",
+    "@storybook/addon-themes": "catalog:",
+    "@storybook/addon-vitest": "catalog:",
+    "@storybook/react-vite": "catalog:",
     "@tauri-apps/cli": "^2.12.4",
-    "@types/node": "^26.6.6",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.2.1",
-    "@vitest/browser-playwright": "^5.1.0",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "oxfmt": "^0.73.0",
     "oxlint": "^1.92.0",
-    "playwright": "^1.65.0",
-    "storybook": "^10.6.6",
-    "typescript": "^6.0.3",
-    "vite": "^8.3.6",
-    "vitest": "^5.1.0"
+    "playwright": "catalog:",
+    "storybook": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}": [
@@ -70,7 +70,5 @@
     "*.{json,jsonc,md,mdx,css,yml,yaml,html,toml}": "oxfmt --no-error-on-unmatched-pattern",
     "*.rs": "cargo fmt --"
   },
-  "allowScripts": {
-    "esbuild@0.28.2": true
-  }
+  "packageManager": "pnpm@12.18.0"
 }
