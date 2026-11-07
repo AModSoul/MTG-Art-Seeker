@@ -102,6 +102,9 @@ export const ChangeSettings: Story = {
     await openDrawer(canvas);
 
     await userEvent.click(screen.getByRole("checkbox", { name: "A folder for each card type" }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Search for larger copies of MTGPics' art too" }),
+    );
     await userEvent.selectOptions(
       screen.getByRole("combobox", { name: "Where art comes from" }),
       "Scryfall only",
@@ -119,6 +122,7 @@ export const ChangeSettings: Story = {
       expect(api.saveSettings).toHaveBeenLastCalledWith({
         ...defaultSettings,
         typeFolders: true,
+        searchMtgpicsArt: true,
         sources: "scryfallOnly",
         printing: "oldest",
         naming: "NAME - SET",

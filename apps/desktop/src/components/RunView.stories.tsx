@@ -12,7 +12,7 @@ import {
 } from "@/__fixtures__/run";
 import { defaultSettings } from "@/__fixtures__/settings";
 import { api } from "@/api";
-import { useRun } from "@/store";
+import { useRun, useSettings } from "@/store";
 
 import { RunView } from "./RunView";
 
@@ -231,6 +231,28 @@ export const FindLargerCopy: Story = {
       2,
       0,
       "website",
+      expect.any(Function),
+    );
+  },
+};
+
+/** With the setting on, MTGPics' art has the search buttons too. */
+export const FindLargerCopyOfMtgpicsArt: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    useSettings.setState({ settings: { ...defaultSettings, searchMtgpicsArt: true } });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(
+      canvas.getByRole("button", {
+        name: "Look for Chase Stone on ArtStation, for Karn, Scion of Urza",
+      }),
+    );
+    await expect(api.findLargerCopy).toHaveBeenLastCalledWith(
+      3,
+      1,
+      0,
+      "artstation",
       expect.any(Function),
     );
   },

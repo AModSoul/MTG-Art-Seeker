@@ -294,7 +294,8 @@ const SITES: { site: Site; icon: IconType; tip: (file: SavedFile) => string }[] 
 /** What can be done with a saved image beyond showing it: look for a larger
  * copy of Scryfall's art, or open the page a found image came from. */
 function FileAction({ job, file }: { job: number; file: SavedFile }) {
-  if (file.source === "scryfall") {
+  const searchMtgpicsArt = useSettings((state) => state.settings?.searchMtgpicsArt ?? false);
+  if (file.source === "scryfall" || (file.source === "mtgpics" && searchMtgpicsArt)) {
     return (
       <HStack gap="0">
         {SITES.map(({ site, icon: Icon, tip }) => (

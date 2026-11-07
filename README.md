@@ -82,6 +82,7 @@ only its images. You can sign in to a site in that window; **Sign out of sites**
 | File names                | `NAME (ARTIST) [SET] {NUMBER}` |                                                    |
 | Where art comes from      | MTGPics, then Scryfall         | or MTGPics only, or Scryfall only                  |
 | Scryfall image            | Art crop                       | or the full card scan, as a PNG                    |
+| Search MTGPics' art too   | Off                            | the Find a larger copy buttons beside MTGPics' art |
 | Printing                  | Newest                         | for lines with only a name                         |
 | Every printing's art      | Off                            | for lines with only a name                         |
 | One printing per artwork  | On                             | skip reprints that reuse an art                    |
