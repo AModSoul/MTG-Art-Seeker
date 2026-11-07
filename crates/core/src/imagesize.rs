@@ -24,7 +24,34 @@ pub fn image_size(path: &Path, kind: ImageKind) -> Option<ImageSize> {
     match kind {
         ImageKind::Png => png_size(&mut file),
         ImageKind::Jpeg => jpeg_size(&mut file),
+        ImageKind::Webp => webp_size(&mut file),
     }
+}
+
+/// A WebP is a RIFF file whose first chunk is the image: `VP8 ` (lossy),
+/// `VP8L` (lossless) or `VP8X` (extended, with the canvas size in it).
+fn webp_size(file: &mut impl Read) -> Option<ImageSize> {
+    let mut head = [0; 30];
+    file.read_exact(&mut head).ok()?;
+    if &head[0..4] != b"RIFF" || &head[8..12] != b"WEBP" {
+        return None;
+    }
+    let le16 = |at: usize| u32::from(u16::from_le_bytes([head[at], head[at + 1]]));
+    let le24 = |at: usize| u32::from_le_bytes([head[at], head[at + 1], head[at + 2], 0]);
+    let (width, height) = match &head[12..16] {
+        // A 3-byte frame tag and a start code, then 14 bits each of width
+        // and height (the top two bits are a scale).
+        b"VP8 " if head[23..26] == [0x9D, 0x01, 0x2A] => (le16(26) & 0x3FFF, le16(28) & 0x3FFF),
+        // A signature byte, then 14 bits each of width and height, less one.
+        b"VP8L" if head[20] == 0x2F => {
+            let bits = u32::from_le_bytes([head[21], head[22], head[23], head[24]]);
+            ((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1)
+        }
+        // Flags and reserved bytes, then 24 bits each of width and height, less one.
+        b"VP8X" => (le24(24) + 1, le24(27) + 1),
+        _ => return None,
+    };
+    Some(ImageSize { width, height })
 }
 
 /// A PNG's first chunk is its header: the 8-byte signature, the chunk's length
@@ -121,6 +148,54 @@ mod tests {
                 height: 1536
             })
         );
+    }
+
+    /// A WebP's first 30 bytes: the RIFF header, then `chunk` and its contents.
+    fn webp(chunk: &[u8; 4], contents: &[u8]) -> Vec<u8> {
+        let mut webp = b"RIFF\0\0\0\0WEBP".to_vec();
+        webp.extend(chunk);
+        webp.extend([0; 4]);
+        webp.extend(contents);
+        webp.resize(30, 0);
+        webp
+    }
+
+    #[test]
+    fn reads_webp_headers() {
+        let size = |webp: Vec<u8>| webp_size(&mut Cursor::new(webp));
+        // Lossy: a frame tag, the start code, then 1200 × 881.
+        let lossy = webp(b"VP8 ", &[0, 0, 0, 0x9D, 0x01, 0x2A, 0xB0, 0x04, 0x71, 0x03]);
+        assert_eq!(
+            size(lossy),
+            Some(ImageSize {
+                width: 1200,
+                height: 881
+            })
+        );
+        // Lossless: the signature, then 2047 and 1460 (one less than the size)
+        // packed into 14 bits each.
+        let packed = 2047u32 | (1460 << 14);
+        let mut contents = vec![0x2F];
+        contents.extend(packed.to_le_bytes());
+        assert_eq!(
+            size(webp(b"VP8L", &contents)),
+            Some(ImageSize {
+                width: 2048,
+                height: 1461
+            })
+        );
+        // Extended: flags and reserved bytes, then 24-bit sizes less one.
+        let extended = webp(b"VP8X", &[0x10, 0, 0, 0, 0xFF, 0x0E, 0, 0x7F, 0x0B, 0]);
+        assert_eq!(
+            size(extended),
+            Some(ImageSize {
+                width: 3840,
+                height: 2944
+            })
+        );
+        // A lossy header without its start code, and a file too short.
+        assert_eq!(size(webp(b"VP8 ", &[0; 10])), None);
+        assert_eq!(webp_size(&mut Cursor::new(b"RIFF\0\0\0\0WEBP".to_vec())), None);
     }
 
     #[test]

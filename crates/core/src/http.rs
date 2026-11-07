@@ -142,14 +142,14 @@ impl Http {
     }
 
     /// Streams an image to `dest`; `None` for a 404. Fails, leaving whatever
-    /// was written, if the body isn't a JPEG or PNG.
+    /// was written, if the body isn't a JPEG, PNG or WebP image.
     pub async fn download(&self, url: &str, dest: &Path) -> Result<Option<ImageKind>> {
         let Some(head) = self.stream_to(url, dest, None).await? else {
             return Ok(None);
         };
         ImageKind::sniff(&head).map(Some).ok_or_else(|| Error::Invalid {
             url: url.to_owned(),
-            reason: "the response is not a JPEG or PNG image".into(),
+            reason: "the response is not a JPEG, PNG or WebP image".into(),
         })
     }
 
@@ -174,12 +174,12 @@ impl Http {
             return Ok(None);
         };
         let mut file = tokio::fs::File::create(dest).await?;
-        let mut head = Vec::with_capacity(8);
+        let mut head = Vec::with_capacity(SNIFF_LEN);
         let mut body = response.bytes_stream();
         while let Some(chunk) = body.next().await {
             let chunk = chunk?;
-            if head.len() < 8 {
-                head.extend(chunk.iter().take(8 - head.len()));
+            if head.len() < SNIFF_LEN {
+                head.extend(chunk.iter().take(SNIFF_LEN - head.len()));
             }
             file.write_all(&chunk).await?;
         }
@@ -302,11 +302,16 @@ fn url_authority(url: &Url) -> Option<String> {
     })
 }
 
+/// How many of a download's first bytes [`ImageKind::sniff`] needs.
+const SNIFF_LEN: usize = 12;
+
 /// The image formats a download is accepted as, told apart by their first bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageKind {
     Jpeg,
     Png,
+    /// Served by many sites other than Scryfall and MTGPics; saved as it is.
+    Webp,
 }
 
 impl ImageKind {
@@ -315,6 +320,8 @@ impl ImageKind {
             Some(Self::Jpeg)
         } else if head.starts_with(&[0x89, b'P', b'N', b'G']) {
             Some(Self::Png)
+        } else if head.starts_with(b"RIFF") && head.get(8..12) == Some(b"WEBP") {
+            Some(Self::Webp)
         } else {
             None
         }
@@ -324,6 +331,7 @@ impl ImageKind {
         match self {
             Self::Jpeg => "jpg",
             Self::Png => "png",
+            Self::Webp => "webp",
         }
     }
 }
@@ -468,6 +476,10 @@ mod tests {
     fn sniffs_images() {
         assert_eq!(ImageKind::sniff(&[0xFF, 0xD8, 0xFF, 0xE0]), Some(ImageKind::Jpeg));
         assert_eq!(ImageKind::sniff(b"\x89PNG\r\n\x1a\n"), Some(ImageKind::Png));
+        assert_eq!(ImageKind::sniff(b"RIFF   WEBPVP8 "), Some(ImageKind::Webp));
+        // A RIFF file that isn't an image: a WAV.
+        assert_eq!(ImageKind::sniff(b"RIFF   WAVEfmt "), None);
+        assert_eq!(ImageKind::sniff(b"RIFF"), None);
         assert_eq!(ImageKind::sniff(b"<html>"), None);
     }
 }
