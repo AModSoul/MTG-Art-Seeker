@@ -12,6 +12,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "tauri-dev": "pnpm --filter desktop tauri dev",
+    "site-dev": "pnpm --filter site dev",
     "bindings": "cargo test -p mtg-art-core export_bindings && oxfmt apps/desktop/src/bindings",
     "storybook": "pnpm -r --parallel storybook",
     "ci-storybook": "pnpm -r --parallel ci-storybook",

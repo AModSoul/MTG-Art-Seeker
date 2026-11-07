@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- A placeholder icon. Regenerate every size from a real one with: npx tauri icon <file> -->
+  <rect x="32" y="32" width="960" height="960" rx="180" fill="#3b4a6b"/>
+  <path d="M512 260 L512 700" stroke="#ffffff" stroke-width="88" stroke-linecap="round"/>
+  <path d="M332 540 L512 720 L692 540" fill="none" stroke="#ffffff" stroke-width="88" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

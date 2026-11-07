@@ -11,6 +11,10 @@
     "storybook-desktop": {
       "type": "http",
       "url": "http://localhost:6009/mcp"
+    },
+    "storybook-site": {
+      "type": "http",
+      "url": "http://localhost:6010/mcp"
     }
   }
 }

@@ -8,6 +8,7 @@
     "crates/core/tests/fixtures",
     "pnpm-lock.yaml",
     "storybook-static",
-    ".agents/skills"
+    ".agents/skills",
+    "apps/site/src/routeTree.gen.ts"
   ]
 }
