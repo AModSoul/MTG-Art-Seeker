@@ -16,7 +16,9 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "agents:sync": "node scripts/sync-agents.ts",
+    "postinstall": "npm run agents:sync"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.38.0",
@@ -49,7 +51,7 @@
       "oxlint --fix",
       "oxfmt --no-error-on-unmatched-pattern"
     ],
-    "*.{json,jsonc,md,mdx,css,yml,yaml,html}": "oxfmt --no-error-on-unmatched-pattern",
+    "*.{json,jsonc,md,mdx,css,yml,yaml,html,toml}": "oxfmt --no-error-on-unmatched-pattern",
     "*.rs": "cargo fmt --"
   }
 }

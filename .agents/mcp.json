@@ -3,6 +3,10 @@
     "chakra-ui": {
       "command": "npx",
       "args": ["-y", "@chakra-ui/react-mcp"]
+    },
+    "storybook": {
+      "type": "http",
+      "url": "http://localhost:6008/mcp"
     }
   }
 }

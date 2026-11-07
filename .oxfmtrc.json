@@ -7,6 +7,7 @@
     "src-tauri/gen",
     "crates/core/tests/fixtures",
     "package-lock.json",
-    "storybook-static"
+    "storybook-static",
+    ".agents/skills"
   ]
 }
