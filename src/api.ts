@@ -28,6 +28,8 @@ export const api = {
   /** Starts a run; its events arrive on `onEvent`, ending with `finished`. */
   startRun: (input: RunInput, settings: Settings, onEvent: (event: RunEvent) => void) => {
     const channel = new Channel<RunEvent>();
+    // Tauri's Channel has no addEventListener; onmessage is its only API.
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
     channel.onmessage = onEvent;
     return invoke<number>("start_run", { input, settings, onEvent: channel });
   },

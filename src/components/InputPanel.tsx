@@ -91,16 +91,16 @@ export function InputPanel() {
           <ListInput
             text={text}
             parsed={parsed}
-            onChange={(text) => setInput({ text })}
+            onChange={(value) => setInput({ text: value })}
             onOpen={(file) => setInput({ text: file.text, folder: file.name })}
           />
-          <ListFolder folder={folder} onChange={(folder) => setInput({ folder })} />
+          <ListFolder folder={folder} onChange={(value) => setInput({ folder: value })} />
         </Tabs.Content>
         <Tabs.Content value="search">
-          <SearchInput query={query} onChange={(query) => setInput({ query })} />
+          <SearchInput query={query} onChange={(value) => setInput({ query: value })} />
         </Tabs.Content>
         <Tabs.Content value="preset">
-          <PresetInput presetId={presetId} onChange={(presetId) => setInput({ presetId })} />
+          <PresetInput presetId={presetId} onChange={(value) => setInput({ presetId: value })} />
         </Tabs.Content>
       </Tabs.Root>
 

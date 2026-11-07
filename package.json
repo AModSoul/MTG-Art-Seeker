@@ -1,19 +1,22 @@
 {
   "name": "mtg-art-downloader",
-  "private": true,
   "version": "0.1.0",
-  "type": "module",
+  "private": true,
   "license": "GPL-3.0-or-later",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri-dev": "tauri dev",
-    "bindings": "cargo test -p mtg-art-core export_bindings && prettier --write src/bindings",
-    "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "bindings": "cargo test -p mtg-art-core export_bindings && oxfmt src/bindings",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.38.0",
@@ -29,18 +32,24 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
-    "eslint": "^10.14.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^17.14.0",
-    "prettier": "^3.9.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.92.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.6"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}": [
+      "oxlint --fix",
+      "oxfmt --no-error-on-unmatched-pattern"
+    ],
+    "*.{json,jsonc,md,mdx,css,yml,yaml,html}": "oxfmt --no-error-on-unmatched-pattern",
+    "*.rs": "cargo fmt --"
   }
 }
