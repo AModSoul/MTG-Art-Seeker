@@ -129,45 +129,64 @@ it has been added.
 You need [Rust](https://rustup.rs), [Node 24](https://nodejs.org), and
 [Tauri's system dependencies](https://v2.tauri.app/start/prerequisites/).
 
+The JavaScript side is a [pnpm](https://pnpm.io) workspace; `corepack enable` once gets the pnpm
+version the repo pins.
+
 ```sh
-npm install
-npm run tauri-dev      # the desktop app, reloading as you edit
+pnpm install
+pnpm tauri-dev         # the desktop app, reloading as you edit
+pnpm site-dev          # the website, on port 3000
 cargo test --workspace # the core's tests; none reach the network
 ```
 
-| Path           | What's in it                                                                                         |
-| -------------- | ---------------------------------------------------------------------------------------------------- |
-| `crates/core`  | Everything that finds and saves art: list parsing, Scryfall and its card data, MTGPics, the run loop |
-| `crates/cli`   | The `mtg-art` command line tool                                                                      |
-| `src-tauri`    | The desktop app's Tauri commands, over the core                                                      |
-| `src`          | The desktop app's interface: React and Chakra UI, showing what the core reports                      |
-| `src/bindings` | TypeScript types generated from the core's Rust types                                                |
+| Path                        | What's in it                                                                                         |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `crates/core`               | Everything that finds and saves art: list parsing, Scryfall and its card data, MTGPics, the run loop |
+| `crates/cli`                | The `mtg-art` command line tool                                                                      |
+| `apps/desktop/src-tauri`    | The desktop app's Tauri commands, over the core                                                      |
+| `apps/desktop/src`          | The desktop app's interface: React and Chakra UI, showing what the core reports                      |
+| `apps/desktop/src/bindings` | TypeScript types generated from the core's Rust types                                                |
+| `packages/ui`               | The Chakra UI components and theme the app and the website share                                     |
+| `apps/site`                 | The website, with the download page                                                                  |
 
-After changing a type the interface uses, regenerate its TypeScript with `npm run bindings`. CI
-fails if they're out of date.
+After changing a type the interface uses, regenerate its TypeScript with `pnpm bindings`. CI fails
+if they're out of date.
 
 ### Front end
 
 ```sh
-npm run storybook  # every component and state, on port 6008
-npm test           # unit tests, and every story as a browser test
-npm run lint       # oxlint; npm run format runs oxfmt
+pnpm storybook  # every component and state: the shared library on 6008, the app on 6009, the site on 6010
+pnpm test       # unit tests, and every story as a browser test
+pnpm lint       # oxlint; pnpm format runs oxfmt
 ```
 
-Run `npx playwright install chromium` once before `npm test`. Git hooks lint and format staged
-files on commit.
+Run `pnpm --filter desktop exec playwright install chromium` once before `pnpm test`. Git hooks
+lint and format staged files on commit.
+
+### Website
+
+`apps/site` is prerendered to static HTML and deployed to GitHub Pages by the Pages workflow
+whenever it changes on `trunk`, and again whenever a release is published. It has no versions of
+its own and never makes a release. Its download page lists whatever files the latest release has,
+sorted by the rules in `apps/site/src/downloads/artifacts.ts`; a file no rule knows is still
+offered, under "Other files".
+
+It's served from `https://amodsoul.github.io/mtg-art-downloader-rust/` until `CUSTOM_DOMAIN` is set
+in `apps/site/src/site-config.ts`; then point the domain's DNS at GitHub Pages and set it in the
+repository's Pages settings. Pages' source must be **GitHub Actions**.
 
 ### Agent instructions
 
 [`AGENTS.md`](AGENTS.md), `.agents/skills/` and `.agents/mcp.json` are the sources of truth for
-coding agents. `npm install` copies them to where Claude Code, Cursor and VS Code look for them
+coding agents. `pnpm install` copies them to where Claude Code, Cursor and VS Code look for them
 (`CLAUDE.md`, `.claude/skills/`, `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`); those copies
-are gitignored. The MCP servers are Chakra UI's docs and Storybook's, which VS Code starts when the
-folder opens.
+are gitignored. The MCP servers are Chakra UI's docs and each Storybook's, which VS Code starts when
+the folder opens.
 
 ### Releasing
 
-1. Bump the version in `src-tauri/tauri.conf.json`, `Cargo.toml` and `package.json`.
+1. Bump the version in `apps/desktop/src-tauri/tauri.conf.json`, `Cargo.toml` and
+   `apps/desktop/package.json`.
 2. Push a tag: `git tag v0.2.0 && git push origin v0.2.0`.
 3. The Release workflow builds the installers and attaches them to a draft release. Publish it, and
    installed apps offer the update.
@@ -181,7 +200,7 @@ the private key whose public half is in `tauri.conf.json`, and `TAURI_SIGNING_PR
 (empty if the key has none). Losing the private key means installed apps can't update to a build
 signed with a new one, so keep a copy somewhere safe.
 
-The app icon is a placeholder. To replace it, run `npx tauri icon path/to/icon.png` with a square
+The app icon is a placeholder. To replace it, run `pnpm --filter desktop tauri icon path/to/icon.png` with a square
 PNG or SVG of at least 1024 pixels.
 
 ## License
