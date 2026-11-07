@@ -105,6 +105,29 @@ pub enum Doubt {
     Different,
 }
 
+/// What the app reports about an image the user saved while looking for a
+/// larger copy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "event", rename_all = "camelCase")]
+#[ts(export)]
+pub enum FoundEvent {
+    /// It's saved as the face's art: in `job` of run `run`, `file` takes the
+    /// place of the file at `replaced`.
+    Saved {
+        run: u32,
+        job: u32,
+        file: SavedFile,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        replaced: Option<String>,
+    },
+    /// It doesn't look like a larger copy of `face`'s art, and is kept until
+    /// the user says whether to save it anyway; `token` names it.
+    Doubtful { token: u32, face: String, doubt: Doubt },
+    /// It couldn't be saved.
+    Failed { message: String },
+}
+
 /// What became of an image the user saved.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Imported {
