@@ -10,6 +10,7 @@ import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
 import type { RunEvent } from "@/bindings/RunEvent";
 import type { RunInput } from "@/bindings/RunInput";
+import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 
 export const api = {
@@ -31,16 +32,18 @@ export const api = {
   openFoundPage: (run: number, job: number, face: number) =>
     invoke<void>("open_found_page", { run, job, face }),
 
-  /** Opens Google Lens, in a window of its own, on a saved face's art. What
-   * becomes of each image the user saves there arrives on `onEvent`. */
+  /** Opens `site`, in a window of its own, to look for a larger copy of a
+   * saved face's art. What becomes of each image the user saves there arrives
+   * on `onEvent`. */
   findLargerCopy: (
     run: number,
     job: number,
     face: number,
+    site: Site,
     onEvent: (event: FoundEvent) => void,
   ) => {
     const channel = new Channel<FoundEvent>(onEvent);
-    return invoke<void>("find_larger_copy", { run, job, face, onEvent: channel });
+    return invoke<void>("find_larger_copy", { run, job, face, site, onEvent: channel });
   },
 
   /** Starts a run; its events arrive on `onEvent`, ending with `finished`. */

@@ -1,7 +1,7 @@
 //! The desktop app: Tauri commands over `mtg-art-core`. The front end only
 //! shows what these report; finding and saving art all happens in the core.
 
-mod lens;
+mod finder;
 
 use std::{
     collections::HashMap,
@@ -19,7 +19,7 @@ use mtg_art_core::{
     history::{default_history_path, History},
     http::{Http, HttpConfig},
     list::{parse_list, ListFile, ParsedList},
-    manual::{self, Destination, Found, FoundEvent, Imported, Target},
+    manual::{self, Destination, Found, FoundEvent, Imported, Site, Target},
     presets::{presets, PresetInfo},
     settings::{default_settings_path, Settings},
 };
@@ -42,11 +42,11 @@ struct AppState {
     next_run: AtomicU32,
     /// What recent runs saved, by run id.
     records: Mutex<HashMap<u32, RunRecord>>,
-    /// The face the Lens window is looking for a larger copy of.
+    /// The face the finder window is looking for a larger copy of.
     search: Mutex<Option<Search>>,
     /// Images the user saved that didn't look like a larger copy of the art,
     /// kept until they say whether to save them anyway, by token.
-    doubtful: Mutex<HashMap<u32, (Search, lens::Saved)>>,
+    doubtful: Mutex<HashMap<u32, (Search, finder::Saved)>>,
     next_token: AtomicU32,
 }
 
@@ -59,7 +59,7 @@ struct RunRecord {
     files: HashMap<u32, Vec<SavedFile>>,
 }
 
-/// A face the Lens window is looking for a larger copy of, and where to tell
+/// A face the finder window is looking for a larger copy of, and where to tell
 /// the front end what became of the images the user saves.
 #[derive(Clone)]
 struct Search {
@@ -191,9 +191,10 @@ fn cancel_run(state: State<AppState>, id: u32) {
     }
 }
 
-/// Opens Google Lens, in a window of its own, on Scryfall's art crop of face
-/// `face` of job `job` in run `run`. What becomes of each image the user saves
-/// there arrives on `on_event`.
+/// Opens `site`, in a window of its own, to look for a larger copy of face
+/// `face` of job `job` in run `run`: Google Lens on Scryfall's art crop, or a
+/// search for the artist. What becomes of each image the user saves there
+/// arrives on `on_event`.
 #[tauri::command]
 async fn find_larger_copy(
     app: AppHandle,
@@ -201,6 +202,7 @@ async fn find_larger_copy(
     run: u32,
     job: u32,
     face: u32,
+    site: Site,
     on_event: Channel<FoundEvent>,
 ) -> CommandResult<()> {
     let (settings, file) = {
@@ -227,15 +229,15 @@ async fn find_larger_copy(
     )
     .await
     .map_err(|e| e.to_string())?;
-    let url = lens::lens_url(target.art_crop());
-    let title = format!("Find a larger copy: {}", target.face.name);
+    let url = target.search_url(site);
+    let title = format!("Find a larger copy of {} on {}", target.face.name, site.name());
     *lock(&state.search) = Some(Search {
         run,
         job,
         target,
         events: on_event,
     });
-    lens::open(&app, url, &title, on_saved).map_err(|e| e.to_string())?;
+    finder::open(&app, url, &title, on_saved).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -245,7 +247,7 @@ async fn find_larger_copy(
 async fn confirm_found_art(state: State<'_, AppState>, token: u32, save: bool) -> CommandResult<()> {
     let (search, saved) = lock(&state.doubtful)
         .remove(&token)
-        .ok_or("That image is gone. Save it from the Lens window again.")?;
+        .ok_or("That image is gone. Save it from the search window again.")?;
     if save {
         let event = import_found(&state, &search, &saved, true).await;
         let _ = search.events.send(event);
@@ -255,9 +257,9 @@ async fn confirm_found_art(state: State<'_, AppState>, token: u32, save: bool) -
     Ok(())
 }
 
-/// An image the user saved in the Lens window: saved as the art of the face
+/// An image the user saved in the finder window: saved as the art of the face
 /// being looked for, if it's a larger copy of it.
-fn on_saved(app: &AppHandle, saved: lens::Saved) {
+fn on_saved(app: &AppHandle, saved: finder::Saved) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
@@ -271,7 +273,7 @@ fn on_saved(app: &AppHandle, saved: lens::Saved) {
     });
 }
 
-async fn import_found(state: &AppState, search: &Search, saved: &lens::Saved, force: bool) -> FoundEvent {
+async fn import_found(state: &AppState, search: &Search, saved: &finder::Saved, force: bool) -> FoundEvent {
     let record = lock(&state.records).get(&search.run).map(|record| {
         let replace = record
             .files
@@ -436,7 +438,7 @@ pub fn run() {
                 doubtful: Mutex::new(HashMap::new()),
                 next_token: AtomicU32::new(1),
             });
-            lens::clear_downloads(app.handle());
+            finder::clear_downloads(app.handle());
             // Scryfall publishes new card data daily; until the first copy is
             // in, runs ask Scryfall about each card.
             tauri::async_runtime::spawn(async move {

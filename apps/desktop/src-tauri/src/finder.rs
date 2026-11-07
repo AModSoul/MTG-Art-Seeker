@@ -1,10 +1,11 @@
-//! The window a user searches Google Lens in for a larger copy of a card's art.
+//! The window a user looks for a larger copy of a card's art in: Google Lens,
+//! or an artist search on ArtStation, DeviantArt or Pixiv.
 //!
-//! The app opens Lens on Scryfall's art crop and then only listens: it injects
-//! no scripts and reads nothing from the pages. A person does the searching,
-//! and when they save an image, the download is caught here and handed on.
-//! Google's pages, and every site the user goes on to, get none of the app's
-//! commands: the capabilities in `capabilities/` name only `main`.
+//! The app opens a page the core chose and then only listens: it injects no
+//! scripts and reads nothing from the pages. A person does the searching, and
+//! when they save an image, the download is caught here and handed on. The
+//! pages, and every site the user goes on to, get none of the app's commands:
+//! the capabilities in `capabilities/` name only `main`.
 
 use std::{
     collections::HashMap,
@@ -20,20 +21,13 @@ use tauri::{
     AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 
-pub const LABEL: &str = "lens";
+pub const LABEL: &str = "finder";
 
 /// Numbers downloads for the whole session, so a download still waiting on
 /// the user keeps its name when the window is closed and opened again.
 static NEXT_DOWNLOAD: AtomicU64 = AtomicU64::new(0);
 
-/// Where Lens is asked to search for the image at a URL.
-pub fn lens_url(image_url: &str) -> Url {
-    let mut url = Url::parse("https://lens.google.com/uploadbyurl").expect("a valid URL");
-    url.query_pairs_mut().append_pair("url", image_url);
-    url
-}
-
-/// An image the user saved in the Lens window.
+/// An image the user saved in the window.
 #[derive(Debug, Clone)]
 pub struct Saved {
     /// The image's address.
@@ -44,9 +38,9 @@ pub struct Saved {
     pub path: PathBuf,
 }
 
-/// Where the Lens window's downloads go until they're dealt with.
+/// Where the window's downloads go until they're dealt with.
 fn downloads_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
-    Ok(app.path().app_cache_dir()?.join("lens-downloads"))
+    Ok(app.path().app_cache_dir()?.join("finder-downloads"))
 }
 
 /// Deletes downloads an earlier session left behind.
@@ -56,7 +50,7 @@ pub fn clear_downloads(app: &AppHandle) {
     }
 }
 
-/// Opens the Lens window on `url`, or moves the open one there.
+/// Opens the window on `url`, or moves the open one there.
 /// `on_saved` gets every image the user saves in it.
 pub fn open(
     app: &AppHandle,
@@ -83,8 +77,8 @@ pub fn open(
     WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(url))
         .title(title)
         .inner_size(1100.0, 800.0)
-        // Google's cookies are kept apart from the app's own storage.
-        .data_directory(app.path().app_local_data_dir()?.join("lens-webview"))
+        // The sites' cookies are kept apart from the app's own storage.
+        .data_directory(app.path().app_local_data_dir()?.join("finder-webview"))
         .on_navigation(|url| matches!(url.scheme(), "http" | "https"))
         // A result that opens in a new window opens here instead, so every
         // download goes through the one handler below.
@@ -129,17 +123,4 @@ pub fn open(
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn asks_lens_about_an_image() {
-        assert_eq!(
-            lens_url("https://cards.scryfall.io/art_crop/front/0/0/x.jpg?123").as_str(),
-            "https://lens.google.com/uploadbyurl?url=https%3A%2F%2Fcards.scryfall.io%2Fart_crop%2Ffront%2F0%2F0%2Fx.jpg%3F123"
-        );
-    }
 }

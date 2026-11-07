@@ -1,9 +1,11 @@
 //! Art the user found themselves, saved in place of Scryfall's.
 //!
-//! For a face that got Scryfall's art, the desktop app opens Google Lens on
-//! Scryfall's art crop in a window of its own. The user finds a larger copy
-//! and saves it, and the file they saved comes here: [`prepare`] says which
-//! card and face it's for, and [`import`] checks it against the art crop
+//! For a face that got Scryfall's art, the desktop app opens a window of its
+//! own on one of the [`Site`]s: Google Lens searching for Scryfall's art
+//! crop, or a search for the artist on a site artists post their work. The
+//! user finds a larger copy and saves it, and the file they saved comes here:
+//! [`prepare`] says which card and face it's for, and [`import`] checks it
+//! against the art crop
 //! ([`crate::verify`]) and saves it where the run saved Scryfall's, under the
 //! same name but in the `web` source folder, in place of Scryfall's file. The
 //! history remembers where it came from, so later runs save it from there.
@@ -16,7 +18,8 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use serde::Serialize;
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 use ts_rs::TS;
 
@@ -50,6 +53,61 @@ impl Target {
         self.card
             .art_crop(self.face.index)
             .expect("prepare checks there's an art crop")
+    }
+
+    /// Where to open `site` to look for a larger copy of the face's art.
+    pub fn search_url(&self, site: Site) -> Url {
+        let parse = |url: &str| Url::parse(url).expect("a valid URL");
+        let artist = self.face.artist.as_str();
+        match site {
+            Site::Lens => {
+                let mut url = parse("https://lens.google.com/uploadbyurl");
+                url.query_pairs_mut().append_pair("url", self.art_crop());
+                url
+            }
+            Site::Artstation => {
+                let mut url = parse("https://www.artstation.com/search/artists");
+                url.query_pairs_mut().append_pair("query", artist);
+                url
+            }
+            Site::Deviantart => {
+                let mut url = parse("https://www.deviantart.com/search");
+                url.query_pairs_mut().append_pair("q", artist);
+                url
+            }
+            // Pixiv's user search wants a login; its keyword search doesn't.
+            Site::Pixiv => {
+                let mut url = parse("https://www.pixiv.net/tags");
+                url.path_segments_mut().expect("an http URL").push(artist);
+                url
+            }
+        }
+    }
+}
+
+/// Where the user can look for a larger copy of a face's art.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Site {
+    /// Google Lens, searching for Scryfall's art crop.
+    Lens,
+    /// ArtStation's search for the artist.
+    Artstation,
+    /// DeviantArt's search for the artist.
+    Deviantart,
+    /// Pixiv's search for the artist's name.
+    Pixiv,
+}
+
+impl Site {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Lens => "Google Lens",
+            Self::Artstation => "ArtStation",
+            Self::Deviantart => "DeviantArt",
+            Self::Pixiv => "Pixiv",
+        }
     }
 }
 
@@ -254,4 +312,52 @@ async fn doubt(http: &Http, target: &Target, downloaded: &Path) -> Result<Option
         Verdict::CardScan => Some(Doubt::CardScan),
         Verdict::Different => Some(Doubt::Different),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn target(artist: &str) -> Target {
+        let card: Card = serde_json::from_value(serde_json::json!({
+            "name": "Twilight Prophet", "set": "rix", "collector_number": "88", "artist": artist,
+            "image_uris": { "art_crop": "https://cards.scryfall.io/art_crop/front/x.jpg?1" }
+        }))
+        .unwrap();
+        let face = plan_faces(&card, &Settings::default()).remove(0);
+        Target { card, face }
+    }
+
+    #[test]
+    fn opens_each_site_on_the_art_or_its_artist() {
+        let target = target("Seb McKinnon");
+        let url = |site| target.search_url(site).to_string();
+        assert_eq!(
+            url(Site::Lens),
+            "https://lens.google.com/uploadbyurl?url=https%3A%2F%2Fcards.scryfall.io%2Fart_crop%2Ffront%2Fx.jpg%3F1"
+        );
+        assert_eq!(
+            url(Site::Artstation),
+            "https://www.artstation.com/search/artists?query=Seb+McKinnon"
+        );
+        assert_eq!(
+            url(Site::Deviantart),
+            "https://www.deviantart.com/search?q=Seb+McKinnon"
+        );
+        assert_eq!(url(Site::Pixiv), "https://www.pixiv.net/tags/Seb%20McKinnon");
+    }
+
+    #[test]
+    fn keeps_an_artists_name_in_one_piece() {
+        // A slash or an ampersand stays part of the name.
+        let target = target("Jesper Ejsing & Ron Spencer/RK");
+        assert_eq!(
+            target.search_url(Site::Pixiv).as_str(),
+            "https://www.pixiv.net/tags/Jesper%20Ejsing%20&%20Ron%20Spencer%2FRK"
+        );
+        assert_eq!(
+            target.search_url(Site::Artstation).as_str(),
+            "https://www.artstation.com/search/artists?query=Jesper+Ejsing+%26+Ron+Spencer%2FRK"
+        );
+    }
 }

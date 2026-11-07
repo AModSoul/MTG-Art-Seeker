@@ -178,21 +178,46 @@ export const Cancelled: Story = {
   },
 };
 
-/** A card that got Scryfall's art has a button to look for a larger copy in Google Lens. */
+/** A card that got Scryfall's art has a button for each place to look for a
+ * larger copy: Google Lens, and the artist on ArtStation, DeviantArt and Pixiv. */
 export const FindLargerCopy: Story = {
   beforeEach: () => {
     useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
   },
   play: async ({ canvas }) => {
-    // MTGPics' art has no such button.
+    // MTGPics' art has no such buttons.
     await expect(
-      canvas.queryByRole("button", { name: "Find a larger copy of Karn, Scion of Urza" }),
+      canvas.queryByRole("button", { name: /Google Lens.*Karn, Scion of Urza/ }),
     ).not.toBeInTheDocument();
 
     await userEvent.click(
-      canvas.getByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+      canvas.getByRole("button", { name: "Search Google Lens for this art, for Lightning Bolt" }),
     );
-    await expect(api.findLargerCopy).toHaveBeenCalledWith(3, 2, 0, expect.any(Function));
+    await expect(api.findLargerCopy).toHaveBeenLastCalledWith(
+      3,
+      2,
+      0,
+      "lens",
+      expect.any(Function),
+    );
+    await userEvent.click(
+      canvas.getByRole("button", {
+        name: "Look for Christopher Moeller on ArtStation, for Lightning Bolt",
+      }),
+    );
+    await expect(api.findLargerCopy).toHaveBeenLastCalledWith(
+      3,
+      2,
+      0,
+      "artstation",
+      expect.any(Function),
+    );
+    await expect(
+      canvas.getByRole("button", { name: /Look for Christopher Moeller on DeviantArt/ }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: /Look for Christopher Moeller on Pixiv/ }),
+    ).toBeVisible();
   },
 };
 
@@ -200,13 +225,13 @@ export const FindLargerCopy: Story = {
 export const SavesAFoundCopy: Story = {
   beforeEach: () => {
     useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
-    mocked(api.findLargerCopy).mockImplementation(async (run, job, _face, onEvent) => {
+    mocked(api.findLargerCopy).mockImplementation(async (run, job, _face, _site, onEvent) => {
       onEvent({ event: "saved", run, job, file: foundBoltFile, replaced: boltFile.path });
     });
   },
   play: async ({ canvas }) => {
     await userEvent.click(
-      canvas.getByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+      canvas.getByRole("button", { name: "Search Google Lens for this art, for Lightning Bolt" }),
     );
     await waitFor(() =>
       expect(screen.getByText("Saved the larger copy of Lightning Bolt")).toBeVisible(),
@@ -233,7 +258,7 @@ export const FoundArt: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.getByText("Found")).toBeVisible();
     await expect(
-      canvas.queryByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+      canvas.queryByRole("button", { name: /Google Lens.*Lightning Bolt/ }),
     ).not.toBeInTheDocument();
 
     await userEvent.click(
@@ -243,7 +268,7 @@ export const FoundArt: Story = {
   },
 };
 
-/** Lens can't open: the error shows as a toast. */
+/** The search can't open: the error shows as a toast. */
 export const FindLargerCopyFails: Story = {
   beforeEach: () => {
     useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
@@ -251,8 +276,8 @@ export const FindLargerCopyFails: Story = {
   },
   play: async ({ canvas }) => {
     await userEvent.click(
-      canvas.getByRole("button", { name: "Find a larger copy of Lightning Bolt" }),
+      canvas.getByRole("button", { name: "Search Google Lens for this art, for Lightning Bolt" }),
     );
-    await waitFor(() => expect(screen.getByText("Couldn't open Google Lens")).toBeVisible());
+    await waitFor(() => expect(screen.getByText("Couldn't open the search")).toBeVisible());
   },
 };

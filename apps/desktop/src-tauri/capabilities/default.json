@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window may do: the app's own commands, the folder and file pickers, and installing updates. Only the main window: the Lens window shows Google and other sites, and must get none of this.",
+  "description": "What the main window may do: the app's own commands, the folder and file pickers, and installing updates. Only the main window: the finder window shows Google Lens, ArtStation, DeviantArt, Pixiv and wherever the user goes from there, and must get none of this.",
   "windows": ["main"],
   "permissions": ["core:default", "dialog:allow-open", "updater:default", "process:allow-restart"]
 }

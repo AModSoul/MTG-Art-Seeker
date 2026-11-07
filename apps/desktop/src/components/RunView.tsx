@@ -14,19 +14,21 @@ import {
 } from "@chakra-ui/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { memo, useState } from "react";
+import type { IconType } from "react-icons";
 import {
   LuClipboardCopy,
   LuExternalLink,
   LuFolderOpen,
   LuImageDown,
   LuRotateCcw,
-  LuScanSearch,
 } from "react-icons/lu";
+import { SiArtstation, SiDeviantart, SiGooglelens, SiPixiv } from "react-icons/si";
 
 import { api } from "@/api";
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { JobStatus } from "@/bindings/JobStatus";
 import type { SavedFile } from "@/bindings/SavedFile";
+import type { Site } from "@/bindings/Site";
 import { Alert } from "@mtg-art/ui/alert";
 import { EmptyState } from "@mtg-art/ui/empty-state";
 import { ProgressBar, ProgressLabel, ProgressRoot } from "@mtg-art/ui/progress";
@@ -270,21 +272,41 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
   );
 });
 
+/** The places a larger copy of Scryfall's art can be looked for, by logo. */
+const SITES: { site: Site; icon: IconType; tip: (file: SavedFile) => string }[] = [
+  { site: "lens", icon: SiGooglelens, tip: () => "Search Google Lens for this art" },
+  {
+    site: "artstation",
+    icon: SiArtstation,
+    tip: (file) => `Look for ${file.artist} on ArtStation`,
+  },
+  {
+    site: "deviantart",
+    icon: SiDeviantart,
+    tip: (file) => `Look for ${file.artist} on DeviantArt`,
+  },
+  { site: "pixiv", icon: SiPixiv, tip: (file) => `Look for ${file.artist} on Pixiv` },
+];
+
 /** What can be done with a saved image beyond showing it: look for a larger
  * copy of Scryfall's art, or open the page a found image came from. */
 function FileAction({ job, file }: { job: number; file: SavedFile }) {
   if (file.source === "scryfall") {
     return (
-      <Tooltip content="Find a larger copy with Google Lens">
-        <IconButton
-          size="2xs"
-          variant="ghost"
-          aria-label={`Find a larger copy of ${file.face}`}
-          onClick={() => void findLargerCopy(job, file.faceIndex)}
-        >
-          <LuScanSearch />
-        </IconButton>
-      </Tooltip>
+      <HStack gap="0">
+        {SITES.map(({ site, icon: Icon, tip }) => (
+          <Tooltip key={site} content={tip(file)}>
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              aria-label={`${tip(file)}, for ${file.face}`}
+              onClick={() => void findLargerCopy(job, file.faceIndex, site)}
+            >
+              <Icon />
+            </IconButton>
+          </Tooltip>
+        ))}
+      </HStack>
     );
   }
   if (file.source === "web" && file.page) {

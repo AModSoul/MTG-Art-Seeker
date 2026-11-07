@@ -9,6 +9,7 @@ import type { JobStatus } from "@/bindings/JobStatus";
 import type { RunEvent } from "@/bindings/RunEvent";
 import type { RunInput } from "@/bindings/RunInput";
 import type { RunSummary } from "@/bindings/RunSummary";
+import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
 import { errorText, showError, showSuccess } from "@/notify";
@@ -195,16 +196,17 @@ export function cancelRun() {
   if (runId !== null) void api.cancelRun(runId);
 }
 
-// --- Larger copies the user finds in the Lens window ------------------------
+// --- Larger copies the user finds in the finder window ----------------------
 
-/** Opens Google Lens on face `face` of job `job` of the current run. */
-export async function findLargerCopy(job: number, face: number) {
+/** Opens `site` to look for a larger copy of face `face` of job `job` of the
+ * current run. */
+export async function findLargerCopy(job: number, face: number, site: Site) {
   const { runId } = useRun.getState();
   if (runId === null) return;
   try {
-    await api.findLargerCopy(runId, job, face, onFound);
+    await api.findLargerCopy(runId, job, face, site, onFound);
   } catch (error) {
-    showError("Couldn't open Google Lens", error);
+    showError("Couldn't open the search", error);
   }
 }
 
