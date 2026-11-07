@@ -1,0 +1,27 @@
+[package]
+name = "mtg-art-core"
+description = "Finds and downloads Magic: The Gathering card art from MTGPics and Scryfall"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+deunicode = "1"
+dirs = "6"
+futures = "0.3"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "charset", "http2"] }
+serde.workspace = true
+serde_json.workspace = true
+strsim = "0.11"
+thiserror = "2"
+tokio.workspace = true
+tokio-util.workspace = true
+ts-rs = "12"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["test-util"] }
+wiremock = "0.6"

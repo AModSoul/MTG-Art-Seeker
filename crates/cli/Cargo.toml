@@ -1,0 +1,18 @@
+[package]
+name = "mtg-art-cli"
+description = "Download Magic: The Gathering card art from the command line"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "mtg-art"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+mtg-art-core.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
