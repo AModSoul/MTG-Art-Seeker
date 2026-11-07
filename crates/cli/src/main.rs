@@ -193,7 +193,10 @@ fn report(event: RunEvent, labels: &std::sync::Mutex<std::collections::HashMap<u
                             ArtSource::Mtgpics => "MTGPICS ",
                             ArtSource::Scryfall => "SCRYFALL",
                         };
-                        println!("{source} {label}  →  {}", file.path);
+                        let size = file
+                            .size
+                            .map_or_else(|| "?".to_owned(), |s| format!("{}×{}", s.width, s.height));
+                        println!("{source} {size:>9}  {label}  →  {}", file.path);
                     }
                     for face in missing {
                         println!("MISSING  {face} ({label})");

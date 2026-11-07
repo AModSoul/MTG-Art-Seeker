@@ -155,6 +155,7 @@ export function RunView() {
               <Table.ColumnHeader w="20" />
               <Table.ColumnHeader>Card</Table.ColumnHeader>
               <Table.ColumnHeader w="32">Status</Table.ColumnHeader>
+              <Table.ColumnHeader w="28">Resolution</Table.ColumnHeader>
               <Table.ColumnHeader>Saved</Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
@@ -168,6 +169,9 @@ export function RunView() {
     </Flex>
   );
 }
+
+/** The height of a saved image's line, the same under Resolution and Saved. */
+const FILE_LINE = "6";
 
 const JobRow = memo(function JobRow({ job }: { job: JobView }) {
   const { status } = job;
@@ -208,10 +212,23 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
         <StatusBadge status={status} />
       </Table.Cell>
       <Table.Cell>
+        {/* One line per saved image, level with its line under Saved. */}
+        <Stack gap="1">
+          {files.map((file) => (
+            <Flex key={file.path} h={FILE_LINE} align="center" title="Width × height, in pixels">
+              <Text fontSize="sm" color="fg.muted" fontVariantNumeric="tabular-nums">
+                {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
+              </Text>
+            </Flex>
+          ))}
+        </Stack>
+      </Table.Cell>
+      <Table.Cell>
         <Stack gap="1">
           {files.map((file) => (
             <HStack
               key={file.path}
+              h={FILE_LINE}
               gap="2"
               cursor="pointer"
               title={`${file.path}\nClick to show it in its folder`}

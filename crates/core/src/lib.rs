@@ -12,6 +12,7 @@ pub mod error;
 pub mod faces;
 pub mod history;
 pub mod http;
+pub mod imagesize;
 pub mod list;
 pub mod mtgpics;
 pub mod naming;

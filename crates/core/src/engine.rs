@@ -22,6 +22,7 @@ use crate::{
     faces::{plan_faces, FacePlan},
     history::{History, Remembered},
     http::Http,
+    imagesize::{image_size, ImageSize},
     list::{parse_list, CardLine, SkippedLine},
     mtgpics::{self, MtgpicsArt},
     naming::{file_stem, sanitize, NameParts},
@@ -129,6 +130,8 @@ pub struct SavedFile {
     pub set: String,
     pub number: String,
     pub artist: String,
+    /// The image's size in pixels, if its header could be read.
+    pub size: Option<ImageSize>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, TS)]
@@ -670,6 +673,7 @@ async fn save(
     let Some(kind) = context.http.download(url, temp.path()).await? else {
         return Ok(None);
     };
+    let size = image_size(temp.path(), kind);
     let set = card.set.to_uppercase();
     let stem = file_stem(
         &settings.naming,
@@ -690,6 +694,7 @@ async fn save(
         set,
         number: card.collector_number.clone(),
         artist: face.artist.clone(),
+        size,
     }))
 }
 
