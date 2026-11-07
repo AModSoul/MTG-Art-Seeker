@@ -4,34 +4,47 @@ Guide for coding agents working in this repo. Read [README.md](README.md) for wh
 
 ## Shape
 
-A Rust core does all the work; two thin shells drive it.
+A pnpm workspace and a Cargo workspace in one repo. A Rust core does all the work; two thin shells
+drive it. A marketing site sits beside them.
 
 - `crates/core` (`mtg-art-core`) — parsing, Scryfall and its card data (`carddb`), MTGPics, the run
   loop, settings. Nothing in it knows about Tauri.
 - `crates/cli` (`mtg-art`) — prints the core's events.
-- `src-tauri` — Tauri commands over the core. A run reports progress on a `Channel<RunEvent>` passed
-  to `start_run`.
-- `src` — React 19 + Chakra UI v3 + Zustand. It shows what the core reports and holds no logic of
-  its own: no fetching, no parsing, no file writes.
+- `apps/desktop` (package `desktop`) — the desktop app.
+  - `src-tauri` — Tauri commands over the core. A run reports progress on a `Channel<RunEvent>`
+    passed to `start_run`.
+  - `src` — React 19 + Chakra UI v3 + Zustand. It shows what the core reports and holds no logic of
+    its own: no fetching, no parsing, no file writes.
+- `packages/ui` (`@mtg-art/ui`) — the Chakra snippets, theme, provider and shared Storybook preview
+  both apps use. Source only, no build step: import `@mtg-art/ui/<snippet>`, `@mtg-art/ui/theme`.
+- `apps/site` (package `site`) — the marketing site on GitHub Pages: Vite, TanStack Router, and
+  `vite-prerender-plugin`, which renders every page to static HTML after the build.
 
 ## Commands
 
 | Task                           | Command                                                                     |
 | ------------------------------ | --------------------------------------------------------------------------- |
-| Install                        | `npm install` (also runs `typegen` and `agents:sync`)                       |
-| Desktop app                    | `npm run tauri-dev`                                                         |
-| Storybook                      | `npm run storybook` (port 6008; VS Code starts it when the folder opens)    |
+| Task                           | Command                                                                     |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| Install                        | `pnpm install` (also runs `agents:sync`; `corepack enable` once for pnpm)   |
+| Desktop app                    | `pnpm tauri-dev`                                                            |
+| Site                           | `pnpm site-dev` (port 3000); `pnpm --filter site build` prerenders it       |
+| Storybooks                     | `pnpm storybook` (all three; VS Code starts them when the folder opens)     |
 | Rust tests                     | `cargo test --workspace`                                                    |
 | Rust lint and format           | `cargo clippy --workspace --all-targets -- -D warnings` / `cargo fmt --all` |
-| Front end tests                | `npm test` (unit tests, and every story in headless Chromium)               |
-| Front end typecheck and build  | `npm run typecheck` / `npm run build`                                       |
-| Front end lint and format      | `npm run lint` / `npm run format` (oxlint and oxfmt)                        |
-| Chakra theme types             | `npm run typegen`                                                           |
-| Regenerate TypeScript bindings | `npm run bindings`                                                          |
+| Front end tests                | `pnpm test` (unit tests, and every package's stories in headless Chromium)  |
+| Front end typecheck and build  | `pnpm typecheck` / `pnpm build`                                             |
+| Front end lint and format      | `pnpm lint` / `pnpm format` (oxlint and oxfmt, from the root)               |
+| Chakra theme types             | `pnpm --filter @mtg-art/ui typegen` (the apps' dev, build and typecheck do) |
+| Regenerate TypeScript bindings | `pnpm bindings`                                                             |
 | A real run, no window          | `cargo run -p mtg-art-cli -- cards.txt --out <dir>`                         |
 
-The Tauri crate embeds `dist/`, so `npm run build` once before `cargo clippy --workspace` on a fresh
-clone.
+Run one package's script with `pnpm --filter <desktop|site|@mtg-art/ui> <script>`. Shared dependency
+versions live in the `catalog:` in `pnpm-workspace.yaml`; a package asks for one with `"catalog:"`,
+so every package gets the same React, Chakra and Vite.
+
+The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` once before
+`cargo clippy --workspace` on a fresh clone.
 
 ## Rules
 
@@ -50,40 +63,55 @@ clone.
 - **The front end never passes URLs or file paths to download.** It sends text input and settings;
   the core builds every URL and path, and file names go through `naming::sanitize`.
 - **Types the front end reads derive `TS` with `#[ts(export)]`.** After changing one, run
-  `npm run bindings` and commit `src/bindings`. Don't edit those files by hand.
+  `pnpm bindings` and commit `apps/desktop/src/bindings`. Don't edit those files by hand.
 - **Tests don't touch the network.** Unit tests read saved pages in `crates/core/tests/fixtures`
   (MTGPics pages are ISO-8859-1); `crates/core/tests/run.rs` runs the engine against `wiremock`
   servers. Save a new real page as a fixture rather than hand-writing one where you can.
 - **Chakra UI v3**, not v2: compound components (`Drawer.Root`, `Switch.Root`…) and
   `colorPalette`. Check an unfamiliar component's API with the `chakra-ui` MCP server before using
   it, and load the `chakra-ui-builder` skill (or `chakra-ui-refactor`) for UI work.
-- **Reach for a snippet before a compound component.** `src/components/ui` holds Chakra's snippets
-  (`Field`, `Switch`, `Radio`, `NativeSelect*`, `SegmentedControl`, `Drawer*`, `EmptyState`,
-  `Alert`, `Progress*`, `Tooltip`…), so a component writes `<Switch checked>Label</Switch>`, not the
-  five parts behind it. oxlint enforces it: importing a component that has a snippet (or could
-  have one) from `@chakra-ui/react` is an error outside `src/components/ui`, `src/theme.ts` and
-  `.storybook`. Before writing UI, check what's there with the Storybook MCP's `docs-list`. Add a
-  missing snippet with `npx @chakra-ui/cli snippet add <name> --tsx --outdir src/components/ui`,
-  convert it to React 19 style (`ref` as a prop, no `forwardRef`, no `"use client"`), and give it a
-  story so `docs-show` documents it.
-- **Theme tokens, recipes and slot recipes live in `src/theme.ts`.** Run `npm run typegen` after
-  changing it so their props are typed. Use semantic tokens (`fg.muted`, `bg.subtle`…) over raw
-  colours so both colour modes work.
-- **Errors go through `showError`** (`src/notify.ts`), and a select, segmented control or tab list
-  over a string union narrows its value with `findOption` (`src/utils/options.ts`).
+- **Reach for a snippet before a compound component.** `packages/ui/src/components/ui` holds
+  Chakra's snippets (`Field`, `Switch`, `Radio`, `NativeSelect*`, `SegmentedControl`, `Drawer*`,
+  `EmptyState`, `Alert`, `Progress*`, `Tooltip`…), shared by both apps, so a component writes
+  `<Switch checked>Label</Switch>`, not the five parts behind it. oxlint enforces it: importing a
+  component that has a snippet (or could have one) from `@chakra-ui/react` is an error outside
+  `packages/ui/src` and `.storybook`. Before writing UI, check what's there with the
+  `storybook-ui` MCP's `docs-list`. Add a missing snippet with
+  `npx @chakra-ui/cli snippet add <name> --tsx --outdir packages/ui/src/components/ui`, convert it
+  to React 19 style (`ref` as a prop, no `forwardRef`, no `"use client"`), import within the
+  package by relative path, and give it a story so `docs-show` documents it.
+- **Theme tokens, recipes and slot recipes live in `packages/ui/src/theme.ts`**, one system for both
+  apps. Run `pnpm --filter @mtg-art/ui typegen` after changing it so their props are typed. Use
+  semantic tokens (`fg.muted`, `bg.subtle`…) over raw colours so both colour modes work.
+- **In the desktop app, errors go through `showError`** (`apps/desktop/src/notify.ts`), and a
+  select, segmented control or tab list over a string union narrows its value with `findOption`
+  (`apps/desktop/src/utils/options.ts`).
+- **The download page never names a file.** It fetches the latest release from GitHub and
+  `apps/site/src/downloads/artifacts.ts` sorts its files with a table of rules. Files no rule knows
+  are listed as "Other files", so a new kind of file shows up on its own; to give it a label and a
+  place on its system's tab, add a rule there and a case to `artifacts.test.ts`. Never hard-code an
+  asset name or version in a component.
+- **The site never creates a GitHub release or a `v*` tag.** The app's updater and the download
+  page read `releases/latest`, which must always be the app's. The site deploys from `trunk` on
+  its own (`.github/workflows/pages.yml`); the app ships by tag (`release.yml`).
+- **The site's base path comes from `apps/site/src/site-config.ts`.** It's the repository's name on
+  GitHub Pages until `CUSTOM_DOMAIN` is set. Link with the router's `Link` and build public file
+  URLs from `import.meta.env.BASE_URL`, never a hard-coded `/`.
 - **Types over casts** in TypeScript: narrow with a guard instead of `as`.
 
 ## Agent config and MCP servers
 
-`AGENTS.md`, `.agents/skills/` and `.agents/mcp.json` are the sources. `npm run agents:sync` (run on
+`AGENTS.md`, `.agents/skills/` and `.agents/mcp.json` are the sources. `pnpm agents:sync` (run on
 install, checkout and merge) generates `CLAUDE.md`, `.claude/skills/`, and the MCP configs for
 Claude Code (`.mcp.json`), Cursor (`.cursor/mcp.json`) and VS Code (`.vscode/mcp.json`). Those
 are gitignored: edit the sources, never the generated files. The Chakra skills come from
 `npx skills add chakra-ui/chakra-ui` and are pinned in `skills-lock.json`.
 
 - `chakra-ui` — Chakra's component docs, props and examples.
-- `storybook` — served by `@storybook/addon-mcp` at `http://localhost:6008/mcp`, so only while
-  Storybook is running.
+- `storybook-ui`, `storybook-desktop`, `storybook-site` — served by `@storybook/addon-mcp` at
+  `http://localhost:6008/mcp` (`packages/ui`), `6009` (`apps/desktop`) and `6010` (`apps/site`), so
+  only while that Storybook is running. Use the one for the package you're changing, and
+  `storybook-ui` for the snippets.
 
 When working on UI components:
 
@@ -92,14 +120,18 @@ When working on UI components:
   component's props, and use only props that are documented or shown in example stories. Story
   names don't always match prop names. If a prop isn't documented, ask the user instead of
   assuming. `docs-show` prints imports from `'mtg-art-downloader'`; the real import is
-  `@/components/ui/<file>` or `@/components/<Component>`.
+  `@mtg-art/ui/<file>` for a snippet or `@/components/<Component>` for an app's own component.
 - Call `get-storybook-story-instructions` before creating or updating stories.
 - Run `test-run` to verify your changes.
 
 ## Storybook stories
 
 Stories sit next to their component (`RunView.tsx` and `RunView.stories.tsx`) and every one runs
-as a test under `npm test`.
+as a test under `pnpm test`. Each package has its own Storybook: `packages/ui` for the snippets
+(port 6008), `apps/desktop` (6009) and `apps/site` (6010). The app Storybooks compose the library's
+as a "UI library" ref, so they show its stories too while it runs. Shared preview setup (theme
+switcher, Chakra provider, toaster, a11y settings) is `@mtg-art/ui/storybook`; each package's
+`.storybook/preview.tsx` spreads `basePreview` and calls `resetUi()` in its `beforeEach`.
 
 - Write or update a story when you create a component or a snippet, or add props, states or
   variants to one. Cover each state the component can reach (empty, loading, running, finished,
@@ -107,16 +139,18 @@ as a test under `npm test`.
 - Add a `play` function that checks the behaviour a story is about, with role- or label-based
   queries. Chakra overlays (drawers, tooltips, toasts) render in a portal: query them with
   `screen`, not `canvas`, and `waitFor` them to finish animating in.
-- Don't wrap stories in a provider or add a `<Toaster />`; `.storybook/preview.tsx` does. Don't
-  add `tags: ["autodocs"]` or a `title`; titles come from the file path.
-- **There is no Tauri in Storybook.** The preview mocks `src/api.ts` and every `@tauri-apps/*`
+- Don't wrap stories in a provider or add a `<Toaster />`; `.storybook/preview.tsx` does, and the
+  site's also puts every story inside a router so router links work. Don't add
+  `tags: ["autodocs"]` or a `title`; titles come from the file path.
+- **There is no Tauri in Storybook.** The desktop preview mocks `src/api.ts` and every `@tauri-apps/*`
   module the app imports with `sb.mock`, and gives each a default answer. Override one in the
   story's `beforeEach` with `mocked(api.countSearch).mockResolvedValue(…)` and assert calls with
   `expect(api.startRun).toHaveBeenCalledWith(…)`. If a component starts importing another
   `@tauri-apps/*` module, add it to the preview's `sb.mock` list and defaults.
-- The Zustand stores are reset before every story. Seed one in `beforeEach` with
-  `useRun.setState({ … })`. Typed sample data lives in `src/__fixtures__`; build it from the
-  `src/bindings` types.
+- The desktop's Zustand stores are reset before every story. Seed one in `beforeEach` with
+  `useRun.setState({ … })`. Typed sample data lives in `apps/desktop/src/__fixtures__`; build it
+  from the `src/bindings` types. The site's sample releases are in
+  `apps/site/src/downloads/__fixtures__`, built on a real release saved from GitHub's API.
 
 ## Accessibility
 
@@ -132,5 +166,5 @@ the MCP's `test-run`, but don't fail tests (`a11y.test: "todo"` in `.storybook/p
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `feat(core): …`,
-`fix(mtgpics): …`, `chore(ci): …`, in the imperative, lower case, no trailing period. The default
+`fix(mtgpics): …`, `feat(site): …`, `refactor(ui): …`, `chore(ci): …`, in the imperative, lower case, no trailing period. The default
 branch is `trunk`.
