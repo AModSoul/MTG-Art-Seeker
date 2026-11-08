@@ -18,9 +18,9 @@ import {
   LuFileText,
   LuFolderTree,
   LuImage,
-  LuSearch,
+  LuPackage,
+  LuScanSearch,
   LuTerminal,
-  LuTrophy,
   LuZap,
 } from "react-icons/lu";
 
@@ -38,19 +38,19 @@ const FEATURES: { icon: IconType; title: string; body: string }[] = [
     body: "Art comes from MTGPics where it has it, and from Scryfall otherwise. A page counts as a match only when it names the card and credits its artist, so you never get the wrong art.",
   },
   {
+    icon: LuScanSearch,
+    title: "Find a larger copy",
+    body: "When Scryfall's small art is all there is, look for a bigger copy with Google Lens or on the artist's ArtStation, DeviantArt, Pixiv or website. The app checks what you save is the same art, larger, and every later download of it gets your copy.",
+  },
+  {
     icon: LuFileText,
-    title: "Any deck list",
-    body: "Paste or open the lists deck sites export. A line with a set and collector number gets that exact printing; a misspelt name is matched to the closest card.",
+    title: "Deck lists and searches",
+    body: "Paste or open the lists deck sites export: a line with a set and collector number gets that exact printing, and a misspelt name the closest card. Or download every card a Scryfall search matches, such as set:mh2 t:creature pow>=3.",
   },
   {
-    icon: LuSearch,
-    title: "Scryfall searches",
-    body: "Anything Scryfall's search takes, such as set:mh2 t:creature pow>=3, downloads every matching card. Count the matches first.",
-  },
-  {
-    icon: LuTrophy,
-    title: "EDHREC top lists",
-    body: "Presets for EDHREC's most-played Commander cards.",
+    icon: LuPackage,
+    title: "Precons and EDHREC lists",
+    body: "Pick any preconstructed deck MTGJSON lists, by a picture of its box, and get the art of the exact printings in it. Search them in Scryfall's words. Presets give EDHREC's most-played Commander cards.",
   },
   {
     icon: LuFolderTree,
@@ -73,9 +73,9 @@ function Home() {
             Card art for a whole deck, in one go
           </Heading>
           <Text fontSize={{ base: "lg", md: "xl" }} color="fg.muted">
-            Paste a deck list, run a Scryfall search, or pick an EDHREC list, and MTG Art Downloader
-            saves the art for every card. A desktop app for Windows, macOS and Linux, and a command
-            line tool.
+            Paste a deck list, run a Scryfall search, or pick an EDHREC list or a preconstructed
+            deck, and MTG Art Downloader saves the art for every card. A desktop app for Windows,
+            macOS and Linux, and a command line tool.
           </Text>
           <HStack gap={3} wrap="wrap" justify="center">
             <LinkButton asChild colorPalette="blue" size="lg">
@@ -131,6 +131,7 @@ function Home() {
                 "mtg-art cards.txt                       # a card list file",
                 'mtg-art --search "set:mh2 t:creature"   # a Scryfall search',
                 "mtg-art --preset edhrec-top-year        # a preset; --presets lists them",
+                "mtg-art --deck AbzanArmor_TDC           # a precon, by its file's name on MTGJSON",
                 "mtg-art cards.txt --out ./art           # somewhere other than the settings' folder",
               ].join("\n")}
             </code>
