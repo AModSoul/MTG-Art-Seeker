@@ -241,9 +241,12 @@ export const DeckFolder: Story = {
     useInput.setState({ tab: "deck" });
   },
   play: async ({ canvas }) => {
-    const folder = canvas.getByRole("textbox", { name: /folder for this deck/i });
-    await expect(folder).toHaveValue("");
+    // No deck, no folder to name.
+    await expect(
+      canvas.queryByRole("textbox", { name: /folder for this deck/i }),
+    ).not.toBeInTheDocument();
     await userEvent.click(await canvas.findByRole("button", { name: /Abzan Armor/ }));
+    const folder = canvas.getByRole("textbox", { name: /folder for this deck/i });
     await expect(folder).toHaveValue("Abzan Armor");
 
     await userEvent.clear(folder);

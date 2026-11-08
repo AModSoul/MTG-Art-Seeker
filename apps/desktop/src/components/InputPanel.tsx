@@ -87,7 +87,7 @@ export function InputPanel() {
       >
         <Tabs.List>
           {TABS.map((option) => (
-            <Tabs.Trigger key={option.value} value={option.value}>
+            <Tabs.Trigger key={option.value} value={option.value} whiteSpace="nowrap">
               {option.label}
             </Tabs.Trigger>
           ))}
@@ -115,12 +115,14 @@ export function InputPanel() {
         </Tabs.Content>
         <Tabs.Content value="deck" flex="1" display="flex" flexDirection="column" gap="2" minH="0">
           <DeckPicker />
-          <SubFolder
-            label="Folder for this deck"
-            placeholder={deck?.name ?? "Abzan Armor"}
-            folder={deckFolder}
-            onChange={(value) => setInput({ deckFolder: value })}
-          />
+          {deck && (
+            <SubFolder
+              label="Folder for this deck"
+              placeholder={deck.name}
+              folder={deckFolder}
+              onChange={(value) => setInput({ deckFolder: value })}
+            />
+          )}
         </Tabs.Content>
       </Tabs.Root>
 

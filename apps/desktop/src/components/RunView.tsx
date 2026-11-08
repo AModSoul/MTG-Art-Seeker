@@ -84,7 +84,7 @@ export function RunView() {
         description={
           running
             ? "Looking up the cards to download."
-            : "Paste a card list, search Scryfall, or pick a preset, then download its art."
+            : "Paste a card list, search Scryfall, or pick a preset or a deck, then download its art."
         }
       />
     );
