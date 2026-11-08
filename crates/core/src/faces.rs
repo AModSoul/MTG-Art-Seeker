@@ -5,8 +5,9 @@
 //! cards and Rooms are split cards too) have a painting each, which MTGPics has
 //! apart and Scryfall only together: with MTGPics in use, each half is its own
 //! image, and when MTGPics hasn't both, the run saves Scryfall's image of the
-//! whole card instead ([`whole_card`]). Everything else, adventure and flip
-//! cards among them, is one download.
+//! whole card instead ([`whole_card`]); and when MTGPics' halves are one
+//! picture, as Duskmourn's Rooms' are, that picture, once. Everything else,
+//! adventure and flip cards among them, is one download.
 
 use crate::{
     card::Card,

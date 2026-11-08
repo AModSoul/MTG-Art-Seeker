@@ -1302,25 +1302,26 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), Some(in_use));
 }
 
-/// Fire // Ice from Modern Horizons 2 (`mh2/290`), as Scryfall has it, its
-/// image links pointed at the mock CDN: a split card, with a painting per half.
-fn fire_ice(servers: &Servers) -> Value {
-    let json = String::from_utf8(fixture("card_mh2_290.json")).unwrap();
-    serde_json::from_str(&json.replace("https://cards.scryfall.io", &servers.cdn.uri())).unwrap()
-}
-
-#[tokio::test]
-async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall() {
-    let servers = Servers::start().await;
-    let card = fire_ice(&servers);
+/// A card as Scryfall has it, saved as fixture `name`, its image links
+/// pointed at the mock CDN, which serves its art crop.
+async fn scryfall_card(servers: &Servers, name: &str) -> Value {
+    let json = String::from_utf8(fixture(name)).unwrap();
+    let card: Value = serde_json::from_str(&json.replace("https://cards.scryfall.io", &servers.cdn.uri())).unwrap();
     let crop = card["image_uris"]["art_crop"].as_str().unwrap();
-    let crop = reqwest::Url::parse(crop).unwrap().path().to_owned();
-    Servers::image(&servers.cdn, &crop, JPEG).await;
+    Servers::image(&servers.cdn, reqwest::Url::parse(crop).unwrap().path(), JPEG).await;
     Mock::given(method("POST"))
         .and(path("/cards/collection"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "data": [card], "not_found": [] })))
         .mount(&servers.scryfall)
         .await;
+    card
+}
+
+#[tokio::test]
+async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall() {
+    let servers = Servers::start().await;
+    // Fire // Ice from Modern Horizons 2: a split card, with a painting per half.
+    scryfall_card(&servers, "card_mh2_290.json").await;
     let input = || RunInput::List {
         text: "Fire // Ice (MH2) 290".into(),
         folder: None,
@@ -1353,5 +1354,34 @@ async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall
     };
     let faces: Vec<_> = files.iter().map(|f| (f.face_index, f.face.as_str())).collect();
     assert_eq!(faces, [(0, "Fire"), (1, "Ice")]);
+    assert!(missing.is_empty());
+}
+
+#[tokio::test]
+async fn saves_a_split_card_whole_when_mtgpics_files_one_image_under_both_halves() {
+    let servers = Servers::start().await;
+    // Bottomless Pool // Locker Room, a Room: MTGPics lists `dsk/043` and
+    // `dsk/1009` for its halves, and both are the whole card's image.
+    scryfall_card(&servers, "card_dsk_43.json").await;
+    servers.mtgpics_page("dsk043", fixture("card_dsk043.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/dsk/043.jpg", JPEG).await;
+    Servers::image(&servers.mtgpics, "/pics/art/dsk/1009.jpg", JPEG).await;
+
+    let out = tempfile::tempdir().unwrap();
+    let input = RunInput::List {
+        text: "Bottomless Pool // Locker Room (DSK) 43".into(),
+        folder: None,
+    };
+    let (summary, jobs) = run_to_end(&servers.http(), input, &settings(out.path())).await;
+    assert_eq!((summary.done, summary.mtgpics_files), (1, 1));
+    let saved: Vec<_> = walk(out.path()).iter().map(|file| relative(file, out.path())).collect();
+    assert_eq!(saved, ["mtgpics/Split/Bottomless Pool - Locker Room [DSK] {43}.jpg"]);
+    let JobStatus::Done { files, missing } = &jobs[0].1 else {
+        panic!("{jobs:?}");
+    };
+    assert_eq!(
+        (files[0].face.as_str(), files[0].face_index),
+        ("Bottomless Pool // Locker Room", 0)
+    );
     assert!(missing.is_empty());
 }

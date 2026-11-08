@@ -621,6 +621,26 @@ async fn download_card(
         missing.push(face.name.clone());
     }
 
+    // MTGPics may file a split card's whole image under each half, as it
+    // does Duskmourn's Rooms: halves that are one picture are the whole card.
+    if halves_missing.is_empty() && faces.iter().any(FacePlan::is_split_half) {
+        if let [first, second] = &files[first_file..] {
+            if same_contents(Path::new(&first.path), Path::new(&second.path)).await {
+                let second = files.pop().expect("two files");
+                let _ = tokio::fs::remove_file(&second.path).await;
+                let first = files.pop().expect("two files");
+                let whole = whole_card(card, settings);
+                match rename_to_face(first, card, &whole, context).await {
+                    Ok(file) => files.push(file),
+                    Err(error) => {
+                        errors.push(error.to_string());
+                        missing.push(whole.name);
+                    }
+                }
+            }
+        }
+    }
+
     if !halves_missing.is_empty() {
         if settings.sources == SourceMode::MtgpicsOnly {
             missing.extend(halves_missing);
@@ -660,6 +680,38 @@ async fn download_card(
         };
         let _ = history.remember(card, &log, checked_at);
     }
+}
+
+/// Whether two files hold the same bytes.
+async fn same_contents(a: &Path, b: &Path) -> bool {
+    match (tokio::fs::read(a).await, tokio::fs::read(b).await) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
+/// Moves a saved image to where `face`'s image from the same source goes, and
+/// says it's that face's.
+async fn rename_to_face(file: SavedFile, card: &Card, face: &FacePlan, context: &Context<'_>) -> Result<SavedFile> {
+    let settings = context.settings;
+    let dir = face_dir(&context.output_dir, settings, file.source, face);
+    tokio::fs::create_dir_all(&dir).await?;
+    let extension = Path::new(&file.path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("jpg")
+        .to_owned();
+    let path = context
+        .paths
+        .reserve(&dir, &face_stem(settings, card, face), &extension, settings.overwrite);
+    tokio::fs::rename(&file.path, &path).await?;
+    Ok(SavedFile {
+        path: path.to_string_lossy().into_owned(),
+        face: face.name.clone(),
+        face_index: face.index as u32,
+        artist: face.artist.clone(),
+        ..file
+    })
 }
 
 /// Saves a face's art from where the user found it before, if they did and
