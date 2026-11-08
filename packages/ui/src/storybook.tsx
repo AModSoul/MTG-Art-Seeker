@@ -3,6 +3,7 @@
 // `.storybook/preview.tsx` spreads `basePreview` and calls `resetUi` from its
 // own `beforeEach`.
 
+import "./fonts.css";
 import { ChakraProvider } from "@chakra-ui/react";
 import { withThemeByClassName } from "@storybook/addon-themes";
 import type { Preview } from "@storybook/react-vite";

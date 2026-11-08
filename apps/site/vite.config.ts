@@ -55,6 +55,42 @@ function dropPrerenderChunks(): Plugin {
 }
 
 /**
+ * Preloads Inter's Latin file from each page's `<head>`, so it's fetched alongside the stylesheet
+ * rather than once the stylesheet has been parsed. `@mtg-art/ui`'s fonts are `font-display: block`,
+ * which hides text until they load; this makes that wait last no longer than the stylesheet does.
+ */
+function preloadInter(): Plugin {
+  return {
+    name: "preload-inter",
+    apply: "build",
+    transformIndexHtml: {
+      order: "post",
+      handler(_html, { bundle }) {
+        const font = Object.values(bundle ?? {}).find(
+          (output) =>
+            output.type === "asset" &&
+            /^inter-latin-wght-normal\b.*\.woff2$/.test(path.basename(output.fileName)),
+        );
+        if (!font) throw new Error("preload-inter: the build has no inter-latin-wght-normal font");
+        return [
+          {
+            tag: "link",
+            attrs: {
+              rel: "preload",
+              href: `/${font.fileName}`,
+              as: "font",
+              type: "font/woff2",
+              crossorigin: "",
+            },
+            injectTo: "head-prepend",
+          },
+        ];
+      },
+    },
+  };
+}
+
+/**
  * The prerender imports the built bundle into Node, which can leave file handles open so the
  * process never exits although the build is done and written.
  */
@@ -110,6 +146,7 @@ export default defineConfig(({ command }) => ({
             prerenderScript: PRERENDER_SCRIPT,
           }),
           dropPrerenderChunks(),
+          preloadInter(),
           exitAfterBuild(),
         ]
       : []),

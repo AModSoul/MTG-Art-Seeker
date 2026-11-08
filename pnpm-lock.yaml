@@ -173,6 +173,9 @@ catalogs:
     '@emotion/react':
       specifier: ^11.14.0
       version: 11.14.0
+    '@fontsource-variable/inter':
+      specifier: ^5.3.0
+      version: 5.3.0
     '@storybook/addon-a11y':
       specifier: ^10.6.6
       version: 10.6.6
@@ -437,6 +440,10 @@ importers:
         version: 4.158.0(@types/node@26.6.6)
 
   packages/ui:
+    dependencies:
+      '@fontsource-variable/inter':
+        specifier: 'catalog:'
+        version: 5.3.0
     devDependencies:
       '@chakra-ui/cli':
         specifier: 'catalog:'
@@ -934,6 +941,9 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@fontsource-variable/inter@5.3.0':
+    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -4274,6 +4284,8 @@ snapshots:
       '@floating-ui/utils': 0.2.12
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@fontsource-variable/inter@5.3.0': {}
 
   '@img/colour@1.1.0': {}
 
