@@ -124,7 +124,7 @@ export function RunView() {
 
       {jobs.length > 0 && (
         <Stack gap="3">
-          <ProgressRoot value={finished} max={jobs.length} size="sm" colorPalette="emerald">
+          <ProgressRoot value={finished} max={jobs.length} size="sm">
             <HStack justify="space-between" mb="1">
               <ProgressLabel>
                 {running ? "Downloading" : summary?.cancelled ? "Cancelled" : "Finished"}

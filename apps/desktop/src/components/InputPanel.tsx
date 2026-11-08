@@ -133,11 +133,7 @@ export function InputPanel() {
           <LuSquare /> Cancel
         </Button>
       ) : (
-        <Button
-          colorPalette="emerald"
-          disabled={!input}
-          onClick={() => input && void startRun(input)}
-        >
+        <Button disabled={!input} onClick={() => input && void startRun(input)}>
           <LuDownload /> Download art
         </Button>
       )}

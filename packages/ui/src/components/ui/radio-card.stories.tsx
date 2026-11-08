@@ -48,7 +48,7 @@ export const Default: Story = {
 
 /** Stacked, with a picture and no indicator, as the desktop app's decks are. */
 export const Vertical: Story = {
-  args: { orientation: "vertical", size: "sm", colorPalette: "emerald" },
+  args: { orientation: "vertical", size: "sm" },
   render: (args) => (
     <RadioCardRoot {...args}>
       <RadioCardLabel srOnly>Precon decks</RadioCardLabel>
