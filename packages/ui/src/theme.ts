@@ -1,4 +1,8 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
+
+/** Chakra's own fallbacks, for the moment before Inter loads. */
+const FALLBACK_FONTS = `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`;
+
 /**
  * The app's Chakra system. Tokens, semantic tokens, recipes and slot recipes go in this config;
  * run `npm run typegen` after changing it so their props are typed.
@@ -6,6 +10,13 @@ import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 const config = defineConfig({
   theme: {
     tokens: {
+      // Chakra's stack names Inter but doesn't ship it, so it only showed where it was installed.
+      // `./fonts.css`, which the provider and the Storybook preview import, declares it as
+      // "Inter Variable".
+      fonts: {
+        heading: { value: `"Inter Variable", ${FALLBACK_FONTS}` },
+        body: { value: `"Inter Variable", ${FALLBACK_FONTS}` },
+      },
       colors: {
         // The download button and progress bar: emerald, #50C878, at 500.
         emerald: {

@@ -17,6 +17,9 @@
     "ci-storybook": "storybook dev -p 6008 --quiet --ci",
     "build-storybook": "storybook build"
   },
+  "dependencies": {
+    "@fontsource-variable/inter": "catalog:"
+  },
   "devDependencies": {
     "@chakra-ui/cli": "catalog:",
     "@chakra-ui/react": "catalog:",
