@@ -51,6 +51,15 @@ const FINE_WIDTH: u32 = 192;
 /// The art crop's width as a share of the candidate's, from smallest to
 /// largest, searched roughly.
 const SCALES: [f32; 10] = [0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0];
+/// The same for a split card's half ([`CropPart`]), which is only part of
+/// the half's art crop, so takes less of the painting.
+const PART_SCALES: [f32; 15] = [
+    0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0,
+];
+/// Where the part of a split card's art crop that's only its second half's
+/// painting starts, as a share of the crop's width. The first half takes from
+/// half (Fire // Ice) to about 61% (an aftermath card's) of it.
+const SECOND_HALF_FROM: f32 = 0.65;
 /// How far either side of the match's edges the frame test looks, in pixels
 /// of the fine copy.
 const FRAME_REACH: u32 = 2;
@@ -117,10 +126,72 @@ impl Analysis {
     }
 }
 
-/// Compares the image at `candidate` with the art crop at `art_crop`.
 /// How much better the other order has to match for a split card's halves'
 /// paintings to count as the wrong way round.
 const SWAP_MARGIN: f32 = 0.1;
+
+/// Which of a face's art Scryfall's art crop shows. A split card's crop shows
+/// both halves side by side, the first on the left.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CropPart {
+    Whole,
+    /// A split card's first half: the crop's left half, which is all its.
+    FirstHalf,
+    /// A split card's second half: the crop from [`SECOND_HALF_FROM`] on.
+    SecondHalf,
+}
+
+/// What a candidate is checked against: the art crop, or for a split card's
+/// half, the part of it that's that half's painting. Decoded once, to check
+/// any number of candidates.
+pub struct Reference {
+    image: DynamicImage,
+    scales: &'static [f32],
+}
+
+impl Reference {
+    pub fn new(art_crop: &DynamicImage, part: CropPart) -> Self {
+        let (width, height) = (art_crop.width(), art_crop.height());
+        match part {
+            CropPart::Whole => Self {
+                image: art_crop.clone(),
+                scales: &SCALES,
+            },
+            CropPart::FirstHalf => Self {
+                image: art_crop.crop_imm(0, 0, (width / 2).max(1), height),
+                scales: &PART_SCALES,
+            },
+            CropPart::SecondHalf => {
+                let from = ((width as f32 * SECOND_HALF_FROM) as u32).min(width.saturating_sub(1));
+                Self {
+                    image: art_crop.crop_imm(from, 0, width - from, height),
+                    scales: &PART_SCALES,
+                }
+            }
+        }
+    }
+
+    /// The art crop at `path`, decoded.
+    pub fn open(path: &Path, part: CropPart) -> Result<Self> {
+        Ok(Self::new(&open(path)?, part))
+    }
+
+    pub fn compare(&self, candidate: &DynamicImage) -> Verdict {
+        // A copy no wider than the crop can't hold a larger copy of it.
+        if candidate.width() <= self.image.width() {
+            return Verdict::Smaller;
+        }
+        match analyse_at(&self.image, candidate, self.scales) {
+            Some(analysis) => analysis.verdict(self.image.width()),
+            None => Verdict::Different,
+        }
+    }
+
+    /// Compares the image at `candidate`.
+    pub fn compare_file(&self, candidate: &Path) -> Result<Verdict> {
+        Ok(self.compare(&open(candidate)?))
+    }
+}
 
 /// Whether the paintings saved for a split card's halves, `first` and
 /// `second`, are the wrong way round. Scryfall's art crop of a split card
@@ -142,24 +213,19 @@ pub fn halves_swapped_images(art_crop: &DynamicImage, first: &DynamicImage, seco
     swapped > as_saved + SWAP_MARGIN
 }
 
-pub fn compare(art_crop: &Path, candidate: &Path) -> Result<Verdict> {
-    Ok(compare_images(&open(art_crop)?, &open(candidate)?))
-}
-
+/// Compares `candidate` with the whole of `art_crop`.
 pub fn compare_images(art_crop: &DynamicImage, candidate: &DynamicImage) -> Verdict {
-    // A copy no wider than the crop can't hold a larger copy of it.
-    if candidate.width() <= art_crop.width() {
-        return Verdict::Smaller;
-    }
-    match analyse(art_crop, candidate) {
-        Some(analysis) => analysis.verdict(art_crop.width()),
-        None => Verdict::Different,
-    }
+    Reference::new(art_crop, CropPart::Whole).compare(candidate)
 }
 
 /// Where the art crop best matches inside `candidate`; `None` if either is
 /// blank or the crop's shape can't fit in it.
 pub fn analyse(art_crop: &DynamicImage, candidate: &DynamicImage) -> Option<Analysis> {
+    analyse_at(art_crop, candidate, &SCALES)
+}
+
+/// [`analyse`], trying the crop at `scales` of the candidate's width.
+fn analyse_at(art_crop: &DynamicImage, candidate: &DynamicImage, scales: &[f32]) -> Option<Analysis> {
     let crop = art_crop.to_luma8();
     let aspect = crop.height() as f32 / crop.width() as f32;
     let candidate_gray = candidate.to_luma8();
@@ -167,7 +233,7 @@ pub fn analyse(art_crop: &DynamicImage, candidate: &DynamicImage) -> Option<Anal
     // Roughly: every scale, every position.
     let coarse = shrink(&candidate_gray, COARSE_WIDTH);
     let mut best: Option<(f32, f32, u32, u32)> = None;
-    for scale in SCALES {
+    for &scale in scales {
         if let Some((score, x, y)) = best_position(&coarse, &crop, scale, aspect, None) {
             if best.map_or(true, |(s, ..)| score > s) {
                 best = Some((score, scale, x, y));
@@ -477,6 +543,34 @@ mod tests {
         let crop = split_crop(&cut, &ribbons, 1024, 625, 231);
         assert!(!halves_swapped_images(&crop, &cut, &ribbons));
         assert!(halves_swapped_images(&crop, &ribbons, &cut));
+    }
+
+    #[test]
+    fn checks_a_split_cards_half_against_its_own_part_of_the_crop() {
+        let larger = |art: &DynamicImage| art.resize_exact(art.width() * 2, art.height() * 2, FilterType::Triangle);
+        let (fire, ice) = (painting(1000, 680, 11), painting(960, 652, 12));
+        let crop = split_crop(&fire, &ice, 808, 404, 280);
+        let (first, second) = (
+            Reference::new(&crop, CropPart::FirstHalf),
+            Reference::new(&crop, CropPart::SecondHalf),
+        );
+        // The whole crop isn't in either half's painting.
+        assert_eq!(compare_images(&crop, &larger(&fire)), Verdict::Different);
+        assert!(matches!(first.compare(&larger(&fire)), Verdict::Same { .. }));
+        assert!(matches!(second.compare(&larger(&ice)), Verdict::Same { .. }));
+        assert_eq!(first.compare(&larger(&ice)), Verdict::Different);
+        assert_eq!(second.compare(&larger(&fire)), Verdict::Different);
+
+        // An aftermath card's first half takes more of the crop.
+        let (cut, ribbons) = (painting(1200, 446, 13), painting(1200, 705, 14));
+        let crop = split_crop(&cut, &ribbons, 1024, 625, 231);
+        let (first, second) = (
+            Reference::new(&crop, CropPart::FirstHalf),
+            Reference::new(&crop, CropPart::SecondHalf),
+        );
+        assert!(matches!(first.compare(&larger(&cut)), Verdict::Same { .. }));
+        assert!(matches!(second.compare(&larger(&ribbons)), Verdict::Same { .. }));
+        assert_eq!(second.compare(&larger(&cut)), Verdict::Different);
     }
 
     #[test]

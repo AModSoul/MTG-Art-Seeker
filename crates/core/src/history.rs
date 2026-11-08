@@ -201,15 +201,12 @@ impl History {
 
     /// Logs what MTGPics said of `artist`'s website: `url`, or none.
     pub fn remember_artist_website(&self, artist: &str, url: Option<&str>) -> Result<()> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(i64::MAX));
         self.lock()
             .prepare_cached(
                 "INSERT INTO artist_websites (artist, url, checked_at) VALUES (?1, ?2, ?3) \
                  ON CONFLICT (artist) DO UPDATE SET url = ?2, checked_at = ?3",
             )?
-            .execute(params![fold(artist), url, now])?;
+            .execute(params![fold(artist), url, now()])?;
         Ok(())
     }
 
@@ -229,15 +226,12 @@ impl History {
     }
 
     pub fn remember_found_by_hand(&self, illustration: &str, found: &FoundByHand) -> Result<()> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(i64::MAX));
         self.lock()
             .prepare_cached(
                 "INSERT INTO found_by_hand (illustration_id, url, page, saved_at) VALUES (?1, ?2, ?3, ?4) \
                  ON CONFLICT (illustration_id) DO UPDATE SET url = ?2, page = ?3, saved_at = ?4",
             )?
-            .execute(params![illustration, found.url, found.page, now])?;
+            .execute(params![illustration, found.url, found.page, now()])?;
         Ok(())
     }
 

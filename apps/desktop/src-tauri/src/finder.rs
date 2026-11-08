@@ -4,7 +4,8 @@
 //! The app opens a page the core chose and then listens: a person does the
 //! searching, and when they save an image, the download is caught here and
 //! handed on. The app reads a page only when the user asks, from the window's
-//! menu, to find the art on it, and then reads only the addresses and sizes
+//! menu (on macOS, a menu in the app's menu bar, since a window there can't
+//! have one), to find the art on it, and then reads only the addresses and sizes
 //! of its images ([`PAGE_IMAGES`]); it never clicks, scrolls or navigates for
 //! them. What came of an image is shown in a small toast of the app's own in
 //! the page's corner ([`toast`]), kept apart from the page's content and
@@ -15,14 +16,14 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
-        Mutex, MutexGuard,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Mutex, MutexGuard,
     },
 };
 
 use mtg_art_core::manual::PageImage;
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, Submenu},
     webview::{DownloadEvent, NewWindowResponse},
     AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
@@ -184,42 +185,22 @@ pub fn open(
     let pending: Mutex<HashMap<Url, PathBuf>> = Mutex::default();
     let opener = app.clone();
     let saver = app.clone();
-    let menu = Menu::with_items(
-        app,
-        &[
-            &MenuItem::with_id(app, FIND_ART, "Find the art on this page", true, None::<&str>)?,
-            &MenuItem::with_id(app, SIGN_OUT, "Sign out of sites", true, None::<&str>)?,
-        ],
-    )?;
-    let on_page = std::sync::Arc::new(on_page);
+    let on_page: Arc<PageHandler> = Arc::new(on_page);
 
-    WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(url))
+    let mut builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(url))
         .title(title)
-        .inner_size(1100.0, 800.0)
-        .menu(menu)
-        .on_menu_event(move |window, event| {
-            let Some(webview) = window.app_handle().get_webview_window(LABEL) else {
-                return;
-            };
-            match event.id().as_ref() {
-                FIND_ART => {
-                    let (app, on_page) = (window.app_handle().clone(), on_page.clone());
-                    let page = webview.url().ok();
-                    let _ = webview.eval_with_callback(PAGE_IMAGES, move |json| {
-                        let images = serde_json::from_str(&json).unwrap_or_default();
-                        on_page(&app, images, page.clone());
-                    });
-                }
-                SIGN_OUT => {
-                    // Cookies and storage go; the page is loaded again without them.
-                    let _ = webview.clear_all_browsing_data();
-                    if let Ok(url) = webview.url() {
-                        let _ = webview.navigate(url);
-                    }
-                }
-                _ => {}
-            }
-        })
+        .inner_size(1100.0, 800.0);
+    if cfg!(target_os = "macos") {
+        // A window can't have a menu of its own on macOS: the menu bar is the
+        // app's, so the window's commands are a menu in it.
+        add_to_app_menu(app, on_page)?;
+    } else {
+        let (find_art, sign_out) = menu_items(app)?;
+        builder = builder
+            .menu(Menu::with_items(app, &[&find_art, &sign_out])?)
+            .on_menu_event(move |window, event| on_menu(window.app_handle(), event.id().as_ref(), &on_page));
+    }
+    builder
         // The sites' cookies are kept apart from the app's own storage.
         .data_directory(app.path().app_local_data_dir()?.join("finder-webview"))
         .on_navigation(|url| matches!(url.scheme(), "http" | "https"))
@@ -262,6 +243,59 @@ pub fn open(
             true
         })
         .build()
+}
+
+/// What's handed the images of the page the user is on.
+type PageHandler = dyn Fn(&AppHandle, Vec<PageImage>, Option<Url>) + Send + Sync;
+
+/// Whether the window's commands are in the app's menu yet, on macOS.
+static IN_APP_MENU: AtomicBool = AtomicBool::new(false);
+
+fn menu_items(app: &AppHandle) -> tauri::Result<(MenuItem<tauri::Wry>, MenuItem<tauri::Wry>)> {
+    Ok((
+        MenuItem::with_id(app, FIND_ART, "Find the art on this page", true, None::<&str>)?,
+        MenuItem::with_id(app, SIGN_OUT, "Sign out of sites", true, None::<&str>)?,
+    ))
+}
+
+/// Adds the window's commands to the app's menu, once: the default menu,
+/// with a menu of the window's after it. They do nothing while the window is
+/// closed.
+fn add_to_app_menu(app: &AppHandle, on_page: Arc<PageHandler>) -> tauri::Result<()> {
+    if IN_APP_MENU.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    let (find_art, sign_out) = menu_items(app)?;
+    let menu = Menu::default(app)?;
+    menu.append(&Submenu::with_items(app, "Find Art", true, &[&find_art, &sign_out])?)?;
+    app.set_menu(menu)?;
+    app.on_menu_event(move |app, event| on_menu(app, event.id().as_ref(), &on_page));
+    Ok(())
+}
+
+/// Does what the menu item `id` says, in the window, if it's open.
+fn on_menu(app: &AppHandle, id: &str, on_page: &Arc<PageHandler>) {
+    let Some(webview) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    match id {
+        FIND_ART => {
+            let (app, on_page) = (app.clone(), Arc::clone(on_page));
+            let page = webview.url().ok();
+            let _ = webview.eval_with_callback(PAGE_IMAGES, move |json| {
+                let images = serde_json::from_str(&json).unwrap_or_default();
+                on_page(&app, images, page.clone());
+            });
+        }
+        SIGN_OUT => {
+            // Cookies and storage go; the page is loaded again without them.
+            let _ = webview.clear_all_browsing_data();
+            if let Ok(url) = webview.url() {
+                let _ = webview.navigate(url);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {

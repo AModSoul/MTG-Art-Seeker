@@ -161,7 +161,15 @@ impl Http {
     /// Streams an image to `dest`; `None` for a 404. Fails, leaving whatever
     /// was written, if the body isn't a JPEG, PNG or WebP image.
     pub async fn download(&self, url: &str, dest: &Path) -> Result<Option<ImageKind>> {
-        let Some(head) = self.stream_to(url, dest, None).await? else {
+        self.download_from(url, None, dest).await
+    }
+
+    /// [`Http::download`], saying the request comes from `page`, as a
+    /// browser would: sites that guard their images against being linked
+    /// from elsewhere, such as Pixiv's, refuse a request without it.
+    pub async fn download_from(&self, url: &str, page: Option<&str>, dest: &Path) -> Result<Option<ImageKind>> {
+        let referer = page.filter(|page| page.starts_with("https://") || page.starts_with("http://"));
+        let Some(head) = self.stream_to(url, dest, None, referer).await? else {
             return Ok(None);
         };
         ImageKind::sniff(&head).map(Some).ok_or_else(|| Error::Invalid {
@@ -196,18 +204,30 @@ impl Http {
     /// Streams a large file to `dest`, with longer to finish than other
     /// requests get; `false` for a 404.
     pub async fn download_file(&self, url: &str, dest: &Path) -> Result<bool> {
-        Ok(self.stream_to(url, dest, Some(LARGE_FILE_TIMEOUT)).await?.is_some())
+        Ok(self
+            .stream_to(url, dest, Some(LARGE_FILE_TIMEOUT), None)
+            .await?
+            .is_some())
     }
 
     /// Streams a response to `dest`, returning its first few bytes; `None` for a 404.
-    async fn stream_to(&self, url: &str, dest: &Path, timeout: Option<Duration>) -> Result<Option<Vec<u8>>> {
+    async fn stream_to(
+        &self,
+        url: &str,
+        dest: &Path,
+        timeout: Option<Duration>,
+        referer: Option<&str>,
+    ) -> Result<Option<Vec<u8>>> {
         let response = self
             .send(url, |client| {
-                let request = client.get(url);
-                match timeout {
-                    Some(timeout) => request.timeout(timeout),
-                    None => request,
+                let mut request = client.get(url);
+                if let Some(timeout) = timeout {
+                    request = request.timeout(timeout);
                 }
+                if let Some(referer) = referer {
+                    request = request.header(header::REFERER, referer);
+                }
+                request
             })
             .await?;
         let Some(response) = ok_or_missing(url, response).await? else {
@@ -295,11 +315,11 @@ impl Http {
     }
 }
 
-/// The response if it succeeded, `None` for a 404, otherwise an error carrying
-/// the service's explanation when it gave one.
+/// The response if it succeeded, `None` for a 404 or a 410, otherwise an error
+/// carrying the service's explanation when it gave one.
 async fn ok_or_missing(url: &str, response: Response) -> Result<Option<Response>> {
     let status = response.status();
-    if status == StatusCode::NOT_FOUND {
+    if status == StatusCode::NOT_FOUND || status == StatusCode::GONE {
         return Ok(None);
     }
     if status.is_success() {

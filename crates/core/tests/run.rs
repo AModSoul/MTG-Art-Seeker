@@ -19,7 +19,7 @@ use mtg_art_core::{
 use serde_json::{json, Value};
 use tokio_util::sync::CancellationToken;
 use wiremock::{
-    matchers::{body_partial_json, method, path, query_param},
+    matchers::{body_partial_json, header, method, path, query_param},
     Mock, MockServer, ResponseTemplate,
 };
 
@@ -898,8 +898,15 @@ async fn asks_before_saving_an_image_that_is_not_the_art() {
 #[tokio::test]
 async fn later_runs_save_the_users_copy_from_where_they_found_it() {
     let servers = Servers::start().await;
-    karn_with_art(&servers).await;
-    Servers::image(&servers.cdn, "/found/karn.jpg", JPEG).await;
+    let art = karn_with_art(&servers).await;
+    // Asked for as the page it was on asks for it: some sites refuse a
+    // request for an image that doesn't come from one of their pages.
+    Mock::given(method("GET"))
+        .and(path("/found/karn.jpg"))
+        .and(header("referer", "https://example.com/karn"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(jpeg(&art), "image/jpeg"))
+        .mount(&servers.cdn)
+        .await;
     // MTGPics isn't asked about a face the user found art for.
     Mock::given(method("GET"))
         .and(path("/card"))
@@ -988,6 +995,95 @@ async fn forgets_the_users_copy_once_it_is_gone() {
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
 }
 
+/// Runs Karn once with `history`, returning the summary.
+async fn run_karn(servers: &Servers, history: &History, out: &Path) -> RunSummary {
+    run(
+        &servers.http(),
+        RunInput::List {
+            text: "Karn, Scion of Urza (DOM) 1".into(),
+            folder: None,
+        },
+        &settings(out),
+        Local {
+            cards: None,
+            history: Some(history),
+        },
+        &CancellationToken::new(),
+        &|_| {},
+    )
+    .await
+}
+
+#[tokio::test]
+async fn checks_the_users_copy_again_before_saving_it() {
+    let servers = Servers::start().await;
+    karn_with_art(&servers).await;
+    servers.mtgpics_page("dom001", fixture("card_dom001.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/dom/001_1.jpg", JPEG).await;
+    // Something else is at the copy's address now.
+    Servers::image(&servers.cdn, "/found/karn.jpg", &jpeg(&painting(1400, 1050, 9))).await;
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let url = format!("{}/found/karn.jpg", servers.cdn.uri());
+    let found = FoundByHand {
+        url: url.clone(),
+        page: None,
+    };
+    history.remember_found_by_hand(KARN_ART, &found).unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    let summary = run_karn(&servers, &history, out.path()).await;
+    assert_eq!((summary.done, summary.web_files, summary.mtgpics_files), (1, 0, 1));
+    assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None, "it's forgotten");
+
+    // But an image the user saved though the check doubted it is theirs to
+    // keep, while it's the size it was when they saved it.
+    history.remember_found_by_hand(KARN_ART, &found).unwrap();
+    let copy = |width, height| mtg_art_core::history::FoundCopy {
+        url: url.clone(),
+        page: None,
+        site: None,
+        size: Some(mtg_art_core::imagesize::ImageSize { width, height }),
+    };
+    history.remember_found_copy(KARN_ART, &copy(1400, 1050)).unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let summary = run_karn(&servers, &history, out.path()).await;
+    assert_eq!((summary.done, summary.web_files), (1, 1));
+    assert!(history.found_by_hand(KARN_ART).unwrap().is_some());
+}
+
+#[tokio::test]
+async fn keeps_only_a_copy_that_can_be_downloaded_again() {
+    let servers = Servers::start().await;
+    let art = karn_with_art(&servers).await;
+    let http = servers.http();
+    let out = tempfile::tempdir().unwrap();
+    let settings = settings(out.path());
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let downloaded = dir.path().join("blob.part");
+    std::fs::write(&downloaded, jpeg(&art)).unwrap();
+    let target = manual::prepare(&http, None, &settings, "dom", "1", 0, None)
+        .await
+        .unwrap();
+    let found = manual::Found {
+        image_url: "blob:https://www.instagram.com/3f1c",
+        page: Some("https://www.instagram.com/p/karn/"),
+        site: Some(manual::Site::Instagram),
+    };
+    let destination = manual::Destination {
+        settings: &settings,
+        list_folder: None,
+        replace: None,
+    };
+    let imported = manual::import(&http, Some(&history), &target, destination, &downloaded, found, false)
+        .await
+        .unwrap();
+    assert!(matches!(imported, manual::Imported::Saved { .. }), "saved this once");
+    assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
+    assert!(history.found_copies(KARN_ART).unwrap().is_empty());
+}
+
 /// A card by `artist`, to look for a larger copy of.
 fn target_by(artist: &str) -> manual::Target {
     let card: mtg_art_core::card::Card = serde_json::from_value(json!({
@@ -1059,6 +1155,49 @@ async fn opens_the_website_mtgpics_links_for_the_artist() {
 }
 
 #[tokio::test]
+async fn asks_for_mtgpics_list_of_artists_again_when_it_had_no_one_on_it() {
+    let servers = Servers::start().await;
+    // A page with no artists on it the first time, the list the next.
+    Mock::given(method("GET"))
+        .and(path("/illustrators"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("<html>Down for maintenance</html>"))
+        .up_to_n_times(1)
+        .mount(&servers.mtgpics)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/illustrators"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(fixture("illustrators.html"), "text/html; charset=ISO-8859-1"),
+        )
+        .mount(&servers.mtgpics)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/illus"))
+        .and(query_param("art", "729"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(fixture("illus_729.html"), "text/html; charset=ISO-8859-1"),
+        )
+        .mount(&servers.mtgpics)
+        .await;
+    let http = servers.http();
+    let artists = mtg_art_core::mtgpics::Artists::default();
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let target = target_by("Seb McKinnon");
+    let website = manual::Site::Website;
+
+    assert!(manual::site_url(&http, Some(&history), &artists, &target, website)
+        .await
+        .is_err());
+    // Nothing was noted of the artist, so the next try asks MTGPics.
+    assert_eq!(history.artist_website("Seb McKinnon").unwrap(), None);
+    let url = manual::site_url(&http, Some(&history), &artists, &target, website)
+        .await
+        .unwrap();
+    assert_eq!(url.as_str(), "http://www.sebmckinnon.com/");
+}
+
+#[tokio::test]
 async fn offers_the_images_of_a_page_art_first() {
     let servers = Servers::start().await;
     let art = karn_with_art(&servers).await;
@@ -1093,7 +1232,7 @@ async fn offers_the_images_of_a_page_art_first() {
         image("missing.jpg", 2000, 1500),
         image("art.jpg", 1200, 900),
     ];
-    let found = manual::fetch_page_images(&http, &target, &images, dir.path())
+    let found = manual::fetch_page_images(&http, &target, &images, None, dir.path())
         .await
         .unwrap();
 
@@ -1140,7 +1279,7 @@ async fn offers_the_images_of_a_page_art_first() {
     assert_eq!(file.size.map(|s| s.width), Some(1200));
 
     // A page with nothing large enough has nothing to choose from.
-    let none = manual::fetch_page_images(&http, &target, &[image("avatar.jpg", 150, 150)], dir.path())
+    let none = manual::fetch_page_images(&http, &target, &[image("avatar.jpg", 150, 150)], None, dir.path())
         .await
         .unwrap();
     assert!(none.is_empty());
@@ -1358,6 +1497,56 @@ async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall
     let faces: Vec<_> = files.iter().map(|f| (f.face_index, f.face.as_str())).collect();
     assert_eq!(faces, [(0, "Fire"), (1, "Ice")]);
     assert!(missing.is_empty());
+}
+
+#[tokio::test]
+async fn later_runs_save_a_copy_the_user_found_of_a_split_card_saved_whole() {
+    let servers = Servers::start().await;
+    // Fire // Ice, saved whole from Scryfall, and a larger copy of the whole
+    // card the user found for it.
+    let whole = painting(1600, 700, 31);
+    let crop =
+        whole
+            .crop_imm(160, 70, 1280, 1280 * 280 / 808)
+            .resize_exact(808, 280, image::imageops::FilterType::Triangle);
+    scryfall_card(&servers, "card_mh2_290.json", &jpeg(&crop)).await;
+    Servers::image(&servers.cdn, "/found/fire-ice.jpg", &jpeg(&whole)).await;
+    // MTGPics isn't asked about the halves.
+    Mock::given(method("GET"))
+        .and(path("/card"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(0)
+        .mount(&servers.mtgpics)
+        .await;
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let found = FoundByHand {
+        url: format!("{}/found/fire-ice.jpg", servers.cdn.uri()),
+        page: None,
+    };
+    history
+        .remember_found_by_hand("511174a2-18dc-4582-9de1-c04871eb77de", &found)
+        .unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    let summary = run(
+        &servers.http(),
+        RunInput::List {
+            text: "Fire // Ice (MH2) 290".into(),
+            folder: None,
+        },
+        &settings(out.path()),
+        Local {
+            cards: None,
+            history: Some(&history),
+        },
+        &CancellationToken::new(),
+        &|_| {},
+    )
+    .await;
+    assert_eq!((summary.done, summary.web_files), (1, 1));
+    let saved: Vec<_> = walk(out.path()).iter().map(|file| relative(file, out.path())).collect();
+    assert_eq!(saved, ["web/Split/Fire - Ice [MH2] {290}.jpg"]);
 }
 
 #[tokio::test]

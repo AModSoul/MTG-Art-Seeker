@@ -36,14 +36,23 @@ pub struct Artists {
 }
 
 /// The website MTGPics links for `artist`: `None` when it has no page for
-/// them, or their page links none.
+/// them, or their page links none. Fails, and is asked again next time, when
+/// the list of artists can't be had: a list with no one on it isn't MTGPics'.
 pub async fn artist_website(http: &Http, artists: &Artists, artist: &str) -> Result<Option<String>> {
     let origin = &http.endpoints().mtgpics;
     let ids = artists
         .ids
         .get_or_try_init(|| async {
-            let html = http.get_text(&format!("{origin}/illustrators")).await?;
-            Ok::<_, crate::Error>(parse_artist_list(&html.unwrap_or_default()))
+            let url = format!("{origin}/illustrators");
+            let html = http.get_text(&url).await?;
+            let ids = parse_artist_list(html.as_deref().unwrap_or_default());
+            if ids.is_empty() {
+                return Err(crate::Error::Invalid {
+                    url,
+                    reason: "MTGPics' list of artists is empty; try again later".into(),
+                });
+            }
+            Ok(ids)
         })
         .await?;
     let Some(id) = find_artist(ids, artist) else {

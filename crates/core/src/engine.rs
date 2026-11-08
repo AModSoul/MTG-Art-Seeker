@@ -25,6 +25,7 @@ use crate::{
     http::{Http, ImageKind},
     imagesize::{image_size, ImageSize},
     list::{parse_list, CardLine, SkippedLine},
+    manual::{refetch_found_copy, FoundCopyAt, Refetched},
     mtgpics::{self, MtgpicsArt},
     naming::{file_stem, sanitize, NameParts},
     presets::preset_names,
@@ -218,7 +219,6 @@ struct Context<'a> {
     output_dir: PathBuf,
     cache: mtgpics::Cache,
     paths: PathReserver,
-    temp_ids: AtomicU64,
     emit: &'a (dyn Fn(RunEvent) + Sync),
 }
 
@@ -311,7 +311,6 @@ pub async fn run(
         output_dir,
         cache: mtgpics::Cache::default(),
         paths: PathReserver::default(),
-        temp_ids: AtomicU64::new(0),
         emit,
     };
     let statuses = stream::iter(jobs)
@@ -596,6 +595,16 @@ async fn download_card(
     // A split card's halves MTGPics had no art for: Scryfall has none of a half.
     let mut halves_missing = Vec::new();
 
+    // A split card saved whole before, as Scryfall has it or as MTGPics' one
+    // picture of a Room, may have a copy the user found of the whole card.
+    // It's used unless they found one of a half since.
+    if faces.iter().any(FacePlan::is_split_half) && !faces.iter().any(|face| has_found_by_hand(face, context)) {
+        if let Some(file) = found_by_hand(card, &whole_card(card, settings), context, errors).await {
+            files.push(file);
+            return;
+        }
+    }
+
     for (index, face) in faces.iter().enumerate() {
         // An image the user picked themselves comes before anything found for them.
         if let Some(file) = found_by_hand(card, face, context, errors).await {
@@ -669,13 +678,17 @@ async fn download_card(
             Halves::Swapped => {
                 let second = files.pop().expect("two files");
                 let first = files.pop().expect("two files");
-                match swap_pictures(first, second).await {
+                match swap_pictures(&first, &second).await {
                     Ok((first, second)) => {
                         files.extend([first, second]);
                         // Logged the right way round, for the next run.
                         log.swap(0, 1);
                     }
-                    Err(error) => errors.push(error.to_string()),
+                    // Left as they were saved: the wrong way round, but saved.
+                    Err(error) => {
+                        errors.push(error.to_string());
+                        files.extend([first, second]);
+                    }
                 }
             }
         }
@@ -744,7 +757,7 @@ async fn split_halves(card: &Card, first: &SavedFile, second: &SavedFile, contex
     let (Some(crop_url), Some(dir)) = (card.art_crop(0), first_path.parent()) else {
         return Halves::AsSaved;
     };
-    let crop = TempFile::beside(dir, context.temp_ids.fetch_add(1, Ordering::Relaxed));
+    let crop = TempFile::beside(dir);
     if !matches!(context.http.download(crop_url, crop.path()).await, Ok(Some(_))) {
         return Halves::AsSaved;
     }
@@ -759,7 +772,8 @@ async fn split_halves(card: &Card, first: &SavedFile, second: &SavedFile, contex
 
 /// Swaps two saved images' pictures, so each face's name holds its own: each
 /// keeps its type's extension, and its size, source and page go with it.
-async fn swap_pictures(first: SavedFile, second: SavedFile) -> Result<(SavedFile, SavedFile)> {
+/// If a rename fails, the ones done are undone, so both are as they were.
+async fn swap_pictures(first: &SavedFile, second: &SavedFile) -> Result<(SavedFile, SavedFile)> {
     let (first_path, second_path) = (PathBuf::from(&first.path), PathBuf::from(&second.path));
     let extension = |path: &Path| path.extension().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
     // The first's picture goes under the second's name, and the other way round.
@@ -767,8 +781,15 @@ async fn swap_pictures(first: SavedFile, second: SavedFile) -> Result<(SavedFile
     let second_picture_to = first_path.with_extension(extension(&second_path));
     let parked = first_path.with_extension("swapping.part");
     tokio::fs::rename(&first_path, &parked).await?;
-    tokio::fs::rename(&second_path, &second_picture_to).await?;
-    tokio::fs::rename(&parked, &first_picture_to).await?;
+    if let Err(error) = tokio::fs::rename(&second_path, &second_picture_to).await {
+        let _ = tokio::fs::rename(&parked, &first_path).await;
+        return Err(error.into());
+    }
+    if let Err(error) = tokio::fs::rename(&parked, &first_picture_to).await {
+        let _ = tokio::fs::rename(&second_picture_to, &second_path).await;
+        let _ = tokio::fs::rename(&parked, &first_path).await;
+        return Err(error.into());
+    }
     let path = |path: &Path| path.to_string_lossy().into_owned();
     Ok((
         SavedFile {
@@ -780,10 +801,10 @@ async fn swap_pictures(first: SavedFile, second: SavedFile) -> Result<(SavedFile
         },
         SavedFile {
             path: path(&first_picture_to),
-            face: second.face,
+            face: second.face.clone(),
             face_index: second.face_index,
-            artist: second.artist,
-            ..first
+            artist: second.artist.clone(),
+            ..first.clone()
         },
     ))
 }
@@ -820,8 +841,17 @@ async fn rename_to_face(file: SavedFile, card: &Card, face: &FacePlan, context: 
     })
 }
 
+/// Whether the user found a copy of `face`'s art before.
+fn has_found_by_hand(face: &FacePlan, context: &Context<'_>) -> bool {
+    let (Some(history), Some(art)) = (context.history, face.illustration.as_deref()) else {
+        return false;
+    };
+    history.found_by_hand(art).ok().flatten().is_some()
+}
+
 /// Saves a face's art from where the user found it before, if they did and
-/// it's still there. Gone from there, it's forgotten.
+/// it's still the copy they saved: checked again, since anything could be at
+/// that address now. Gone from there, or changed, it's forgotten.
 async fn found_by_hand(
     card: &Card,
     face: &FacePlan,
@@ -834,13 +864,46 @@ async fn found_by_hand(
     let history = context.history?;
     let art = face.illustration.as_deref()?;
     let found = history.found_by_hand(art).ok().flatten()?;
-    match save(card, face, ArtSource::Web, &found.url, context).await {
-        Ok(Some(file)) => Some(SavedFile {
+    // The size the copy had when the user saved it.
+    let accepted = history
+        .found_copies(art)
+        .unwrap_or_default()
+        .into_iter()
+        .find(|(_, copy)| copy.url == found.url)
+        .and_then(|(_, copy)| copy.size);
+
+    let saved = async {
+        let dir = face_dir(&context.output_dir, context.settings, ArtSource::Web, face);
+        tokio::fs::create_dir_all(&dir).await?;
+        let temp = TempFile::beside(&dir);
+        let copy = FoundCopyAt {
+            url: &found.url,
+            page: found.page.as_deref(),
+            accepted,
+        };
+        let kind = match refetch_found_copy(context.http, card, face, copy, temp.path()).await? {
+            Refetched::Ready(kind) => kind,
+            other => return Ok(Err(other)),
+        };
+        let stem = face_stem(context.settings, card, face);
+        let path = context
+            .paths
+            .reserve(&dir, &stem, kind.extension(), context.settings.overwrite);
+        place(temp, kind, &path, card, face, ArtSource::Web).await.map(Ok)
+    };
+    match saved.await {
+        Ok(Ok(file)) => Some(SavedFile {
             page: found.page,
             ..file
         }),
-        Ok(None) => {
+        Ok(Err(not_saved)) => {
             let _ = history.forget_found_by_hand(art);
+            if not_saved == Refetched::Changed {
+                errors.push(format!(
+                    "The image you found at {} isn't the one you saved any more",
+                    found.url
+                ));
+            }
             None
         }
         Err(error) => {
@@ -928,7 +991,7 @@ async fn save(
 
     // Downloaded beside its final place, and only moved there whole: a run
     // cancelled mid-download leaves no half image behind.
-    let temp = TempFile::beside(&dir, context.temp_ids.fetch_add(1, Ordering::Relaxed));
+    let temp = TempFile::beside(&dir);
     let Some(kind) = context.http.download(url, temp.path()).await? else {
         return Ok(None);
     };
@@ -990,14 +1053,27 @@ pub(crate) async fn place(
     })
 }
 
+/// Numbers every temporary file this process makes, so no two share a name:
+/// a run's, and a save the user asks for while one runs.
+static TEMP_IDS: AtomicU64 = AtomicU64::new(0);
+
+/// A number no other temporary file in this process has.
+pub(crate) fn next_temp_id() -> u64 {
+    TEMP_IDS.fetch_add(1, Ordering::Relaxed)
+}
+
 /// A partly downloaded file, deleted when dropped unless kept.
 pub(crate) struct TempFile(Option<PathBuf>);
 
 impl TempFile {
     /// A hidden file in `dir`, named so no other download in this process,
     /// or any other, takes the same name.
-    pub(crate) fn beside(dir: &Path, id: u64) -> Self {
-        Self(Some(dir.join(format!(".download-{}-{id}.part", std::process::id()))))
+    pub(crate) fn beside(dir: &Path) -> Self {
+        Self(Some(dir.join(format!(
+            ".download-{}-{}.part",
+            std::process::id(),
+            next_temp_id()
+        ))))
     }
 
     pub(crate) fn path(&self) -> &Path {
