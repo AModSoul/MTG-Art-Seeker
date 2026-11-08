@@ -2,5 +2,6 @@
 *.png binary
 *.ico binary
 *.icns binary
-# Saved pages, kept byte for byte (MTGPics serves ISO-8859-1).
-crates/core/tests/fixtures/** -text
+# Saved pages, kept byte for byte (MTGPics serves ISO-8859-1), and folded
+# away in GitHub's diffs and line counts: they're saved, not written.
+crates/core/tests/fixtures/** -text linguist-generated=true
