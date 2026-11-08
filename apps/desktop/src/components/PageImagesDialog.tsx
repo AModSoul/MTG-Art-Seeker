@@ -13,6 +13,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@mtg-art/ui/dialog";
+import { Tooltip } from "@mtg-art/ui/tooltip";
 import { choosePageImage, useRun } from "@/store";
 
 /** What the check said of each image, as a badge. */
@@ -104,9 +105,11 @@ function PageImageCard({ image, onSave }: { image: PageChoice; onSave: () => voi
           {label}
         </Badge>
       </HStack>
-      <Text fontSize="xs" color="fg.muted" truncate title={image.host}>
-        {image.host}
-      </Text>
+      <Tooltip content={image.host}>
+        <Text fontSize="xs" color="fg.muted" truncate>
+          {image.host}
+        </Text>
+      </Tooltip>
       <Button
         size="sm"
         variant={image.doubt === null ? "solid" : "outline"}

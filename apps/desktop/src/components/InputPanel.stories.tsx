@@ -223,7 +223,7 @@ export const Deck: Story = {
     ).not.toBeInTheDocument();
     const download = canvas.getByRole("button", { name: /download art/i });
     await expect(download).toBeDisabled();
-    await userEvent.click(await canvas.findByRole("button", { name: /Abzan Armor/ }));
+    await userEvent.click(await canvas.findByRole("radio", { name: /Abzan Armor/ }));
     await expect(download).toBeEnabled();
     await userEvent.click(download);
     await expect(api.startRun).toHaveBeenCalledWith(
@@ -245,7 +245,7 @@ export const DeckFolder: Story = {
     await expect(
       canvas.queryByRole("textbox", { name: /folder for this deck/i }),
     ).not.toBeInTheDocument();
-    await userEvent.click(await canvas.findByRole("button", { name: /Abzan Armor/ }));
+    await userEvent.click(await canvas.findByRole("radio", { name: /Abzan Armor/ }));
     const folder = canvas.getByRole("textbox", { name: /folder for this deck/i });
     await expect(folder).toHaveValue("Abzan Armor");
 

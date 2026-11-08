@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, mocked, userEvent, waitFor } from "storybook/test";
+import { expect, mocked, screen, userEvent, waitFor } from "storybook/test";
 
 import { abzanArmor, allDecks, eocDecks, worldShaper } from "@/__fixtures__/decks";
 import { api } from "@/api";
@@ -63,13 +63,15 @@ export const SearchBySet: Story = {
   },
 };
 
-/** Clicking a deck picks it; the line under the list says which, and unpicks it. */
+/** The decks are one group of radio cards: clicking one picks it, and the line
+ * under the list says which, and unpicks it. */
 export const PickADeck: Story = {
   play: async ({ canvas }) => {
-    const tile = await canvas.findByRole("button", { name: /Abzan Armor/ });
-    await expect(tile).toHaveAttribute("aria-pressed", "false");
+    await expect(await canvas.findByRole("radiogroup", { name: "Precon decks" })).toBeVisible();
+    const tile = await canvas.findByRole("radio", { name: /Abzan Armor/ });
+    await expect(tile).not.toBeChecked();
     await userEvent.click(tile);
-    await expect(tile).toHaveAttribute("aria-pressed", "true");
+    await expect(tile).toBeChecked();
     await expect(useInput.getState().deck).toEqual({
       fileName: abzanArmor.fileName,
       name: abzanArmor.name,
@@ -79,8 +81,27 @@ export const PickADeck: Story = {
     await expect(canvas.getByText("Picked")).toBeVisible();
 
     await userEvent.click(canvas.getByRole("button", { name: "Unpick the deck" }));
-    await expect(tile).toHaveAttribute("aria-pressed", "false");
+    await expect(tile).not.toBeChecked();
     await expect(useInput.getState().deck).toBeNull();
+  },
+};
+
+/** Arrow keys move between decks, as in any radio group, and pick as they go. */
+export const PickWithTheKeyboard: Story = {
+  play: async ({ canvas }) => {
+    const first = await canvas.findByRole("radio", { name: /Abzan Armor/ });
+    await userEvent.click(first);
+    await userEvent.keyboard("{ArrowRight}");
+    await waitFor(() => expect(useInput.getState().deck?.fileName).not.toBe(abzanArmor.fileName));
+    await expect(first).not.toBeChecked();
+  },
+};
+
+/** Hovering a deck says what kind of deck it is. */
+export const DeckType: Story = {
+  play: async ({ canvas }) => {
+    await userEvent.hover(await canvas.findByText("Abzan Armor"));
+    await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent(abzanArmor.type));
   },
 };
 
@@ -93,7 +114,13 @@ export const PickedButHidden: Story = {
   play: async ({ canvas }) => {
     await expect(await canvas.findByText("2 decks")).toBeVisible();
     await expect(canvas.getByText("Picked")).toBeVisible();
-    await expect(canvas.getByTitle("Abzan Armor · Tarkir: Dragonstorm Commander")).toBeVisible();
+    // Its name may be cut short; hovering it shows it whole, with its set.
+    await userEvent.hover(canvas.getByText("Abzan Armor"));
+    await waitFor(() =>
+      expect(screen.getByRole("tooltip")).toHaveTextContent(
+        "Abzan Armor · Tarkir: Dragonstorm Commander",
+      ),
+    );
   },
 };
 

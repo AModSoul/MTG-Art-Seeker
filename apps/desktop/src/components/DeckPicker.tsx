@@ -18,6 +18,8 @@ import { LuPackage, LuX } from "react-icons/lu";
 import { api } from "@/api";
 import type { DeckSearch } from "@/bindings/DeckSearch";
 import type { DeckSummary } from "@/bindings/DeckSummary";
+import { RadioCardItem, RadioCardLabel, RadioCardRoot } from "@mtg-art/ui/radio-card";
+import { Tooltip } from "@mtg-art/ui/tooltip";
 import { errorText } from "@/notify";
 import { type PickedDeck, useInput } from "@/store";
 
@@ -48,26 +50,32 @@ export function DeckPicker() {
       <Box flex="1" minH="0" overflowY="auto" mx="-1" px="1">
         {found.search && found.search.decks.length > 0 && (
           <Stack gap="3" pb="1">
-            <SimpleGrid columns={2} gap="2">
-              {found.search.decks.map((summary) => (
-                <DeckTile
-                  key={summary.fileName}
-                  deck={summary}
-                  picked={deck?.fileName === summary.fileName}
-                  onPick={() =>
-                    setInput({
-                      deck: {
-                        fileName: summary.fileName,
-                        name: summary.name,
-                        code: summary.code,
-                        setName: summary.setName,
-                      },
-                      deckFolder: summary.name,
-                    })
-                  }
-                />
-              ))}
-            </SimpleGrid>
+            <RadioCardRoot
+              value={deck?.fileName ?? null}
+              onValueChange={(event) => {
+                const summary = found.search?.decks.find((d) => d.fileName === event.value);
+                if (!summary) return;
+                setInput({
+                  deck: {
+                    fileName: summary.fileName,
+                    name: summary.name,
+                    code: summary.code,
+                    setName: summary.setName,
+                  },
+                  deckFolder: summary.name,
+                });
+              }}
+              orientation="vertical"
+              size="sm"
+              colorPalette="emerald"
+            >
+              <RadioCardLabel srOnly>Precon decks</RadioCardLabel>
+              <SimpleGrid columns={2} gap="2">
+                {found.search.decks.map((summary) => (
+                  <DeckTile key={summary.fileName} deck={summary} />
+                ))}
+              </SimpleGrid>
+            </RadioCardRoot>
             {found.search.total > found.search.decks.length && (
               <Button
                 size="sm"
@@ -118,40 +126,32 @@ function SearchSummary({ found }: { found: Found }) {
   );
 }
 
-function DeckTile({
-  deck,
-  picked,
-  onPick,
-}: {
-  deck: DeckSummary;
-  picked: boolean;
-  onPick: () => void;
-}) {
+/** A deck to pick: its box, its name and its set, and what kind of deck it is
+ * on hover. */
+function DeckTile({ deck }: { deck: DeckSummary }) {
   return (
-    <Stack
-      asChild
-      gap="1.5"
-      p="2"
-      rounded="md"
-      borderWidth="2px"
-      borderColor={picked ? "colorPalette.solid" : "transparent"}
-      bg={picked ? "colorPalette.subtle" : undefined}
-      colorPalette="emerald"
-      textAlign="start"
-      cursor="pointer"
-      _hover={{ bg: picked ? "colorPalette.subtle" : "bg.muted" }}
-      focusRing="outside"
-    >
-      <button type="button" aria-pressed={picked} onClick={onPick} title={deck.type}>
-        <DeckBox deck={deck} />
-        <Text fontSize="sm" fontWeight="medium" lineClamp={2}>
-          {deck.name}
-        </Text>
-        <Text fontSize="xs" color="fg.muted" lineClamp={2}>
-          {deck.setName}
-        </Text>
-      </button>
-    </Stack>
+    <Tooltip content={deck.type}>
+      {/* The tooltip's anchor: the item hands its ref to its hidden input. */}
+      <Box display="flex">
+        <RadioCardItem
+          value={deck.fileName}
+          flex="1"
+          cursor="pointer"
+          indicator={null}
+          icon={<DeckBox deck={deck} />}
+          label={
+            <Text as="span" lineClamp={2}>
+              {deck.name}
+            </Text>
+          }
+          description={
+            <Text as="span" lineClamp={2}>
+              {deck.setName}
+            </Text>
+          }
+        />
+      </Box>
+    </Tooltip>
   );
 }
 
@@ -214,12 +214,14 @@ function PickedDeckLine({ deck, onClear }: { deck: PickedDeck; onClear: () => vo
         <Text fontSize="xs" color="fg.muted">
           Picked
         </Text>
-        <Text fontSize="sm" fontWeight="medium" truncate title={`${deck.name} · ${deck.setName}`}>
-          {deck.name}{" "}
-          <Text as="span" color="fg.muted" fontWeight="normal">
-            ({deck.code})
+        <Tooltip content={`${deck.name} · ${deck.setName}`}>
+          <Text fontSize="sm" fontWeight="medium" truncate>
+            {deck.name}{" "}
+            <Text as="span" color="fg.muted" fontWeight="normal">
+              ({deck.code})
+            </Text>
           </Text>
-        </Text>
+        </Tooltip>
       </Stack>
       <IconButton size="xs" variant="ghost" aria-label="Unpick the deck" onClick={onClear}>
         <LuX />

@@ -101,13 +101,25 @@ export const Resolution: Story = {
   },
 };
 
-/** Clicking a saved file shows it in its folder; "Open folder" opens the output folder. */
+/** Clicking a saved file or its thumbnail shows it in its folder, and so does
+ * Enter on either; "Open folder" opens the output folder. */
 export const RevealFiles: Story = {
   beforeEach: () => {
     useRun.setState({ jobs: finishedJobs, summary: finishedSummary });
   },
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByText("Karn, Scion of Urza · Chase Stone"));
+    await expect(api.revealFile).toHaveBeenCalledWith(karnFile.path);
+
+    mocked(api.revealFile).mockClear();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Show Karn, Scion of Urza's art in its folder" }),
+    );
+    await expect(api.revealFile).toHaveBeenCalledWith(karnFile.path);
+
+    mocked(api.revealFile).mockClear();
+    canvas.getByRole("button", { name: /Karn, Scion of Urza · Chase Stone/ }).focus();
+    await userEvent.keyboard("{Enter}");
     await expect(api.revealFile).toHaveBeenCalledWith(karnFile.path);
 
     await userEvent.click(canvas.getByRole("button", { name: /open folder/i }));
@@ -475,9 +487,10 @@ export const SourcesForEachFace: Story = {
   play: async ({ canvas, canvasElement }) => {
     // Each face has its own thumbnail and a line twice as tall as one card's.
     await expect(canvasElement.querySelectorAll("img")).toHaveLength(2);
-    const sizes = canvas.getAllByTitle("Width × height, in pixels");
+    // A size, or a dash for one unknown, on a line of its own per face.
+    const sizes = canvas.getAllByText(/^(\d+ × \d+|—)$/);
     await expect(sizes).toHaveLength(2);
-    await expect(sizes[0]?.getBoundingClientRect().height).toBe(48);
+    await expect(sizes[0]?.parentElement?.getBoundingClientRect().height).toBe(48);
     await userEvent.pointer({ keys: "[MouseRight]", target: canvas.getByText("Done") });
     await waitFor(() =>
       expect(screen.getByText("Insectile Aberration: use the art from")).toBeVisible(),

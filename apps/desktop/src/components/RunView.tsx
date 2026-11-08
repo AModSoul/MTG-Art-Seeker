@@ -228,19 +228,25 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
         {/* A thumbnail per face, level with its lines; one card shows its only one. */}
         <Stack gap="1">
           {files.map((file) => (
-            <Image
-              key={file.path}
-              src={convertFileSrc(file.path)}
-              alt=""
-              w="16"
-              maxW="none"
-              h="12"
-              objectFit="cover"
-              rounded="sm"
-              loading="lazy"
-              cursor="pointer"
-              onClick={() => void api.revealFile(file.path)}
-            />
+            <Box key={file.path} asChild w="16" h="12" rounded="sm" focusRing="outside">
+              <button
+                type="button"
+                aria-label={`Show ${file.face}'s art in its folder`}
+                onClick={() => void api.revealFile(file.path)}
+              >
+                <Image
+                  src={convertFileSrc(file.path)}
+                  alt=""
+                  w="full"
+                  maxW="none"
+                  h="full"
+                  objectFit="cover"
+                  rounded="sm"
+                  loading="lazy"
+                  cursor="pointer"
+                />
+              </button>
+            </Box>
           ))}
         </Stack>
       </Table.Cell>
@@ -264,15 +270,17 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
         {/* One line per saved image, level with its line under Saved. */}
         <Stack gap="1">
           {files.map((file) => (
-            <Flex key={file.path} h={line} align="center" title="Width × height, in pixels">
-              <Text
-                fontSize="sm"
-                color="fg.muted"
-                fontVariantNumeric="tabular-nums"
-                whiteSpace="nowrap"
-              >
-                {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
-              </Text>
+            <Flex key={file.path} h={line} align="center">
+              <Tooltip content="Width × height, in pixels" disabled={!file.size}>
+                <Text
+                  fontSize="sm"
+                  color="fg.muted"
+                  fontVariantNumeric="tabular-nums"
+                  whiteSpace="nowrap"
+                >
+                  {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
+                </Text>
+              </Tooltip>
             </Flex>
           ))}
         </Stack>
@@ -281,19 +289,35 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
         <Stack gap="1">
           {files.map((file) => (
             <HStack key={file.path} h={line} gap="1">
-              <HStack
-                flex="1"
-                minW="0"
-                gap="2"
-                cursor="pointer"
-                title={`${file.path}\nClick to show it in its folder, or right-click the row for its other sources`}
-                onClick={() => void api.revealFile(file.path)}
+              <Tooltip
+                content={
+                  <>
+                    <Text wordBreak="break-all">{file.path}</Text>
+                    <Text mt="1">
+                      Click to show it in its folder, or right-click the row for its other sources
+                    </Text>
+                  </>
+                }
+                contentProps={{ maxW: "md" }}
               >
-                <SourceBadge source={file.source} />
-                <Text fontSize="sm" truncate>
-                  {file.face} · {file.artist}
-                </Text>
-              </HStack>
+                <HStack
+                  asChild
+                  flex="1"
+                  minW="0"
+                  gap="2"
+                  cursor="pointer"
+                  textAlign="start"
+                  rounded="sm"
+                  focusRing="outside"
+                >
+                  <button type="button" onClick={() => void api.revealFile(file.path)}>
+                    <SourceBadge source={file.source} />
+                    <Text fontSize="sm" truncate>
+                      {file.face} · {file.artist}
+                    </Text>
+                  </button>
+                </HStack>
+              </Tooltip>
               <FileAction job={job.id} file={file} />
             </HStack>
           ))}
@@ -430,7 +454,8 @@ function FileAction({ job, file }: { job: number; file: SavedFile }) {
               aria-label={`${tip(file)}, for ${file.face}`}
               onClick={() => void findLargerCopy(job, file.faceIndex, site)}
             >
-              <Icon />
+              {/* Simple Icons' logos are role="img"; the button's label names them. */}
+              <Icon aria-hidden />
             </IconButton>
           </Tooltip>
         ))}

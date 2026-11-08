@@ -178,6 +178,7 @@ function ListInput({
         value={text}
         onChange={(event) => onChange(event.target.value)}
         placeholder={LIST_PLACEHOLDER}
+        aria-label="Card list"
         fontFamily="mono"
         fontSize="sm"
         flex="1"
@@ -321,9 +322,11 @@ function OutputFolder() {
         Saving to
       </Text>
       <HStack gap="2">
-        <Text fontSize="sm" truncate flex="1" title={outputDir}>
-          {outputDir}
-        </Text>
+        <Tooltip content={outputDir}>
+          <Text fontSize="sm" truncate flex="1">
+            {outputDir}
+          </Text>
+        </Tooltip>
         <Tooltip content="Choose a folder">
           <IconButton
             size="xs"
