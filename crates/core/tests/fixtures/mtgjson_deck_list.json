@@ -1,0 +1,104 @@
+{
+ "meta": {
+  "date": "2026-11-07",
+  "version": "5.3.0+20261107"
+ },
+ "data": [
+  {
+   "code": "CMD",
+   "fileName": "Counterpunch_CMD",
+   "name": "Counterpunch",
+   "releaseDate": "2011-06-17",
+   "source": "https://magic.wizards.com/en/articles/archive/arcana/magic-gathering-commander-decklists-2011-06-14",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "CMD",
+   "fileName": "DevourForPower_CMD",
+   "name": "Devour for Power",
+   "releaseDate": "2011-06-17",
+   "source": "https://magic.wizards.com/en/articles/archive/arcana/magic-gathering-commander-decklists-2011-06-14",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "CMD",
+   "fileName": "HeavenlyInferno_CMD",
+   "name": "Heavenly Inferno",
+   "releaseDate": "2011-06-17",
+   "source": "https://magic.wizards.com/en/articles/archive/arcana/magic-gathering-commander-decklists-2011-06-14",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "CMD",
+   "fileName": "MirrorMastery_CMD",
+   "name": "Mirror Mastery",
+   "releaseDate": "2011-06-17",
+   "source": "https://magic.wizards.com/en/articles/archive/arcana/magic-gathering-commander-decklists-2011-06-14",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "CMD",
+   "fileName": "PoliticalPuppets_CMD",
+   "name": "Political Puppets",
+   "releaseDate": "2011-06-17",
+   "source": "https://magic.wizards.com/en/articles/archive/arcana/magic-gathering-commander-decklists-2011-06-14",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "EOC",
+   "fileName": "CounterIntelligence_EOC",
+   "name": "Counter Intelligence",
+   "releaseDate": "2025-08-01",
+   "source": "https://magic.wizards.com/en/news/announcements/edge-of-eternities-commander-decklists",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "EOC",
+   "fileName": "WorldShaper_EOC",
+   "name": "World Shaper",
+   "releaseDate": "2025-08-01",
+   "source": "https://magic.wizards.com/en/news/announcements/edge-of-eternities-commander-decklists",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "TDC",
+   "fileName": "AbzanArmor_TDC",
+   "name": "Abzan Armor",
+   "releaseDate": "2025-04-11",
+   "source": "https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists#Abzan",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "TDC",
+   "fileName": "JeskaiStriker_TDC",
+   "name": "Jeskai Striker",
+   "releaseDate": "2025-04-11",
+   "source": "https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists#Jeskai",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "TDC",
+   "fileName": "MarduSurge_TDC",
+   "name": "Mardu Surge",
+   "releaseDate": "2025-04-11",
+   "source": "https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists#Mardu",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "TDC",
+   "fileName": "SultaiArisen_TDC",
+   "name": "Sultai Arisen",
+   "releaseDate": "2025-04-11",
+   "source": "https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists#Sultai",
+   "type": "Commander Deck"
+  },
+  {
+   "code": "TDC",
+   "fileName": "TemurRoar_TDC",
+   "name": "Temur Roar",
+   "releaseDate": "2025-04-11",
+   "source": "https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists#Temur",
+   "type": "Commander Deck"
+  }
+ ]
+}

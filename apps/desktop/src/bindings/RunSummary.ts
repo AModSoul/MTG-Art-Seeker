@@ -14,5 +14,9 @@ export type RunSummary = {
   cancelled: number;
   mtgpicsFiles: number;
   scryfallFiles: number;
+  /**
+   * Images the user found themselves, saved again from where they were.
+   */
+  webFiles: number;
   seconds: number;
 };

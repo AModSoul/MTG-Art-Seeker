@@ -34,11 +34,17 @@ export function Header() {
 
           <HStack as="nav" aria-label="Main" gap={{ base: 3, sm: 5 }} fontSize="sm">
             {NAV.map(({ to, label }) => (
-              <Link key={to} asChild color="fg.muted" _hover={{ color: "fg" }}>
+              <Link
+                key={to}
+                asChild
+                color="fg.muted"
+                _hover={{ color: "fg" }}
+                _currentPage={{ fontWeight: "semibold" }}
+              >
                 <RouterLink
                   to={to}
                   activeOptions={{ exact: true }}
-                  activeProps={{ "aria-current": "page", style: { fontWeight: 600 } }}
+                  activeProps={{ "aria-current": "page" }}
                 >
                   {label}
                 </RouterLink>

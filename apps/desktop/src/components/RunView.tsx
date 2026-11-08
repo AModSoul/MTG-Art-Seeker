@@ -4,6 +4,7 @@ import {
   Button,
   Flex,
   HStack,
+  IconButton,
   Image,
   Spinner,
   Stack,
@@ -13,20 +14,52 @@ import {
 } from "@chakra-ui/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { memo, useState } from "react";
-import { LuClipboardCopy, LuFolderOpen, LuImageDown, LuRotateCcw } from "react-icons/lu";
+import type { IconType } from "react-icons";
+import {
+  LuClipboardCopy,
+  LuExternalLink,
+  LuFolderOpen,
+  LuGlobe,
+  LuImageDown,
+  LuRotateCcw,
+} from "react-icons/lu";
+import { SiArtstation, SiDeviantart, SiGooglelens, SiInstagram, SiPixiv } from "react-icons/si";
 
 import { api } from "@/api";
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { JobStatus } from "@/bindings/JobStatus";
+import type { KnownSource } from "@/bindings/KnownSource";
+import type { SavedFile } from "@/bindings/SavedFile";
+import type { Site } from "@/bindings/Site";
 import { Alert } from "@mtg-art/ui/alert";
 import { EmptyState } from "@mtg-art/ui/empty-state";
+import {
+  MenuContent,
+  MenuContextTrigger,
+  MenuItem,
+  MenuItemGroup,
+  MenuRoot,
+  MenuSeparator,
+} from "@mtg-art/ui/menu";
 import { ProgressBar, ProgressLabel, ProgressRoot } from "@mtg-art/ui/progress";
 import { SegmentedControl } from "@mtg-art/ui/segmented-control";
+import { Tooltip } from "@mtg-art/ui/tooltip";
 import { showError, showSuccess } from "@/notify";
-import { type JobView, startRun, useRun, useSettings } from "@/store";
+import {
+  artSources,
+  findLargerCopy,
+  type JobView,
+  openFoundPage,
+  knownSourceName,
+  saveArtFrom,
+  SITE_NAMES,
+  startRun,
+  useRun,
+  useSettings,
+} from "@/store";
 import { findOption } from "@/utils/options";
 
-type Filter = "all" | "failed" | "scryfall" | "mtgpics";
+type Filter = "all" | "failed" | "scryfall" | "mtgpics" | "web";
 
 /** The table's filters, each with the jobs it shows. */
 const FILTERS: { value: Filter; label: string; matches: (status: JobStatus) => boolean }[] = [
@@ -34,6 +67,7 @@ const FILTERS: { value: Filter; label: string; matches: (status: JobStatus) => b
   { value: "failed", label: "Failed", matches: (status) => isFailed(status) },
   { value: "scryfall", label: "Scryfall", matches: (status) => hasSource(status, "scryfall") },
   { value: "mtgpics", label: "MTGPics", matches: (status) => hasSource(status, "mtgpics") },
+  { value: "web", label: "Found", matches: (status) => hasSource(status, "web") },
 ];
 
 export function RunView() {
@@ -50,7 +84,7 @@ export function RunView() {
         description={
           running
             ? "Looking up the cards to download."
-            : "Paste a card list, search Scryfall, or pick a preset, then download its art."
+            : "Paste a card list, search Scryfall, or pick a preset or a deck, then download its art."
         }
       />
     );
@@ -90,7 +124,7 @@ export function RunView() {
 
       {jobs.length > 0 && (
         <Stack gap="3">
-          <ProgressRoot value={finished} max={jobs.length} size="sm" colorPalette="blue">
+          <ProgressRoot value={finished} max={jobs.length} size="sm" colorPalette="emerald">
             <HStack justify="space-between" mb="1">
               <ProgressLabel>
                 {running ? "Downloading" : summary?.cancelled ? "Cancelled" : "Finished"}
@@ -159,7 +193,10 @@ export function RunView() {
               <Table.ColumnHeader>Card</Table.ColumnHeader>
               <Table.ColumnHeader w="32">Status</Table.ColumnHeader>
               <Table.ColumnHeader w="28">Resolution</Table.ColumnHeader>
-              <Table.ColumnHeader>Saved</Table.ColumnHeader>
+              {/* Saved takes the width left over, and its names are cut short to fit it. */}
+              <Table.ColumnHeader w="full" maxW="0">
+                Saved
+              </Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -176,27 +213,42 @@ export function RunView() {
 /** The height of a saved image's line, the same under Resolution and Saved. */
 const FILE_LINE = "6";
 
+/** A face's line on a card with more than one image: twice as tall, with room
+ * for the face's own thumbnail beside it. */
+const FACE_LINE = "12";
+
 const JobRow = memo(function JobRow({ job }: { job: JobView }) {
   const { status } = job;
   const files = status.state === "done" ? status.files : [];
-  const first = files[0];
+  const line = files.length > 1 ? FACE_LINE : FILE_LINE;
 
-  return (
+  const row = (
     <Table.Row>
       <Table.Cell>
-        {first && (
-          <Image
-            src={convertFileSrc(first.path)}
-            alt=""
-            w="16"
-            h="12"
-            objectFit="cover"
-            rounded="sm"
-            loading="lazy"
-            cursor="pointer"
-            onClick={() => void api.revealFile(first.path)}
-          />
-        )}
+        {/* A thumbnail per face, level with its lines; one card shows its only one. */}
+        <Stack gap="1">
+          {files.map((file) => (
+            <Box key={file.path} asChild w="16" h="12" rounded="sm" focusRing="outside">
+              <button
+                type="button"
+                aria-label={`Show ${file.face}'s art in its folder`}
+                onClick={() => void api.revealFile(file.path)}
+              >
+                <Image
+                  src={convertFileSrc(file.path)}
+                  alt=""
+                  w="full"
+                  maxW="none"
+                  h="full"
+                  objectFit="cover"
+                  rounded="sm"
+                  loading="lazy"
+                  cursor="pointer"
+                />
+              </button>
+            </Box>
+          ))}
+        </Stack>
       </Table.Cell>
       <Table.Cell>
         <Text fontWeight="medium">{job.label}</Text>
@@ -218,36 +270,214 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
         {/* One line per saved image, level with its line under Saved. */}
         <Stack gap="1">
           {files.map((file) => (
-            <Flex key={file.path} h={FILE_LINE} align="center" title="Width × height, in pixels">
-              <Text fontSize="sm" color="fg.muted" fontVariantNumeric="tabular-nums">
-                {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
-              </Text>
+            <Flex key={file.path} h={line} align="center">
+              <Tooltip content="Width × height, in pixels" disabled={!file.size}>
+                <Text
+                  fontSize="sm"
+                  color="fg.muted"
+                  fontVariantNumeric="tabular-nums"
+                  whiteSpace="nowrap"
+                >
+                  {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
+                </Text>
+              </Tooltip>
             </Flex>
           ))}
         </Stack>
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell w="full" maxW="0">
         <Stack gap="1">
           {files.map((file) => (
-            <HStack
-              key={file.path}
-              h={FILE_LINE}
-              gap="2"
-              cursor="pointer"
-              title={`${file.path}\nClick to show it in its folder`}
-              onClick={() => void api.revealFile(file.path)}
-            >
-              <SourceBadge source={file.source} />
-              <Text fontSize="sm" truncate>
-                {file.face} · {file.artist}
-              </Text>
+            <HStack key={file.path} h={line} gap="1">
+              <Tooltip
+                content={
+                  <>
+                    <Text wordBreak="break-all">{file.path}</Text>
+                    <Text mt="1">
+                      Click to show it in its folder, or right-click the row for its other sources
+                    </Text>
+                  </>
+                }
+                contentProps={{ maxW: "md" }}
+              >
+                <HStack
+                  asChild
+                  flex="1"
+                  minW="0"
+                  gap="2"
+                  cursor="pointer"
+                  textAlign="start"
+                  rounded="sm"
+                  focusRing="outside"
+                >
+                  <button type="button" onClick={() => void api.revealFile(file.path)}>
+                    <SourceBadge source={file.source} />
+                    <Text fontSize="sm" truncate>
+                      {file.face} · {file.artist}
+                    </Text>
+                  </button>
+                </HStack>
+              </Tooltip>
+              <FileAction job={job.id} file={file} />
             </HStack>
           ))}
         </Stack>
       </Table.Cell>
     </Table.Row>
   );
+  // A row with saved art opens its menu anywhere on it.
+  return files.length > 0 ? (
+    <RowMenu job={job.id} files={files}>
+      {row}
+    </RowMenu>
+  ) : (
+    row
+  );
 });
+
+/** What a choice in a row's menu does. */
+type RowAction =
+  | { kind: "reveal"; file: SavedFile }
+  | { kind: "use"; file: SavedFile; known: KnownSource };
+
+/** A row's right-click menu: for each saved image, the places its art is known
+ * to be, to save it again from one, and a way to show it in its folder. */
+function RowMenu({
+  job,
+  files,
+  children,
+}: {
+  job: number;
+  files: SavedFile[];
+  children: React.ReactNode;
+}) {
+  // Per file, where its art is known to be; `null` while they're asked for.
+  const [known, setKnown] = useState<KnownSource[][] | null>(null);
+  const actions = new Map<string, RowAction>();
+
+  async function load() {
+    setKnown(null);
+    setKnown(await Promise.all(files.map((file) => artSources(job, file.faceIndex))));
+  }
+
+  const groups = files.map((file, position) => {
+    const reveal = `${file.faceIndex}:reveal`;
+    actions.set(reveal, { kind: "reveal", file });
+    const sources = known?.[position];
+    return (
+      <MenuItemGroup
+        key={file.faceIndex}
+        title={files.length > 1 ? `${file.face}: use the art from` : "Use the art from"}
+      >
+        {sources === undefined ? (
+          <MenuItem value={`${file.faceIndex}:loading`} disabled>
+            <Spinner size="xs" /> Looking…
+          </MenuItem>
+        ) : (
+          sources.map((source, index) => {
+            const value = `${file.faceIndex}:${index}`;
+            actions.set(value, { kind: "use", file, known: source });
+            return (
+              <MenuItem key={value} value={value} disabled={source.current}>
+                <Stack gap="0">
+                  <Text>
+                    {knownSourceName(source)}
+                    {source.size && ` · ${source.size.width} × ${source.size.height}`}
+                    {source.current && " (saved now)"}
+                  </Text>
+                  {source.site && (
+                    <Text fontSize="xs" color="fg.muted">
+                      Found from {SITE_NAMES[source.site]}
+                    </Text>
+                  )}
+                </Stack>
+              </MenuItem>
+            );
+          })
+        )}
+        <MenuItem value={reveal}>Show in folder</MenuItem>
+      </MenuItemGroup>
+    );
+  });
+
+  return (
+    <MenuRoot
+      onOpenChange={(event) => {
+        if (event.open) void load();
+      }}
+      onSelect={(event) => {
+        const action = actions.get(event.value);
+        if (action?.kind === "reveal") void api.revealFile(action.file.path);
+        if (action?.kind === "use") void saveArtFrom(job, action.file.faceIndex, action.known);
+      }}
+    >
+      <MenuContextTrigger asChild>{children}</MenuContextTrigger>
+      <MenuContent>
+        {groups.flatMap((group, index) =>
+          index === 0 ? [group] : [<MenuSeparator key={`separator-${index}`} />, group],
+        )}
+      </MenuContent>
+    </MenuRoot>
+  );
+}
+
+/** The places a larger copy of Scryfall's art can be looked for, by logo. */
+const SITES: { site: Site; icon: IconType; tip: (file: SavedFile) => string }[] = [
+  { site: "lens", icon: SiGooglelens, tip: () => "Search Google Lens for this art" },
+  {
+    site: "artstation",
+    icon: SiArtstation,
+    tip: (file) => `Look for ${file.artist} on ArtStation`,
+  },
+  {
+    site: "deviantart",
+    icon: SiDeviantart,
+    tip: (file) => `Look for ${file.artist} on DeviantArt`,
+  },
+  { site: "pixiv", icon: SiPixiv, tip: (file) => `Look for ${file.artist} on Pixiv` },
+  { site: "instagram", icon: SiInstagram, tip: (file) => `Look for ${file.artist} on Instagram` },
+  { site: "website", icon: LuGlobe, tip: (file) => `Open ${file.artist}'s website` },
+];
+
+/** What can be done with a saved image beyond showing it: look for a larger
+ * copy of Scryfall's art, or open the page a found image came from. */
+function FileAction({ job, file }: { job: number; file: SavedFile }) {
+  const searchMtgpicsArt = useSettings((state) => state.settings?.searchMtgpicsArt ?? false);
+  if (file.source === "scryfall" || (file.source === "mtgpics" && searchMtgpicsArt)) {
+    return (
+      <HStack gap="0">
+        {SITES.map(({ site, icon: Icon, tip }) => (
+          <Tooltip key={site} content={tip(file)}>
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              aria-label={`${tip(file)}, for ${file.face}`}
+              onClick={() => void findLargerCopy(job, file.faceIndex, site)}
+            >
+              {/* Simple Icons' logos are role="img"; the button's label names them. */}
+              <Icon aria-hidden />
+            </IconButton>
+          </Tooltip>
+        ))}
+      </HStack>
+    );
+  }
+  if (file.source === "web" && file.page) {
+    return (
+      <Tooltip content="Open the page it came from">
+        <IconButton
+          size="2xs"
+          variant="ghost"
+          aria-label={`Open the page ${file.face}'s art came from`}
+          onClick={() => void openFoundPage(job, file.faceIndex)}
+        >
+          <LuExternalLink />
+        </IconButton>
+      </Tooltip>
+    );
+  }
+  return null;
+}
 
 /** How each status is shown: its badge colour and words, and whether it's under way. */
 function statusLook(status: JobStatus): { palette: string; label: string; busy?: boolean } {
@@ -281,6 +511,7 @@ function StatusBadge({ status }: { status: JobStatus }) {
 const SOURCE_LOOK: Record<ArtSource, { palette: string; label: string }> = {
   mtgpics: { palette: "purple", label: "MTGPics" },
   scryfall: { palette: "teal", label: "Scryfall" },
+  web: { palette: "blue", label: "Found" },
 };
 
 function SourceBadge({ source }: { source: ArtSource }) {

@@ -12,7 +12,10 @@ use tokio::{
     time::{sleep, sleep_until, Instant},
 };
 
-use crate::{Error, Result};
+use crate::{
+    imagesize::{image_size_of, ImageSize},
+    Error, Result,
+};
 
 pub const USER_AGENT: &str = concat!(
     "MTGArtDownloaderRust/",
@@ -26,6 +29,10 @@ pub struct Endpoints {
     pub scryfall_api: String,
     pub mtgpics: String,
     pub edhrec: String,
+    /// MTGJSON's files, for the precon decks.
+    pub mtgjson: String,
+    /// TCGplayer's product pictures, for the boxes precons come in.
+    pub box_images: String,
 }
 
 impl Default for Endpoints {
@@ -34,6 +41,8 @@ impl Default for Endpoints {
             scryfall_api: "https://api.scryfall.com".into(),
             mtgpics: "https://www.mtgpics.com".into(),
             edhrec: "https://json.edhrec.com".into(),
+            mtgjson: "https://mtgjson.com/api/v5".into(),
+            box_images: "https://tcgplayer-cdn.tcgplayer.com".into(),
         }
     }
 }
@@ -141,45 +150,96 @@ impl Http {
         }
     }
 
+    /// GETs a response's body whole; `None` for a 404.
+    pub async fn get_bytes(&self, url: &str) -> Result<Option<Vec<u8>>> {
+        match ok_or_missing(url, self.get(url).await?).await? {
+            Some(response) => Ok(Some(response.bytes().await?.to_vec())),
+            None => Ok(None),
+        }
+    }
+
     /// Streams an image to `dest`; `None` for a 404. Fails, leaving whatever
-    /// was written, if the body isn't a JPEG or PNG.
+    /// was written, if the body isn't a JPEG, PNG or WebP image.
     pub async fn download(&self, url: &str, dest: &Path) -> Result<Option<ImageKind>> {
-        let Some(head) = self.stream_to(url, dest, None).await? else {
+        self.download_from(url, None, dest).await
+    }
+
+    /// [`Http::download`], saying the request comes from `page`, as a
+    /// browser would: sites that guard their images against being linked
+    /// from elsewhere, such as Pixiv's, refuse a request without it.
+    pub async fn download_from(&self, url: &str, page: Option<&str>, dest: &Path) -> Result<Option<ImageKind>> {
+        let referer = page.filter(|page| page.starts_with("https://") || page.starts_with("http://"));
+        let Some(head) = self.stream_to(url, dest, None, referer).await? else {
             return Ok(None);
         };
         ImageKind::sniff(&head).map(Some).ok_or_else(|| Error::Invalid {
             url: url.to_owned(),
-            reason: "the response is not a JPEG or PNG image".into(),
+            reason: "the response is not a JPEG, PNG or WebP image".into(),
         })
+    }
+
+    /// The size of the image at `url`, read from as little of it as holds
+    /// its header; `None` for a 404, or if the header isn't in its first
+    /// [`SIZE_PROBE_LIMIT`] bytes or can't be read.
+    pub async fn image_size(&self, url: &str) -> Result<Option<ImageSize>> {
+        let response = self.send(url, |client| client.get(url)).await?;
+        let Some(response) = ok_or_missing(url, response).await? else {
+            return Ok(None);
+        };
+        let mut head = Vec::new();
+        let mut body = response.bytes_stream();
+        while let Some(chunk) = body.next().await {
+            head.extend_from_slice(&chunk?);
+            if let Some(size) = image_size_of(&head) {
+                // The rest isn't read: dropping the response ends it.
+                return Ok(Some(size));
+            }
+            if head.len() >= SIZE_PROBE_LIMIT {
+                break;
+            }
+        }
+        Ok(None)
     }
 
     /// Streams a large file to `dest`, with longer to finish than other
     /// requests get; `false` for a 404.
     pub async fn download_file(&self, url: &str, dest: &Path) -> Result<bool> {
-        Ok(self.stream_to(url, dest, Some(LARGE_FILE_TIMEOUT)).await?.is_some())
+        Ok(self
+            .stream_to(url, dest, Some(LARGE_FILE_TIMEOUT), None)
+            .await?
+            .is_some())
     }
 
     /// Streams a response to `dest`, returning its first few bytes; `None` for a 404.
-    async fn stream_to(&self, url: &str, dest: &Path, timeout: Option<Duration>) -> Result<Option<Vec<u8>>> {
+    async fn stream_to(
+        &self,
+        url: &str,
+        dest: &Path,
+        timeout: Option<Duration>,
+        referer: Option<&str>,
+    ) -> Result<Option<Vec<u8>>> {
         let response = self
             .send(url, |client| {
-                let request = client.get(url);
-                match timeout {
-                    Some(timeout) => request.timeout(timeout),
-                    None => request,
+                let mut request = client.get(url);
+                if let Some(timeout) = timeout {
+                    request = request.timeout(timeout);
                 }
+                if let Some(referer) = referer {
+                    request = request.header(header::REFERER, referer);
+                }
+                request
             })
             .await?;
         let Some(response) = ok_or_missing(url, response).await? else {
             return Ok(None);
         };
         let mut file = tokio::fs::File::create(dest).await?;
-        let mut head = Vec::with_capacity(8);
+        let mut head = Vec::with_capacity(SNIFF_LEN);
         let mut body = response.bytes_stream();
         while let Some(chunk) = body.next().await {
             let chunk = chunk?;
-            if head.len() < 8 {
-                head.extend(chunk.iter().take(8 - head.len()));
+            if head.len() < SNIFF_LEN {
+                head.extend(chunk.iter().take(SNIFF_LEN - head.len()));
             }
             file.write_all(&chunk).await?;
         }
@@ -255,11 +315,11 @@ impl Http {
     }
 }
 
-/// The response if it succeeded, `None` for a 404, otherwise an error carrying
-/// the service's explanation when it gave one.
+/// The response if it succeeded, `None` for a 404 or a 410, otherwise an error
+/// carrying the service's explanation when it gave one.
 async fn ok_or_missing(url: &str, response: Response) -> Result<Option<Response>> {
     let status = response.status();
-    if status == StatusCode::NOT_FOUND {
+    if status == StatusCode::NOT_FOUND || status == StatusCode::GONE {
         return Ok(None);
     }
     if status.is_success() {
@@ -302,11 +362,20 @@ fn url_authority(url: &Url) -> Option<String> {
     })
 }
 
+/// How many of a download's first bytes [`ImageKind::sniff`] needs.
+const SNIFF_LEN: usize = 12;
+
+/// How much of an image [`Http::image_size`] reads looking for its header.
+/// A JPEG's metadata, which comes first, is rarely larger.
+const SIZE_PROBE_LIMIT: usize = 512 * 1024;
+
 /// The image formats a download is accepted as, told apart by their first bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageKind {
     Jpeg,
     Png,
+    /// Served by many sites other than Scryfall and MTGPics; saved as it is.
+    Webp,
 }
 
 impl ImageKind {
@@ -315,6 +384,8 @@ impl ImageKind {
             Some(Self::Jpeg)
         } else if head.starts_with(&[0x89, b'P', b'N', b'G']) {
             Some(Self::Png)
+        } else if head.starts_with(b"RIFF") && head.get(8..12) == Some(b"WEBP") {
+            Some(Self::Webp)
         } else {
             None
         }
@@ -324,6 +395,7 @@ impl ImageKind {
         match self {
             Self::Jpeg => "jpg",
             Self::Png => "png",
+            Self::Webp => "webp",
         }
     }
 }
@@ -468,6 +540,10 @@ mod tests {
     fn sniffs_images() {
         assert_eq!(ImageKind::sniff(&[0xFF, 0xD8, 0xFF, 0xE0]), Some(ImageKind::Jpeg));
         assert_eq!(ImageKind::sniff(b"\x89PNG\r\n\x1a\n"), Some(ImageKind::Png));
+        assert_eq!(ImageKind::sniff(b"RIFF   WEBPVP8 "), Some(ImageKind::Webp));
+        // A RIFF file that isn't an image: a WAV.
+        assert_eq!(ImageKind::sniff(b"RIFF   WAVEfmt "), None);
+        assert_eq!(ImageKind::sniff(b"RIFF"), None);
         assert_eq!(ImageKind::sniff(b"<html>"), None);
     }
 }

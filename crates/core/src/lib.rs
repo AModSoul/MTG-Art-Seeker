@@ -7,19 +7,23 @@
 
 pub mod card;
 pub mod carddb;
+pub mod decks;
 pub mod engine;
 pub mod error;
 pub mod faces;
 pub mod history;
 pub mod http;
 pub mod imagesize;
+pub mod known;
 pub mod list;
+pub mod manual;
 pub mod mtgpics;
 pub mod naming;
 pub mod presets;
 pub mod scryfall;
 pub mod settings;
 pub mod text;
+pub mod verify;
 
 pub use error::{Error, Result};
 

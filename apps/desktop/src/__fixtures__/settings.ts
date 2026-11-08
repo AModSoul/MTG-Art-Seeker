@@ -6,6 +6,7 @@ export const defaultSettings: Settings = {
   naming: "NAME (ARTIST) [SET] {NUMBER}",
   sources: "mtgpicsThenScryfall",
   scryfallImage: "artCrop",
+  searchMtgpicsArt: false,
   printing: "newest",
   downloadAll: false,
   uniqueArt: true,

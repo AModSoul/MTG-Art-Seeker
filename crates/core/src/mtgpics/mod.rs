@@ -7,6 +7,7 @@
 //! original downloader did; each checklist is read once per run, however many
 //! of its cards are asked for.
 
+mod artists;
 mod checklist;
 mod codes;
 mod page;
@@ -15,6 +16,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::{Mutex, OnceCell};
 
+pub use artists::{artist_website, parse_artist_list, website_on_page, Artists};
 pub use checklist::{parse_checklist, set_id_on_card_page, Checklist, Row};
 pub use codes::{mtgpics_set_code, pad_collector_number};
 pub use page::{extract_arts, is_missing_page, page_artists, page_title, pick_arts, MtgpicsArt};

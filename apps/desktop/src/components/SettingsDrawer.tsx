@@ -53,9 +53,16 @@ const PRINTINGS: Option<Printing>[] = [
 
 /** The on/off settings, in the order they're shown, by section. */
 const SWITCHES: Record<
-  "files" | "printings" | "searching",
+  "sources" | "files" | "printings" | "searching",
   { key: BooleanSetting; label: string; help?: string }[]
 > = {
+  sources: [
+    {
+      key: "searchMtgpicsArt",
+      label: "Search for larger copies of MTGPics' art too",
+      help: "Shows the Google Lens, ArtStation and other search buttons beside MTGPics' art, not only Scryfall's.",
+    },
+  ],
   files: [
     {
       key: "overwrite",
@@ -204,6 +211,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
               onChange={(scryfallImage) => update({ scryfallImage })}
             />
           </Field>
+          {switches("sources")}
           <CardData />
         </Fieldset.Content>
       </Fieldset.Root>

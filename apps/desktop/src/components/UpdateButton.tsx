@@ -10,7 +10,6 @@ import { showError } from "@/notify";
  * Development builds don't check. */
 export function UpdateButton() {
   const [update, setUpdate] = useState<Update | null>(null);
-  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
     if (!import.meta.env.PROD) return;
@@ -25,10 +24,17 @@ export function UpdateButton() {
     };
   }, []);
 
-  if (!update) return null;
+  return update ? <UpdateOffer update={update} /> : null;
+}
+
+/** The parts of an update the button uses. */
+export type AvailableUpdate = Pick<Update, "version" | "downloadAndInstall">;
+
+/** Offers `update`, and installs it and restarts the app when clicked. */
+export function UpdateOffer({ update }: { update: AvailableUpdate }) {
+  const [installing, setInstalling] = useState(false);
 
   async function install() {
-    if (!update) return;
     setInstalling(true);
     try {
       await update.downloadAndInstall();

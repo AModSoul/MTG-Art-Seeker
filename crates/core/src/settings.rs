@@ -18,6 +18,9 @@ pub struct Settings {
     pub naming: String,
     pub sources: SourceMode,
     pub scryfall_image: ScryfallImage,
+    /// Offer to look for a larger copy of MTGPics' art too, not only of
+    /// Scryfall's: the buttons that open the finder window show beside both.
+    pub search_mtgpics_art: bool,
     /// Which printing a line with only a name gets.
     pub printing: Printing,
     /// For a line with only a name, every printing's art instead of one.
@@ -73,6 +76,7 @@ impl Default for Settings {
             naming: "NAME (ARTIST) [SET] {NUMBER}".into(),
             sources: SourceMode::MtgpicsThenScryfall,
             scryfall_image: ScryfallImage::ArtCrop,
+            search_mtgpics_art: false,
             printing: Printing::Newest,
             download_all: false,
             unique_art: true,

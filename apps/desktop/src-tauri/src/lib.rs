@@ -1,6 +1,8 @@
 //! The desktop app: Tauri commands over `mtg-art-core`. The front end only
 //! shows what these report; finding and saving art all happens in the core.
 
+mod finder;
+
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -13,10 +15,14 @@ use std::{
 
 use mtg_art_core::{
     carddb::{default_card_data_dir, CardData, CardDataStatus},
-    engine::{self, Local, RunEvent, RunInput},
+    decks::{default_decks_dir, DeckSearch, Decks},
+    engine::{self, ArtSource, JobStatus, Local, RunEvent, RunInput, SavedFile},
     history::{default_history_path, History},
     http::{Http, HttpConfig},
+    known::{self, KnownSource},
     list::{parse_list, ListFile, ParsedList},
+    manual::{self, Destination, Doubt, Found, FoundEvent, Imported, PageCandidate, PageImage, Site, Target},
+    mtgpics::Artists,
     presets::{presets, PresetInfo},
     settings::{default_settings_path, Settings},
 };
@@ -27,13 +33,122 @@ use tokio_util::sync::CancellationToken;
 /// How often the app checks whether Scryfall has published newer card data.
 const CARD_DATA_CHECK: Duration = Duration::from_secs(3 * 60 * 60);
 
+/// How many runs' results are kept for finding larger copies in, newest first.
+const RUNS_KEPT: u32 = 5;
+
 struct AppState {
     http: Arc<Http>,
     settings_path: PathBuf,
     cards: Arc<CardData>,
     history: Option<Arc<History>>,
+    /// MTGJSON's precon decks and their boxes' pictures.
+    decks: Decks,
     runs: Mutex<HashMap<u32, CancellationToken>>,
     next_run: AtomicU32,
+    /// What recent runs saved, by run id.
+    records: Mutex<HashMap<u32, RunRecord>>,
+    /// The face the finder window is looking for a larger copy of.
+    search: Mutex<Option<Search>>,
+    /// Images the user saved that didn't look like a larger copy of the art,
+    /// kept until they say whether to save them anyway, by token.
+    doubtful: Mutex<HashMap<u32, (Search, finder::Saved)>>,
+    /// The images of the page the user last asked to find the art on, while
+    /// they choose one.
+    choices: Mutex<Option<Choices>>,
+    next_token: AtomicU32,
+    /// MTGPics' list of artists, for their websites, read once a session.
+    artists: Artists,
+}
+
+/// What's kept of a run, so an image the user finds later is saved where the
+/// run saved the face's art.
+struct RunRecord {
+    settings: Settings,
+    list_folder: Option<String>,
+    /// Each finished job's saved files, by job id.
+    files: HashMap<u32, Vec<SavedFile>>,
+}
+
+/// A face the finder window is looking for a larger copy of, and where to tell
+/// the front end what became of the images the user saves.
+#[derive(Clone)]
+struct Search {
+    run: u32,
+    job: u32,
+    target: Target,
+    /// Where the user started looking.
+    site: Site,
+    events: Channel<FoundEvent>,
+}
+
+/// A page's images, downloaded for the user to choose the art from.
+struct Choices {
+    token: u32,
+    search: Search,
+    page: Option<tauri::Url>,
+    images: Vec<PageCandidate>,
+}
+
+impl Choices {
+    /// Deletes the images.
+    fn discard(self) {
+        for image in self.images {
+            let _ = std::fs::remove_file(image.downloaded);
+        }
+    }
+}
+
+/// Tells the front end about an image the user saved, and the user, who is
+/// likely looking at the finder window, with a toast there. A question that
+/// needs an answer is asked in the main window, whose taskbar icon flashes.
+fn report(app: &AppHandle, search: &Search, event: FoundEvent) {
+    let (kind, text) = match &event {
+        FoundEvent::Checking { page: true, .. } => ("loading", "Downloading the images on this page…".to_owned()),
+        FoundEvent::Checking { page: false, .. } => ("loading", "Checking the image you saved…".to_owned()),
+        FoundEvent::Saved { file, .. } => (
+            "success",
+            match file.size {
+                Some(size) => format!("Saved {}'s art: {} × {}", file.face, size.width, size.height),
+                None => format!("Saved {}'s art", file.face),
+            },
+        ),
+        FoundEvent::Doubtful { face, doubt, .. } => {
+            let what = match doubt {
+                Doubt::Smaller => format!("That copy of {face}'s art is no bigger than Scryfall's."),
+                Doubt::CardScan => format!("That's the card, not {face}'s art on its own."),
+                Doubt::Different => format!("That doesn't look like {face}'s art."),
+            };
+            (
+                "warning",
+                format!("{what} Save it anyway? Answer in MTG Art Downloader."),
+            )
+        }
+        FoundEvent::Choose { face, .. } => ("info", format!("Choose {face}'s art in MTG Art Downloader.")),
+        FoundEvent::NoImages { face } => (
+            "warning",
+            format!("No image on this page is large enough to be {face}'s art."),
+        ),
+        FoundEvent::Failed { message } => ("error", format!("Couldn't save that image: {message}")),
+    };
+    finder::toast(app, kind, &text);
+    if let Some(main) = app.get_webview_window("main") {
+        match event {
+            FoundEvent::Doubtful { .. } => {
+                let _ = main.request_user_attention(Some(tauri::UserAttentionType::Informational));
+            }
+            // The user asked for the page's images, so they're shown at once.
+            FoundEvent::Choose { .. } => {
+                let _ = main.unminimize();
+                let _ = main.set_focus();
+            }
+            _ => {}
+        }
+    }
+    let _ = search.events.send(event);
+}
+
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 type CommandResult<T> = Result<T, String>;
@@ -58,6 +173,28 @@ fn parse_card_list(text: String) -> ParsedList {
 #[tauri::command]
 fn list_presets() -> Vec<PresetInfo> {
     presets()
+}
+
+/// The precon decks `query` matches, newest first, up to `limit` of them.
+#[tauri::command]
+async fn search_decks(state: State<'_, AppState>, query: String, limit: u32) -> CommandResult<DeckSearch> {
+    state
+        .decks
+        .search(&state.http, &query, limit as usize)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Where the picture of deck `file_name`'s box is saved, downloading it the
+/// first time; `None` when there's no picture of it.
+#[tauri::command]
+async fn deck_box(state: State<'_, AppState>, file_name: String) -> CommandResult<Option<String>> {
+    let path = state
+        .decks
+        .box_image(&state.http, &file_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.map(|path| path.to_string_lossy().into_owned()))
 }
 
 #[tauri::command]
@@ -97,6 +234,19 @@ fn start_run(
         .map_err(|e| e.to_string())?;
 
     let id = state.next_run.fetch_add(1, Ordering::Relaxed);
+    {
+        let mut records = lock(&state.records);
+        records.retain(|run, _| *run + RUNS_KEPT > id);
+        let list_folder = input.folder().map(str::to_owned);
+        records.insert(
+            id,
+            RunRecord {
+                settings: settings.clone(),
+                list_folder,
+                files: HashMap::new(),
+            },
+        );
+    }
     let cancel = CancellationToken::new();
     state
         .runs
@@ -108,7 +258,17 @@ fn start_run(
     let cards = state.cards.current();
     let history = state.history.clone();
     tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
         let emit = |event: RunEvent| {
+            if let RunEvent::Job {
+                id: job,
+                status: JobStatus::Done { files, .. },
+            } = &event
+            {
+                if let Some(record) = lock(&state.records).get_mut(&id) {
+                    record.files.insert(*job, files.clone());
+                }
+            }
             let _ = on_event.send(event);
         };
         let local = Local {
@@ -116,8 +276,7 @@ fn start_run(
             history: history.as_deref(),
         };
         engine::run(&http, input, &settings, local, &cancel, &emit).await;
-        let state = app.state::<AppState>();
-        state.runs.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
+        lock(&state.runs).remove(&id);
     });
     Ok(id)
 }
@@ -127,6 +286,370 @@ fn cancel_run(state: State<AppState>, id: u32) {
     if let Some(cancel) = state.runs.lock().unwrap_or_else(|p| p.into_inner()).get(&id) {
         cancel.cancel();
     }
+}
+
+/// Opens `site`, in a window of its own, to look for a larger copy of face
+/// `face` of job `job` in run `run`: Google Lens on Scryfall's art crop, or a
+/// search for the artist. What becomes of each image the user saves there
+/// arrives on `on_event`.
+#[tauri::command]
+async fn find_larger_copy(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    run: u32,
+    job: u32,
+    face: u32,
+    site: Site,
+    on_event: Channel<FoundEvent>,
+) -> CommandResult<()> {
+    let (target, ..) = saved_face(&state, run, job, face).await?;
+    let url = manual::site_url(&state.http, state.history.as_deref(), &state.artists, &target, site)
+        .await
+        .map_err(|e| e.to_string())?;
+    let title = format!("Find a larger copy of {} on {}", target.face.name, site.name());
+    *lock(&state.search) = Some(Search {
+        run,
+        job,
+        target,
+        site,
+        events: on_event,
+    });
+    finder::open(&app, url, &title, on_saved, on_page).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// What a run saved for face `face` of job `job`: the face, the run's
+/// settings and list folder, and the file saved for it.
+async fn saved_face(
+    state: &AppState,
+    run: u32,
+    job: u32,
+    face: u32,
+) -> CommandResult<(Target, Settings, Option<String>, SavedFile)> {
+    let (settings, list_folder, file) = {
+        let records = lock(&state.records);
+        let record = records
+            .get(&run)
+            .ok_or("That run is too long ago. Run the card again.")?;
+        let file = record
+            .files
+            .get(&job)
+            .and_then(|files| files.iter().find(|file| file.face_index == face))
+            .cloned()
+            .ok_or("That card's art wasn't saved.")?;
+        (record.settings.clone(), record.list_folder.clone(), file)
+    };
+    let cards = state.cards.current();
+    let target = manual::prepare(
+        &state.http,
+        cards.as_deref(),
+        &settings,
+        &file.set,
+        &file.number,
+        face as usize,
+        Some(&file.face),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok((target, settings, list_folder, file))
+}
+
+/// Where face `face` of job `job` in run `run` is known to have art, for the
+/// user to go back to one.
+#[tauri::command]
+async fn art_sources(state: State<'_, AppState>, run: u32, job: u32, face: u32) -> CommandResult<Vec<KnownSource>> {
+    let (target, settings, _, file) = saved_face(&state, run, job, face).await?;
+    Ok(known::known_sources(&state.http, state.history.as_deref(), &target, &settings, &file).await)
+}
+
+/// Saves face `face` of job `job` in run `run` again from `source` (for a copy
+/// the user found, the one `copy` names), in place of the file saved for it,
+/// and returns the new file.
+#[tauri::command]
+async fn save_art_from(
+    state: State<'_, AppState>,
+    run: u32,
+    job: u32,
+    face: u32,
+    source: ArtSource,
+    copy: Option<i64>,
+) -> CommandResult<SavedFile> {
+    let (target, settings, list_folder, current) = saved_face(&state, run, job, face).await?;
+    let replace = PathBuf::from(&current.path);
+    let destination = Destination {
+        settings: &settings,
+        list_folder: list_folder.as_deref(),
+        replace: Some(&replace),
+    };
+    let (file, _) = known::save_from(
+        &state.http,
+        state.history.as_deref(),
+        &target,
+        destination,
+        source,
+        copy,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    record_file(&state, run, job, file.clone());
+    Ok(file)
+}
+
+/// Notes `file` as its face's file in job `job` of run `run`, so what's done
+/// with it next starts from it.
+fn record_file(state: &AppState, run: u32, job: u32, file: SavedFile) {
+    if let Some(files) = lock(&state.records)
+        .get_mut(&run)
+        .and_then(|record| record.files.get_mut(&job))
+    {
+        files.retain(|f| f.face_index != file.face_index);
+        files.push(file);
+    }
+}
+
+/// Saves an image that didn't look like a larger copy of the art, or with
+/// `save` false, throws it away.
+#[tauri::command]
+async fn confirm_found_art(app: AppHandle, state: State<'_, AppState>, token: u32, save: bool) -> CommandResult<()> {
+    let (search, saved) = lock(&state.doubtful)
+        .remove(&token)
+        .ok_or("That image is gone. Save it from the search window again.")?;
+    if save {
+        let event = import_found(&state, &search, &saved, true).await;
+        report(&app, &search, event);
+    } else {
+        let _ = std::fs::remove_file(&saved.path);
+    }
+    Ok(())
+}
+
+/// Saves image `index` of the page images named by `token` as the art, or
+/// with no `index`, saves none. Either way the images are then deleted.
+#[tauri::command]
+async fn choose_page_image(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    token: u32,
+    index: Option<u32>,
+) -> CommandResult<()> {
+    let choices = {
+        let mut choices = lock(&state.choices);
+        match choices.as_ref() {
+            Some(current) if current.token == token => choices.take(),
+            _ => None,
+        }
+    }
+    .ok_or("Those images are gone. Find the art on the page again.")?;
+    let chosen = index.and_then(|index| choices.images.get(index as usize));
+    if let Some(chosen) = chosen {
+        let event = match tauri::Url::parse(&chosen.image_url) {
+            Ok(image_url) => {
+                // The user saw what the check said of it, so it's saved as it is.
+                let saved = finder::Saved {
+                    image_url,
+                    page: choices.page.clone(),
+                    path: chosen.downloaded.clone(),
+                };
+                import_found(&state, &choices.search, &saved, true).await
+            }
+            Err(error) => FoundEvent::Failed {
+                message: error.to_string(),
+            },
+        };
+        report(&app, &choices.search, event);
+    }
+    choices.discard();
+    Ok(())
+}
+
+/// An image the user saved in the finder window: saved as the art of the face
+/// being looked for, if it's a larger copy of it.
+fn on_saved(app: &AppHandle, saved: finder::Saved) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let search = lock(&state.search).clone();
+        let Some(search) = search else {
+            let _ = std::fs::remove_file(&saved.path);
+            return;
+        };
+        report(
+            &app,
+            &search,
+            FoundEvent::Checking {
+                face: search.target.face.name.clone(),
+                page: false,
+            },
+        );
+        let event = import_found(&state, &search, &saved, false).await;
+        report(&app, &search, event);
+    });
+}
+
+/// The images of the page the user is on, when they ask to find the art on
+/// it: downloaded and checked, for them to choose the face's art from.
+fn on_page(app: &AppHandle, images: Vec<PageImage>, page: Option<tauri::Url>) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let search = lock(&state.search).clone();
+        let Some(search) = search else {
+            return;
+        };
+        report(
+            &app,
+            &search,
+            FoundEvent::Checking {
+                face: search.target.face.name.clone(),
+                page: true,
+            },
+        );
+        let event = fetch_page(&app, &state, &search, &images, page).await;
+        report(&app, &search, event);
+    });
+}
+
+async fn fetch_page(
+    app: &AppHandle,
+    state: &AppState,
+    search: &Search,
+    images: &[PageImage],
+    page: Option<tauri::Url>,
+) -> FoundEvent {
+    let face = search.target.face.name.clone();
+    let dir = match finder::page_images_dir(app) {
+        Ok(dir) => dir,
+        Err(error) => {
+            return FoundEvent::Failed {
+                message: error.to_string(),
+            }
+        }
+    };
+    let referer = page.as_ref().map(tauri::Url::as_str);
+    let images = match manual::fetch_page_images(&state.http, &search.target, images, referer, &dir).await {
+        Ok(images) if images.is_empty() => return FoundEvent::NoImages { face },
+        Ok(images) => images,
+        Err(error) => {
+            return FoundEvent::Failed {
+                message: error.to_string(),
+            }
+        }
+    };
+    let token = state.next_token.fetch_add(1, Ordering::Relaxed);
+    let choices = images.iter().map(Into::into).collect();
+    let replaced = lock(&state.choices).replace(Choices {
+        token,
+        search: search.clone(),
+        page,
+        images,
+    });
+    // An earlier page's images, never chosen from, go.
+    if let Some(replaced) = replaced {
+        replaced.discard();
+    }
+    FoundEvent::Choose {
+        token,
+        face,
+        images: choices,
+    }
+}
+
+/// Where the run saved the face being looked for: its settings, its list
+/// folder, and the file there now. `None` once the run is forgotten.
+fn destination(state: &AppState, search: &Search) -> Option<(Settings, Option<String>, Option<PathBuf>)> {
+    lock(&state.records).get(&search.run).map(|record| {
+        let replace = record
+            .files
+            .get(&search.job)
+            .and_then(|files| files.iter().find(|f| f.face_index as usize == search.target.face.index))
+            .map(|file| PathBuf::from(&file.path));
+        (record.settings.clone(), record.list_folder.clone(), replace)
+    })
+}
+
+fn too_long_ago() -> FoundEvent {
+    FoundEvent::Failed {
+        message: "That run is too long ago. Run the card again to look for a larger copy.".into(),
+    }
+}
+
+/// Notes a found image as the face's file, so a second one replaces it, and
+/// says so.
+fn saved(state: &AppState, search: &Search, file: SavedFile, replaced: Option<String>) -> FoundEvent {
+    record_file(state, search.run, search.job, file.clone());
+    FoundEvent::Saved {
+        run: search.run,
+        job: search.job,
+        file,
+        replaced,
+    }
+}
+
+async fn import_found(state: &AppState, search: &Search, found: &finder::Saved, force: bool) -> FoundEvent {
+    let Some((settings, list_folder, replace)) = destination(state, search) else {
+        let _ = std::fs::remove_file(&found.path);
+        return too_long_ago();
+    };
+    let destination = Destination {
+        settings: &settings,
+        list_folder: list_folder.as_deref(),
+        replace: replace.as_deref(),
+    };
+    let from = Found {
+        image_url: found.image_url.as_str(),
+        page: found.page.as_ref().map(|page| page.as_str()),
+        site: Some(search.site),
+    };
+    let imported = manual::import(
+        &state.http,
+        state.history.as_deref(),
+        &search.target,
+        destination,
+        &found.path,
+        from,
+        force,
+    )
+    .await;
+    match imported {
+        Ok(Imported::Saved { file, replaced }) => {
+            let _ = std::fs::remove_file(&found.path);
+            saved(state, search, file, replaced)
+        }
+        Ok(Imported::Doubtful(doubt)) => {
+            let token = state.next_token.fetch_add(1, Ordering::Relaxed);
+            lock(&state.doubtful).insert(token, (search.clone(), found.clone()));
+            FoundEvent::Doubtful {
+                token,
+                face: search.target.face.name.clone(),
+                doubt,
+            }
+        }
+        Err(error) => {
+            let _ = std::fs::remove_file(&found.path);
+            FoundEvent::Failed {
+                message: error.to_string(),
+            }
+        }
+    }
+}
+
+/// Opens, in the system's browser, the page face `face` of job `job` in run
+/// `run` was saved from, when it's an image the user found.
+#[tauri::command]
+fn open_found_page(app: AppHandle, state: State<AppState>, run: u32, job: u32, face: u32) -> CommandResult<()> {
+    let page = lock(&state.records)
+        .get(&run)
+        .and_then(|record| record.files.get(&job))
+        .and_then(|files| files.iter().find(|file| file.face_index == face))
+        .and_then(|file| file.page.clone())
+        .ok_or("There's no page for that image.")?;
+    let url = tauri::Url::parse(&page).map_err(|e| e.to_string())?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(format!("{page} isn't a web page."));
+    }
+    app.opener()
+        .open_url(url.as_str(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 /// Shows a saved file in the system's file manager.
@@ -193,14 +716,32 @@ pub fn run() {
                         None
                     }
                 });
+            let decks_dir = default_decks_dir()
+                .or_else(|| app.path().app_local_data_dir().ok().map(|dir| dir.join("decks")))
+                .ok_or("no data folder to keep decks in")?;
+            let decks = Decks::open(decks_dir);
+            // The main window shows the pictures of the decks' boxes.
+            std::fs::create_dir_all(decks.images_dir())?;
+            app.asset_protocol_scope().allow_directory(decks.images_dir(), false)?;
             app.manage(AppState {
                 http: http.clone(),
                 settings_path,
                 cards: cards.clone(),
                 history,
+                decks,
                 runs: Mutex::new(HashMap::new()),
                 next_run: AtomicU32::new(1),
+                records: Mutex::new(HashMap::new()),
+                search: Mutex::new(None),
+                doubtful: Mutex::new(HashMap::new()),
+                choices: Mutex::new(None),
+                next_token: AtomicU32::new(1),
+                artists: Artists::default(),
             });
+            finder::clear_downloads(app.handle());
+            // The main window shows a page's images for the user to choose from.
+            app.asset_protocol_scope()
+                .allow_directory(finder::page_images_dir(app.handle())?, false)?;
             // Scryfall publishes new card data daily; until the first copy is
             // in, runs ask Scryfall about each card.
             tauri::async_runtime::spawn(async move {
@@ -219,6 +760,8 @@ pub fn run() {
             parse_card_list,
             list_presets,
             count_search,
+            search_decks,
+            deck_box,
             read_card_list,
             start_run,
             cancel_run,
@@ -226,6 +769,12 @@ pub fn run() {
             open_folder,
             card_data_status,
             open_discord,
+            find_larger_copy,
+            confirm_found_art,
+            choose_page_image,
+            open_found_page,
+            art_sources,
+            save_art_from,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

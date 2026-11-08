@@ -3,18 +3,28 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { api } from "@/api";
+import { toaster } from "@mtg-art/ui/toaster";
+import type { ArtSource } from "@/bindings/ArtSource";
+import type { DeckSummary } from "@/bindings/DeckSummary";
+import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { JobInfo } from "@/bindings/JobInfo";
+import type { KnownSource } from "@/bindings/KnownSource";
 import type { JobStatus } from "@/bindings/JobStatus";
 import type { RunEvent } from "@/bindings/RunEvent";
 import type { RunInput } from "@/bindings/RunInput";
 import type { RunSummary } from "@/bindings/RunSummary";
+import type { SavedFile } from "@/bindings/SavedFile";
+import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
-import { errorText, showError } from "@/notify";
+import { errorText, showError, showInfo, showLoading, showSuccess } from "@/notify";
 
 // --- What the user is about to download, remembered between launches -------
 
-export type InputTab = "list" | "search" | "preset";
+export type InputTab = "list" | "search" | "preset" | "deck";
+
+/** The precon deck picked to download, as much of it as the panel shows. */
+export type PickedDeck = Pick<DeckSummary, "fileName" | "name" | "code" | "setName">;
 
 interface InputState {
   tab: InputTab;
@@ -23,8 +33,19 @@ interface InputState {
   folder: string;
   query: string;
   presetId: string;
+  /** The search typed above the precon decks. */
+  deckQuery: string;
+  deck: PickedDeck | null;
+  /** The folder a deck's art goes in, when the setting for it is on: the
+   * deck's name when it's picked, and whatever the user makes it after. */
+  deckFolder: string;
   setInput: (
-    patch: Partial<Pick<InputState, "tab" | "text" | "folder" | "query" | "presetId">>,
+    patch: Partial<
+      Pick<
+        InputState,
+        "tab" | "text" | "folder" | "query" | "presetId" | "deckQuery" | "deck" | "deckFolder"
+      >
+    >,
   ) => void;
 }
 
@@ -36,6 +57,9 @@ export const useInput = create<InputState>()(
       folder: "",
       query: "",
       presetId: "edhrec-top-year",
+      deckQuery: "",
+      deck: null,
+      deckFolder: "",
       setInput: (patch) => set(patch),
     }),
     { name: "input" },
@@ -87,6 +111,14 @@ export async function chooseOutputDir() {
 
 export type JobView = JobInfo & { status: JobStatus };
 
+/** An image the user saved in the Lens window that didn't look like a larger
+ * copy of the art, waiting for them to say whether to save it anyway. */
+export type FoundDoubt = Extract<FoundEvent, { event: "doubtful" }>;
+
+/** The images of a page the user asked to find the art on, for them to choose
+ * from. */
+export type PageImages = Extract<FoundEvent, { event: "choose" }>;
+
 interface RunState {
   runId: number | null;
   running: boolean;
@@ -98,6 +130,10 @@ interface RunState {
   folder: string | null;
   /** The list folder name the run was started with, for retrying into it. */
   listFolder: string | undefined;
+  /** Found images waiting on the user, oldest first. They outlast a run. */
+  doubts: FoundDoubt[];
+  /** A page's images, while the user chooses one. They outlast a run. */
+  pageImages: PageImages | null;
 }
 
 const idle: RunState = {
@@ -109,6 +145,8 @@ const idle: RunState = {
   summary: null,
   folder: null,
   listFolder: undefined,
+  doubts: [],
+  pageImages: null,
 };
 
 export const useRun = create<RunState>()(() => idle);
@@ -156,11 +194,13 @@ const BATCH_MS = 80;
 export async function startRun(input: RunInput) {
   const { settings } = useSettings.getState();
   if (!settings || useRun.getState().running) return;
-  useRun.setState({
+  useRun.setState((state) => ({
     ...idle,
     running: true,
     listFolder: input.kind === "list" ? input.folder : undefined,
-  });
+    doubts: state.doubts,
+    pageImages: state.pageImages,
+  }));
 
   let queue: RunEvent[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -184,4 +224,161 @@ export async function startRun(input: RunInput) {
 export function cancelRun() {
   const { runId } = useRun.getState();
   if (runId !== null) void api.cancelRun(runId);
+}
+
+// --- Larger copies the user finds in the finder window ----------------------
+
+/** Opens `site` to look for a larger copy of face `face` of job `job` of the
+ * current run. */
+export async function findLargerCopy(job: number, face: number, site: Site) {
+  const { runId } = useRun.getState();
+  if (runId === null) return;
+  try {
+    await api.findLargerCopy(runId, job, face, site, onFound);
+  } catch (error) {
+    showError("Couldn't open the search", error);
+  }
+}
+
+/** Opens the page a found image was saved from. */
+export async function openFoundPage(job: number, face: number) {
+  const { runId } = useRun.getState();
+  if (runId === null) return;
+  try {
+    await api.openFoundPage(runId, job, face);
+  } catch (error) {
+    showError("Couldn't open the page", error);
+  }
+}
+
+/** Where face `face` of job `job` is known to have art; empty if that can't be told. */
+export async function artSources(job: number, face: number): Promise<KnownSource[]> {
+  const { runId } = useRun.getState();
+  if (runId === null) return [];
+  try {
+    return await api.artSources(runId, job, face);
+  } catch (error) {
+    showError("Couldn't tell where the art is", error);
+    return [];
+  }
+}
+
+/** What each source is called where the user picks one. */
+const SOURCE_NAMES: Record<ArtSource, string> = {
+  mtgpics: "MTGPics",
+  scryfall: "Scryfall",
+  web: "a copy you found",
+};
+
+/** The sites a copy was found from, by name. */
+export const SITE_NAMES: Record<Site, string> = {
+  lens: "Google Lens",
+  artstation: "ArtStation",
+  deviantart: "DeviantArt",
+  pixiv: "Pixiv",
+  instagram: "Instagram",
+  website: "the artist's website",
+};
+
+/** Where `known` is, in a few words: MTGPics, Scryfall, or the site a copy was on. */
+export function knownSourceName(known: KnownSource): string {
+  if (known.source !== "web") return SOURCE_NAMES[known.source];
+  return known.host ?? (known.site ? SITE_NAMES[known.site] : SOURCE_NAMES.web);
+}
+
+/** Saves face `face` of job `job` again from `known`, in place of its file. */
+export async function saveArtFrom(job: number, face: number, known: KnownSource) {
+  const { runId } = useRun.getState();
+  if (runId === null) return;
+  const toast = `source-${job}-${face}`;
+  const name = knownSourceName(known);
+  showLoading(`Saving the art from ${name}…`, toast);
+  try {
+    const file = await api.saveArtFrom(runId, job, face, known.source, known.copy);
+    replaceFile(runId, job, file);
+    showSuccess(`Saved ${file.face}'s art from ${name}`, toast);
+  } catch (error) {
+    showError("Couldn't save the art", error, toast);
+  }
+}
+
+/** Puts `file` in its face's place among job `job`'s files, if run `run` is still shown. */
+function replaceFile(run: number, job: number, file: SavedFile) {
+  useRun.setState((state) => {
+    const shown = state.jobs[job - 1];
+    if (state.runId !== run || !shown || shown.status.state !== "done") return {};
+    const files = shown.status.files
+      .filter((other) => other.faceIndex !== file.faceIndex)
+      .concat(file)
+      .toSorted((a, b) => a.faceIndex - b.faceIndex);
+    const jobs = state.jobs.slice();
+    jobs[job - 1] = { ...shown, status: { ...shown.status, files } };
+    return { jobs };
+  });
+}
+
+/** Answers the oldest waiting image: saves it anyway, or throws it away. */
+export async function answerDoubt(save: boolean) {
+  const [first, ...rest] = useRun.getState().doubts;
+  if (!first) return;
+  useRun.setState({ doubts: rest });
+  try {
+    await api.confirmFoundArt(first.token, save);
+  } catch (error) {
+    showError("Couldn't save the image", error);
+  }
+}
+
+/** Saves image `index` of the page's images as the art, or with `null`, none. */
+export async function choosePageImage(index: number | null) {
+  const { pageImages } = useRun.getState();
+  if (!pageImages) return;
+  useRun.setState({ pageImages: null });
+  if (index !== null) showLoading(`Saving ${pageImages.face}'s art…`, FOUND_TOAST);
+  try {
+    await api.choosePageImage(pageImages.token, index);
+  } catch (error) {
+    showError("Couldn't save the image", error, FOUND_TOAST);
+  }
+}
+
+/** The toast that says what the finder window's images came to: one at a time,
+ * a spinner while they're checked and then the result. */
+const FOUND_TOAST = "found";
+
+function onFound(event: FoundEvent) {
+  switch (event.event) {
+    case "checking":
+      showLoading(
+        event.page
+          ? "Downloading the images on the page…"
+          : `Checking the image you saved for ${event.face}…`,
+        FOUND_TOAST,
+      );
+      break;
+    case "saved":
+      replaceFile(event.run, event.job, event.file);
+      showSuccess(`Saved the larger copy of ${event.file.face}`, FOUND_TOAST);
+      break;
+    case "doubtful":
+      // The dialog asks; the spinner has nothing left to say.
+      toaster.dismiss(FOUND_TOAST);
+      useRun.setState((state) => ({ doubts: [...state.doubts, event] }));
+      break;
+    case "choose":
+      // The dialog shows them; the spinner has nothing left to say.
+      toaster.dismiss(FOUND_TOAST);
+      useRun.setState({ pageImages: event });
+      break;
+    case "noImages":
+      showInfo(
+        "No image on this page is large enough",
+        `None could be a larger copy of ${event.face}'s art.`,
+        FOUND_TOAST,
+      );
+      break;
+    case "failed":
+      showError("Couldn't save the image", event.message, FOUND_TOAST);
+      break;
+  }
 }

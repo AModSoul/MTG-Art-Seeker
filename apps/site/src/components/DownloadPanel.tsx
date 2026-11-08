@@ -12,6 +12,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { Alert } from "@mtg-art/ui/alert";
+import { LinkButton } from "@mtg-art/ui/link-button";
 import { useState, type ReactNode } from "react";
 import { LuDownload } from "react-icons/lu";
 
@@ -60,9 +61,9 @@ export function DownloadPanel({ state, os, arch }: DownloadPanelProps) {
           <Alert status="warning" title="Couldn't load the latest release from GitHub">
             {state.message} The installers are all on GitHub's releases page.
           </Alert>
-          <Button asChild colorPalette="blue" size="lg">
-            <a href={`${GITHUB_RELEASES_URL}/latest`}>Go to the latest release</a>
-          </Button>
+          <LinkButton href={`${GITHUB_RELEASES_URL}/latest`} colorPalette="blue" size="lg">
+            Go to the latest release
+          </LinkButton>
         </Stack>
       );
     case "ready":
@@ -181,11 +182,9 @@ function OsDownloads({
     <Stack gap={8}>
       {recommended ? (
         <Stack gap={2} align="flex-start">
-          <Button asChild colorPalette="blue" size="xl">
-            <a href={recommended.asset.browser_download_url}>
-              <LuDownload /> Download for {OS_LABEL[os]}
-            </a>
-          </Button>
+          <LinkButton href={recommended.asset.browser_download_url} colorPalette="blue" size="xl">
+            <LuDownload /> Download for {OS_LABEL[os]}
+          </LinkButton>
           <Text fontSize="sm" color="fg.muted">
             {describe(recommended)}
           </Text>

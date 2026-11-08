@@ -15,6 +15,11 @@ export type Settings = {
   sources: SourceMode;
   scryfallImage: ScryfallImage;
   /**
+   * Offer to look for a larger copy of MTGPics' art too, not only of
+   * Scryfall's: the buttons that open the finder window show beside both.
+   */
+  searchMtgpicsArt: boolean;
+  /**
    * Which printing a line with only a name gets.
    */
   printing: Printing;

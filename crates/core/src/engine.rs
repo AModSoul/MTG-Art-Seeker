@@ -19,11 +19,13 @@ use ts_rs::TS;
 use crate::{
     card::Card,
     carddb::{CardDb, NameQuery},
-    faces::{plan_faces, FacePlan},
+    decks::deck_cards,
+    faces::{plan_faces, whole_card, FacePlan},
     history::{History, Remembered},
-    http::Http,
+    http::{Http, ImageKind},
     imagesize::{image_size, ImageSize},
     list::{parse_list, CardLine, SkippedLine},
+    manual::{refetch_found_copy, FoundCopyAt, Refetched},
     mtgpics::{self, MtgpicsArt},
     naming::{file_stem, sanitize, NameParts},
     presets::preset_names,
@@ -59,6 +61,26 @@ pub enum RunInput {
     Search { query: String },
     /// A ready-made list, by [`crate::presets::PresetInfo::id`].
     Preset { id: String },
+    /// A preconstructed deck's cards, by [`crate::decks::DeckSummary::file_name`].
+    /// With [`Settings::list_folders`] on, its art is saved in a folder of
+    /// this name inside the output folder.
+    Deck {
+        #[serde(rename = "fileName")]
+        file_name: String,
+        #[serde(default)]
+        #[ts(optional)]
+        folder: Option<String>,
+    },
+}
+
+impl RunInput {
+    /// The folder inside the output folder a list or deck asked to be saved in.
+    pub fn folder(&self) -> Option<&str> {
+        match self {
+            Self::List { folder, .. } | Self::Deck { folder, .. } => folder.as_deref(),
+            Self::Search { .. } | Self::Preset { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
@@ -111,12 +133,26 @@ pub enum JobStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum ArtSource {
     Mtgpics,
     Scryfall,
+    /// An image the user found themselves, anywhere on the web, and saved in
+    /// place of Scryfall's; see [`crate::manual`].
+    Web,
+}
+
+impl ArtSource {
+    /// The folder its art goes in, with [`Settings::source_folders`] on.
+    fn folder(self) -> &'static str {
+        match self {
+            Self::Mtgpics => "mtgpics",
+            Self::Scryfall => "scryfall",
+            Self::Web => "web",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -126,12 +162,18 @@ pub struct SavedFile {
     pub path: String,
     /// The name of the face this is the art of.
     pub face: String,
+    /// Which of the card's images it is, from 0; see [`FacePlan::index`].
+    pub face_index: u32,
     pub source: ArtSource,
     pub set: String,
     pub number: String,
     pub artist: String,
     /// The image's size in pixels, if its header could be read.
     pub size: Option<ImageSize>,
+    /// The page a [`ArtSource::Web`] image was saved from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub page: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, TS)]
@@ -147,6 +189,8 @@ pub struct RunSummary {
     pub cancelled: u32,
     pub mtgpics_files: u32,
     pub scryfall_files: u32,
+    /// Images the user found themselves, saved again from where they were.
+    pub web_files: u32,
     pub seconds: f64,
 }
 
@@ -175,7 +219,6 @@ struct Context<'a> {
     output_dir: PathBuf,
     cache: mtgpics::Cache,
     paths: PathReserver,
-    temp_ids: AtomicU64,
     emit: &'a (dyn Fn(RunEvent) + Sync),
 }
 
@@ -268,7 +311,6 @@ pub async fn run(
         output_dir,
         cache: mtgpics::Cache::default(),
         paths: PathReserver::default(),
-        temp_ids: AtomicU64::new(0),
         emit,
     };
     let statuses = stream::iter(jobs)
@@ -317,6 +359,7 @@ fn finish(statuses: Vec<JobStatus>, started: Instant, emit: &(dyn Fn(RunEvent) +
                     match file.source {
                         ArtSource::Mtgpics => summary.mtgpics_files += 1,
                         ArtSource::Scryfall => summary.scryfall_files += 1,
+                        ArtSource::Web => summary.web_files += 1,
                     }
                 }
             }
@@ -352,6 +395,10 @@ async fn plan(http: &Http, input: RunInput, settings: &Settings) -> Result<(Vec<
                 Vec::new(),
             )
         }
+        RunInput::Deck { file_name, .. } => {
+            let deck = deck_cards(http, &file_name).await?;
+            (numbered(lines(deck.lines)), Vec::new())
+        }
         RunInput::Search { query } => {
             let results = scryfall::search(http, &query, &search_options(settings, None), MAX_SEARCH_CARDS).await?;
             (
@@ -376,14 +423,18 @@ impl Job {
     }
 }
 
-/// Where a run saves: the output folder, or for a list with
+/// Where a run saves: the output folder, or for a list or deck with
 /// [`Settings::list_folders`] on and a folder name, that folder inside it.
 fn output_dir(input: &RunInput, settings: &Settings) -> PathBuf {
+    output_dir_for(input.folder(), settings)
+}
+
+/// Where a run with these settings saves, for a list named `list_folder` or
+/// for any other input.
+pub fn output_dir_for(list_folder: Option<&str>, settings: &Settings) -> PathBuf {
     let base = PathBuf::from(&settings.output_dir);
-    match input {
-        RunInput::List {
-            folder: Some(folder), ..
-        } if settings.list_folders && !folder.trim().is_empty() => base.join(sanitize(folder)),
+    match list_folder {
+        Some(folder) if settings.list_folders && !folder.trim().is_empty() => base.join(sanitize(folder)),
         _ => base,
     }
 }
@@ -539,8 +590,36 @@ async fn download_card(
     // Per face, where its MTGPics art was saved from; `None` if it wasn't.
     let mut log = Vec::with_capacity(faces.len());
     let mut mtgpics_failed = false;
+    // This card's files start here: a job saves every printing it's asked for.
+    let first_file = files.len();
+    // A split card's halves MTGPics had no art for: Scryfall has none of a half.
+    let mut halves_missing = Vec::new();
+
+    // A split card saved whole before, as Scryfall has it or as MTGPics' one
+    // picture of a Room, may have a copy the user found of the whole card.
+    // It's used unless they found one of a half since.
+    if faces.iter().any(FacePlan::is_split_half) && !faces.iter().any(|face| has_found_by_hand(face, context)) {
+        if let Some(file) = found_by_hand(card, &whole_card(card, settings), context, errors).await {
+            files.push(file);
+            return;
+        }
+    }
 
     for (index, face) in faces.iter().enumerate() {
+        // An image the user picked themselves comes before anything found for them.
+        if let Some(file) = found_by_hand(card, face, context, errors).await {
+            files.push(file);
+            // MTGPics wasn't asked about this face: log what was known, or,
+            // with nothing known, don't log the card as MTGPics having none.
+            match remembered.as_ref() {
+                Some(remembered) => log.push(remembered.mtgpics.get(index).cloned().flatten()),
+                None => {
+                    log.push(None);
+                    mtgpics_failed = true;
+                }
+            }
+            continue;
+        }
         if use_mtgpics {
             match mtgpics_art(card, (index, face), faces.len(), &mut arts, context, errors).await {
                 FromMtgpics::Saved(file, url) => {
@@ -553,6 +632,10 @@ async fn download_card(
             }
         }
         log.push(None);
+        if face.is_split_half() {
+            halves_missing.push(face.name.clone());
+            continue;
+        }
         if settings.sources != SourceMode::MtgpicsOnly {
             match &face.scryfall_url {
                 Some(url) => match save(card, face, ArtSource::Scryfall, url, context).await {
@@ -569,6 +652,78 @@ async fn download_card(
         missing.push(face.name.clone());
     }
 
+    // A split card's halves from MTGPics: its page doesn't always list them
+    // in order, and may file the whole card's image under each, as it does
+    // Duskmourn's Rooms.
+    if halves_missing.is_empty() && faces.iter().any(FacePlan::is_split_half) {
+        let halves = match &files[first_file..] {
+            [first, second] => split_halves(card, first, second, context).await,
+            _ => Halves::AsSaved,
+        };
+        match halves {
+            Halves::AsSaved => {}
+            Halves::OnePicture => {
+                let second = files.pop().expect("two files");
+                let _ = tokio::fs::remove_file(&second.path).await;
+                let first = files.pop().expect("two files");
+                let whole = whole_card(card, settings);
+                match rename_to_face(first, card, &whole, context).await {
+                    Ok(file) => files.push(file),
+                    Err(error) => {
+                        errors.push(error.to_string());
+                        missing.push(whole.name);
+                    }
+                }
+            }
+            Halves::Swapped => {
+                let second = files.pop().expect("two files");
+                let first = files.pop().expect("two files");
+                match swap_pictures(&first, &second).await {
+                    Ok((first, second)) => {
+                        files.extend([first, second]);
+                        // Logged the right way round, for the next run.
+                        log.swap(0, 1);
+                    }
+                    // Left as they were saved: the wrong way round, but saved.
+                    Err(error) => {
+                        errors.push(error.to_string());
+                        files.extend([first, second]);
+                    }
+                }
+            }
+        }
+    }
+
+    if !halves_missing.is_empty() {
+        if settings.sources == SourceMode::MtgpicsOnly {
+            missing.extend(halves_missing);
+        } else {
+            // Not both halves' art from MTGPics: the whole card, as Scryfall
+            // has it, rather than one half from each.
+            for file in files.drain(first_file..) {
+                let _ = tokio::fs::remove_file(&file.path).await;
+            }
+            let whole = whole_card(card, settings);
+            match &whole.scryfall_url {
+                Some(url) => match save(card, &whole, ArtSource::Scryfall, url, context).await {
+                    Ok(Some(file)) => files.push(file),
+                    Ok(None) => {
+                        errors.push("Scryfall's image is missing".into());
+                        missing.push(whole.name);
+                    }
+                    Err(error) => {
+                        errors.push(format!("Scryfall: {error}"));
+                        missing.push(whole.name);
+                    }
+                },
+                None => {
+                    errors.push("Scryfall has no image of this card".into());
+                    missing.push(whole.name);
+                }
+            }
+        }
+    }
+
     // Logged once MTGPics' answer for every face is known. A face it failed
     // to answer for — a timeout, say — mustn't be logged as one it has no art for.
     if let Some(history) = history.filter(|_| !mtgpics_failed) {
@@ -577,6 +732,184 @@ async fn download_card(
             _ => SystemTime::now(),
         };
         let _ = history.remember(card, &log, checked_at);
+    }
+}
+
+/// What a split card's two halves saved from MTGPics turned out to be.
+enum Halves {
+    AsSaved,
+    /// One picture twice: the whole card's.
+    OnePicture,
+    /// Each the other half's painting.
+    Swapped,
+}
+
+async fn split_halves(card: &Card, first: &SavedFile, second: &SavedFile, context: &Context<'_>) -> Halves {
+    let (first_path, second_path) = (Path::new(&first.path), Path::new(&second.path));
+    if same_contents(first_path, second_path).await {
+        return Halves::OnePicture;
+    }
+    // A found copy was picked by the user, half by half.
+    if first.source != ArtSource::Mtgpics || second.source != ArtSource::Mtgpics {
+        return Halves::AsSaved;
+    }
+    // Scryfall's art crop shows the halves side by side, the first on the left.
+    let (Some(crop_url), Some(dir)) = (card.art_crop(0), first_path.parent()) else {
+        return Halves::AsSaved;
+    };
+    let crop = TempFile::beside(dir);
+    if !matches!(context.http.download(crop_url, crop.path()).await, Ok(Some(_))) {
+        return Halves::AsSaved;
+    }
+    let paths = (crop.path().to_owned(), first_path.to_owned(), second_path.to_owned());
+    let swapped =
+        tokio::task::spawn_blocking(move || crate::verify::halves_swapped(&paths.0, &paths.1, &paths.2)).await;
+    match swapped {
+        Ok(Ok(true)) => Halves::Swapped,
+        _ => Halves::AsSaved,
+    }
+}
+
+/// Swaps two saved images' pictures, so each face's name holds its own: each
+/// keeps its type's extension, and its size, source and page go with it.
+/// If a rename fails, the ones done are undone, so both are as they were.
+async fn swap_pictures(first: &SavedFile, second: &SavedFile) -> Result<(SavedFile, SavedFile)> {
+    let (first_path, second_path) = (PathBuf::from(&first.path), PathBuf::from(&second.path));
+    let extension = |path: &Path| path.extension().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
+    // The first's picture goes under the second's name, and the other way round.
+    let first_picture_to = second_path.with_extension(extension(&first_path));
+    let second_picture_to = first_path.with_extension(extension(&second_path));
+    let parked = first_path.with_extension("swapping.part");
+    tokio::fs::rename(&first_path, &parked).await?;
+    if let Err(error) = tokio::fs::rename(&second_path, &second_picture_to).await {
+        let _ = tokio::fs::rename(&parked, &first_path).await;
+        return Err(error.into());
+    }
+    if let Err(error) = tokio::fs::rename(&parked, &first_picture_to).await {
+        let _ = tokio::fs::rename(&second_picture_to, &second_path).await;
+        let _ = tokio::fs::rename(&parked, &first_path).await;
+        return Err(error.into());
+    }
+    let path = |path: &Path| path.to_string_lossy().into_owned();
+    Ok((
+        SavedFile {
+            path: path(&second_picture_to),
+            face: first.face.clone(),
+            face_index: first.face_index,
+            artist: first.artist.clone(),
+            ..second.clone()
+        },
+        SavedFile {
+            path: path(&first_picture_to),
+            face: second.face.clone(),
+            face_index: second.face_index,
+            artist: second.artist.clone(),
+            ..first.clone()
+        },
+    ))
+}
+
+/// Whether two files hold the same bytes.
+async fn same_contents(a: &Path, b: &Path) -> bool {
+    match (tokio::fs::read(a).await, tokio::fs::read(b).await) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
+/// Moves a saved image to where `face`'s image from the same source goes, and
+/// says it's that face's.
+async fn rename_to_face(file: SavedFile, card: &Card, face: &FacePlan, context: &Context<'_>) -> Result<SavedFile> {
+    let settings = context.settings;
+    let dir = face_dir(&context.output_dir, settings, file.source, face);
+    tokio::fs::create_dir_all(&dir).await?;
+    let extension = Path::new(&file.path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("jpg")
+        .to_owned();
+    let path = context
+        .paths
+        .reserve(&dir, &face_stem(settings, card, face), &extension, settings.overwrite);
+    tokio::fs::rename(&file.path, &path).await?;
+    Ok(SavedFile {
+        path: path.to_string_lossy().into_owned(),
+        face: face.name.clone(),
+        face_index: face.index as u32,
+        artist: face.artist.clone(),
+        ..file
+    })
+}
+
+/// Whether the user found a copy of `face`'s art before.
+fn has_found_by_hand(face: &FacePlan, context: &Context<'_>) -> bool {
+    let (Some(history), Some(art)) = (context.history, face.illustration.as_deref()) else {
+        return false;
+    };
+    history.found_by_hand(art).ok().flatten().is_some()
+}
+
+/// Saves a face's art from where the user found it before, if they did and
+/// it's still the copy they saved: checked again, since anything could be at
+/// that address now. Gone from there, or changed, it's forgotten.
+async fn found_by_hand(
+    card: &Card,
+    face: &FacePlan,
+    context: &Context<'_>,
+    errors: &mut Vec<String>,
+) -> Option<SavedFile> {
+    if context.settings.sources == SourceMode::ScryfallOnly {
+        return None;
+    }
+    let history = context.history?;
+    let art = face.illustration.as_deref()?;
+    let found = history.found_by_hand(art).ok().flatten()?;
+    // The size the copy had when the user saved it.
+    let accepted = history
+        .found_copies(art)
+        .unwrap_or_default()
+        .into_iter()
+        .find(|(_, copy)| copy.url == found.url)
+        .and_then(|(_, copy)| copy.size);
+
+    let saved = async {
+        let dir = face_dir(&context.output_dir, context.settings, ArtSource::Web, face);
+        tokio::fs::create_dir_all(&dir).await?;
+        let temp = TempFile::beside(&dir);
+        let copy = FoundCopyAt {
+            url: &found.url,
+            page: found.page.as_deref(),
+            accepted,
+        };
+        let kind = match refetch_found_copy(context.http, card, face, copy, temp.path()).await? {
+            Refetched::Ready(kind) => kind,
+            other => return Ok(Err(other)),
+        };
+        let stem = face_stem(context.settings, card, face);
+        let path = context
+            .paths
+            .reserve(&dir, &stem, kind.extension(), context.settings.overwrite);
+        place(temp, kind, &path, card, face, ArtSource::Web).await.map(Ok)
+    };
+    match saved.await {
+        Ok(Ok(file)) => Some(SavedFile {
+            page: found.page,
+            ..file
+        }),
+        Ok(Err(not_saved)) => {
+            let _ = history.forget_found_by_hand(art);
+            if not_saved == Refetched::Changed {
+                errors.push(format!(
+                    "The image you found at {} isn't the one you saved any more",
+                    found.url
+                ));
+            }
+            None
+        }
+        Err(error) => {
+            errors.push(format!("The image you found: {error}"));
+            None
+        }
     }
 }
 
@@ -653,56 +986,97 @@ async fn save(
     context: &Context<'_>,
 ) -> Result<Option<SavedFile>> {
     let settings = context.settings;
-    let mut dir = context.output_dir.clone();
-    if settings.source_folders {
-        dir.push(match source {
-            ArtSource::Mtgpics => "mtgpics",
-            ArtSource::Scryfall => "scryfall",
-        });
-    }
-    dir.extend(&face.folders);
+    let dir = face_dir(&context.output_dir, settings, source, face);
     tokio::fs::create_dir_all(&dir).await?;
 
     // Downloaded beside its final place, and only moved there whole: a run
     // cancelled mid-download leaves no half image behind.
-    let temp = TempFile(Some(dir.join(format!(
-        ".download-{}-{}.part",
-        std::process::id(),
-        context.temp_ids.fetch_add(1, Ordering::Relaxed)
-    ))));
+    let temp = TempFile::beside(&dir);
     let Some(kind) = context.http.download(url, temp.path()).await? else {
         return Ok(None);
     };
-    let size = image_size(temp.path(), kind);
-    let set = card.set.to_uppercase();
-    let stem = file_stem(
+    let stem = face_stem(settings, card, face);
+    let path = context.paths.reserve(&dir, &stem, kind.extension(), settings.overwrite);
+    let file = place(temp, kind, &path, card, face, source).await?;
+    // Noted, so the image's size can be shown without downloading it again.
+    if let (Some(history), Some(size)) = (context.history, file.size) {
+        let _ = history.remember_image_size(url, size);
+    }
+    Ok(Some(file))
+}
+
+/// The folder a face's art from `source` goes in, inside `output_dir`.
+pub(crate) fn face_dir(output_dir: &Path, settings: &Settings, source: ArtSource, face: &FacePlan) -> PathBuf {
+    let mut dir = output_dir.to_path_buf();
+    if settings.source_folders {
+        dir.push(source.folder());
+    }
+    dir.extend(&face.folders);
+    dir
+}
+
+/// The name a face's art is saved under, without its extension.
+pub(crate) fn face_stem(settings: &Settings, card: &Card, face: &FacePlan) -> String {
+    file_stem(
         &settings.naming,
         &NameParts {
             name: &face.name,
             artist: &face.artist,
-            set: &set,
+            set: &card.set.to_uppercase(),
             number: &card.collector_number,
         },
-    );
-    let path = context.paths.reserve(&dir, &stem, kind.extension(), settings.overwrite);
-    tokio::fs::rename(temp.path(), &path).await?;
+    )
+}
+
+/// Moves a downloaded image to `path`, in the same folder, and says what it is.
+pub(crate) async fn place(
+    temp: TempFile,
+    kind: ImageKind,
+    path: &Path,
+    card: &Card,
+    face: &FacePlan,
+    source: ArtSource,
+) -> Result<SavedFile> {
+    let size = image_size(temp.path(), kind);
+    tokio::fs::rename(temp.path(), path).await?;
     temp.keep();
-    Ok(Some(SavedFile {
+    Ok(SavedFile {
         path: path.to_string_lossy().into_owned(),
         face: face.name.clone(),
+        face_index: face.index as u32,
         source,
-        set,
+        set: card.set.to_uppercase(),
         number: card.collector_number.clone(),
         artist: face.artist.clone(),
         size,
-    }))
+        page: None,
+    })
+}
+
+/// Numbers every temporary file this process makes, so no two share a name:
+/// a run's, and a save the user asks for while one runs.
+static TEMP_IDS: AtomicU64 = AtomicU64::new(0);
+
+/// A number no other temporary file in this process has.
+pub(crate) fn next_temp_id() -> u64 {
+    TEMP_IDS.fetch_add(1, Ordering::Relaxed)
 }
 
 /// A partly downloaded file, deleted when dropped unless kept.
-struct TempFile(Option<PathBuf>);
+pub(crate) struct TempFile(Option<PathBuf>);
 
 impl TempFile {
-    fn path(&self) -> &Path {
+    /// A hidden file in `dir`, named so no other download in this process,
+    /// or any other, takes the same name.
+    pub(crate) fn beside(dir: &Path) -> Self {
+        Self(Some(dir.join(format!(
+            ".download-{}-{}.part",
+            std::process::id(),
+            next_temp_id()
+        ))))
+    }
+
+    pub(crate) fn path(&self) -> &Path {
         self.0.as_deref().expect("not yet kept")
     }
 
@@ -721,14 +1095,14 @@ impl Drop for TempFile {
 
 /// Hands out file paths, so two jobs in one run can't both claim a name.
 #[derive(Default)]
-struct PathReserver {
+pub(crate) struct PathReserver {
     taken: Mutex<HashSet<PathBuf>>,
 }
 
 impl PathReserver {
     /// `dir/stem.ext`, or with `overwrite` off, the first of `stem (1).ext`,
     /// `stem (2).ext`… that's neither on disk nor handed out already.
-    fn reserve(&self, dir: &Path, stem: &str, extension: &str, overwrite: bool) -> PathBuf {
+    pub(crate) fn reserve(&self, dir: &Path, stem: &str, extension: &str, overwrite: bool) -> PathBuf {
         let mut taken = self.taken.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let first = dir.join(format!("{stem}.{extension}"));
         if overwrite {

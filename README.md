@@ -1,7 +1,7 @@
 # MTG Art Downloader
 
-Download Magic: The Gathering card art in bulk. Paste a deck list, run a Scryfall search, or pick an
-EDHREC top list, and the app saves each card's art — from [MTGPics](https://www.mtgpics.com) where
+Download Magic: The Gathering card art in bulk. Paste a deck list, run a Scryfall search, pick an
+EDHREC top list or a preconstructed deck, and the app saves each card's art — from [MTGPics](https://www.mtgpics.com) where
 it has it, since its art is larger and uncropped, and from [Scryfall](https://scryfall.com)
 otherwise.
 
@@ -47,14 +47,47 @@ many first.
 
 **Presets.** EDHREC's lists of the most-played Commander cards.
 
+**Decks.** Every preconstructed deck [MTGJSON](https://mtgjson.com) lists — Commander decks, Secret
+Lair drops, theme decks, Jumpstart packs and the rest — newest first, with a picture of its box
+where TCGplayer has one. Search them in Scryfall's words: `set:eoc`, `type:commander`,
+`name:abzan`, `year>=2024`, `date<2020-06`, bare words for the deck's or its set's name, and `-`
+before any of them to leave out what it matches. Downloading a deck saves the exact printings in
+the box, its commander first.
+
 Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and by default go in
-`mtgpics/` and `scryfall/` folders, with a folder for each layout: `MDFC Front` and `MDFC Back`,
-`Adventure`, `Saga`, `Basic`. A double-faced card is saved as one image per face. When a run ends,
-**Retry failed** runs the cards that failed again, and **Copy failed** copies them as a list.
+`mtgpics/` and `scryfall/` folders (and `web/` for copies you find), with a folder for each layout:
+`MDFC Front` and `MDFC Back`, `Adventure`, `Saga`, `Basic`. A double-faced card is saved as one
+image per face, and so is a split card such as Fire // Ice or Cut // Ribbons when MTGPics has a
+painting for each half; otherwise, as for Duskmourn's Rooms, whose image MTGPics has whole, it's one
+image of the whole card. When a run ends, **Retry failed** runs the cards that failed again, and
+**Copy failed** copies them as a list.
 
 With **A folder for each list** on, a card list's art goes in a folder of its own inside the save
 folder, named in the field under the list. Opening a list file fills that field in with the file's
-name; leave it empty to save in the save folder itself.
+name; leave it empty to save in the save folder itself. The Decks tab has the same field, which
+picking a deck fills in with the deck's name.
+
+**Find a larger copy.** Scryfall's art is small. Next to each image that came from Scryfall, six
+buttons open a window of the app's own to look for a bigger one: Google Lens, searching for that
+art; a search for the card's artist on ArtStation, DeviantArt or Pixiv, or on Instagram through
+Google; and the artist's own website, when their MTGPics page links one (most don't). Find the
+largest copy you can, open it, and choose **Save image**. The app checks it's the same art and
+larger than Scryfall's, then saves it in place of Scryfall's file, in a `web/` folder, marked
+**Found** in the results with a link to the page it came from. If it doesn't look like a larger copy
+of the art (a card scan, a smaller copy, or another painting), the app asks before saving it. Every
+later download of that art gets your copy.
+
+Replaced an image by mistake? Right-click its card in the results to save its art again from another
+place it's known to be: MTGPics (if an earlier download found it there), Scryfall, or any copy you
+found, listed with its site and size. The app keeps only where each one is, and downloads it again
+when you go back to it. Later downloads of the card use the one you chose last.
+
+Some sites, Instagram among them, cover their images so they can't be saved. On those, open the post
+and choose **Find the art on this page** from the window's menu: the app downloads the images the
+page has and shows them in its main window, each with its size and whether it looks like the art,
+and saves the one you choose. It reads the page only when you ask, and only its images. You can
+sign in to a site in that window; **Sign out of sites** forgets it. Whatever you save or ask about, a note in the window's corner says what came of it: saved, too
+small, a card scan, or not the art.
 
 ### Settings
 
@@ -66,6 +99,7 @@ name; leave it empty to save in the save folder itself.
 | File names                | `NAME (ARTIST) [SET] {NUMBER}` |                                                    |
 | Where art comes from      | MTGPics, then Scryfall         | or MTGPics only, or Scryfall only                  |
 | Scryfall image            | Art crop                       | or the full card scan, as a PNG                    |
+| Search MTGPics' art too   | Off                            | the Find a larger copy buttons beside MTGPics' art |
 | Printing                  | Newest                         | for lines with only a name                         |
 | Every printing's art      | Off                            | for lines with only a name                         |
 | One printing per artwork  | On                             | skip reprints that reuse an art                    |
@@ -86,6 +120,7 @@ The settings live in `settings.json` in the app's config folder
 mtg-art cards.txt                       # a card list file
 mtg-art --search "set:mh2 t:creature"   # a Scryfall search
 mtg-art --preset edhrec-top-year        # a preset; --presets lists them
+mtg-art --deck AbzanArmor_TDC           # a precon, by its file's name on MTGJSON
 mtg-art cards.txt --out ./art           # somewhere other than the settings' folder
 mtg-art cards.txt --folder "Atraxa"     # in an Atraxa folder inside it
 ```
@@ -123,6 +158,16 @@ Every printing whose art is saved is logged, with where on MTGPics each face's a
 downloaded from there without searching MTGPics again; only if the image is gone from that address
 is MTGPics searched afresh. A face MTGPics had no art for is looked for again after 30 days, in case
 it has been added.
+
+An image you save in that window is checked against Scryfall's art crop: the crop has to be found
+inside it, at any size, and it has to be at least 10% wider than the crop. A match that covers too
+little of the image, where the picture stops at the match's edges as at a card's frame, is a card
+scan. Where you saved it from is logged by artwork, so every printing of the art is saved from
+there, before MTGPics is asked; if the image is gone from there, it's forgotten. The app opens the
+page and listens for what you save; it doesn't search or click for you, and reads a page only when
+you choose **Find the art on this page**, and then only its images. A website is the one the
+artist's MTGPics page links, kept for a month. Pixiv's artist search needs an account, so its button
+searches Pixiv for the artist's name instead.
 
 ## Development
 

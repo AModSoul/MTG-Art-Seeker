@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   Code,
   Container,
   Heading,
@@ -11,6 +10,7 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
+import { LinkButton } from "@mtg-art/ui/link-button";
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router";
 import type { IconType } from "react-icons";
 import {
@@ -78,16 +78,20 @@ function Home() {
             line tool.
           </Text>
           <HStack gap={3} wrap="wrap" justify="center">
-            <Button asChild colorPalette="blue" size="lg">
+            <LinkButton asChild colorPalette="blue" size="lg">
               <RouterLink to="/download">
                 <LuDownload /> Download
               </RouterLink>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer">
-                View on GitHub
-              </a>
-            </Button>
+            </LinkButton>
+            <LinkButton
+              href={GITHUB_REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              variant="outline"
+              size="lg"
+            >
+              View on GitHub
+            </LinkButton>
           </HStack>
         </Stack>
       </Container>

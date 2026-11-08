@@ -11,9 +11,10 @@ import {
 } from "@chakra-ui/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
-import { LuDownload, LuFileText, LuFolderOpen, LuSquare } from "react-icons/lu";
+import { LuDownload, LuFileText, LuFolderOpen, LuSquare, LuX } from "react-icons/lu";
 
 import { api } from "@/api";
+import { DeckPicker } from "@/components/DeckPicker";
 import type { ListFile } from "@/bindings/ListFile";
 import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
@@ -37,6 +38,7 @@ const TABS: Option<InputTab>[] = [
   { value: "list", label: "Card list" },
   { value: "search", label: "Search" },
   { value: "preset", label: "Presets" },
+  { value: "deck", label: "Decks" },
 ];
 
 const LIST_PLACEHOLDER = `Paste a card list, one card per line:
@@ -47,7 +49,7 @@ Karn, Scion of Urza (DOM) 1
 1 Sol Ring (C21) 263 *F*`;
 
 export function InputPanel() {
-  const { tab, text, folder, query, presetId, setInput } = useInput();
+  const { tab, text, folder, query, presetId, deck, deckFolder, setInput } = useInput();
   const running = useRun((state) => state.running);
   const parsed = useParsedList(text);
 
@@ -60,9 +62,13 @@ export function InputPanel() {
         ? query.trim()
           ? { kind: "search", query: query.trim() }
           : null
-        : presetId
-          ? { kind: "preset", id: presetId }
-          : null;
+        : tab === "preset"
+          ? presetId
+            ? { kind: "preset", id: presetId }
+            : null
+          : deck
+            ? { kind: "deck", fileName: deck.fileName, folder: deckFolder }
+            : null;
 
   return (
     <Flex direction="column" h="full" p="5" gap="4">
@@ -81,7 +87,7 @@ export function InputPanel() {
       >
         <Tabs.List>
           {TABS.map((option) => (
-            <Tabs.Trigger key={option.value} value={option.value}>
+            <Tabs.Trigger key={option.value} value={option.value} whiteSpace="nowrap">
               {option.label}
             </Tabs.Trigger>
           ))}
@@ -94,13 +100,29 @@ export function InputPanel() {
             onChange={(value) => setInput({ text: value })}
             onOpen={(file) => setInput({ text: file.text, folder: file.name })}
           />
-          <ListFolder folder={folder} onChange={(value) => setInput({ folder: value })} />
+          <SubFolder
+            label="Folder for this list"
+            placeholder="Atraxa deck"
+            folder={folder}
+            onChange={(value) => setInput({ folder: value })}
+          />
         </Tabs.Content>
         <Tabs.Content value="search">
           <SearchInput query={query} onChange={(value) => setInput({ query: value })} />
         </Tabs.Content>
         <Tabs.Content value="preset">
           <PresetInput presetId={presetId} onChange={(value) => setInput({ presetId: value })} />
+        </Tabs.Content>
+        <Tabs.Content value="deck" flex="1" display="flex" flexDirection="column" gap="2" minH="0">
+          <DeckPicker />
+          {deck && (
+            <SubFolder
+              label="Folder for this deck"
+              placeholder={deck.name}
+              folder={deckFolder}
+              onChange={(value) => setInput({ deckFolder: value })}
+            />
+          )}
         </Tabs.Content>
       </Tabs.Root>
 
@@ -111,7 +133,11 @@ export function InputPanel() {
           <LuSquare /> Cancel
         </Button>
       ) : (
-        <Button colorPalette="blue" disabled={!input} onClick={() => input && void startRun(input)}>
+        <Button
+          colorPalette="emerald"
+          disabled={!input}
+          onClick={() => input && void startRun(input)}
+        >
           <LuDownload /> Download art
         </Button>
       )}
@@ -152,6 +178,7 @@ function ListInput({
         value={text}
         onChange={(event) => onChange(event.target.value)}
         placeholder={LIST_PLACEHOLDER}
+        aria-label="Card list"
         fontFamily="mono"
         fontSize="sm"
         flex="1"
@@ -160,9 +187,16 @@ function ListInput({
         spellCheck={false}
       />
       <HStack justify="space-between">
-        <Text fontSize="sm" color="fg.muted">
-          {listSummary(parsed)}
-        </Text>
+        <HStack gap="2">
+          <Text fontSize="sm" color="fg.muted">
+            {listSummary(parsed)}
+          </Text>
+          {text && (
+            <Button size="xs" variant="ghost" onClick={() => onChange("")}>
+              <LuX /> Clear
+            </Button>
+          )}
+        </HStack>
         <Button size="xs" variant="outline" onClick={() => void openList()}>
           <LuFileText /> Open file…
         </Button>
@@ -171,20 +205,30 @@ function ListInput({
   );
 }
 
-/** The folder a list's art goes in, shown when the setting for it is on. */
-function ListFolder({ folder, onChange }: { folder: string; onChange: (folder: string) => void }) {
+/** The folder a list's or deck's art goes in, shown when the setting for it is on. */
+function SubFolder({
+  label,
+  placeholder,
+  folder,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  folder: string;
+  onChange: (folder: string) => void;
+}) {
   const listFolders = useSettings((state) => state.settings?.listFolders);
   if (!listFolders) return null;
 
   return (
     <Field
-      label="Folder for this list"
+      label={label}
       helperText="Inside the folder below. Leave it empty to save there directly."
     >
       <Input
         value={folder}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Atraxa deck"
+        placeholder={placeholder}
         size="sm"
         spellCheck={false}
       />
@@ -278,9 +322,11 @@ function OutputFolder() {
         Saving to
       </Text>
       <HStack gap="2">
-        <Text fontSize="sm" truncate flex="1" title={outputDir}>
-          {outputDir}
-        </Text>
+        <Tooltip content={outputDir}>
+          <Text fontSize="sm" truncate flex="1">
+            {outputDir}
+          </Text>
+        </Tooltip>
         <Tooltip content="Choose a folder">
           <IconButton
             size="xs"
