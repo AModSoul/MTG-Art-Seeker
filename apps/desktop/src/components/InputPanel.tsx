@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
-import { LuDownload, LuFileText, LuFolderOpen, LuSquare } from "react-icons/lu";
+import { LuDownload, LuFileText, LuFolderOpen, LuSquare, LuX } from "react-icons/lu";
 
 import { api } from "@/api";
 import type { ListFile } from "@/bindings/ListFile";
@@ -164,9 +164,16 @@ function ListInput({
         spellCheck={false}
       />
       <HStack justify="space-between">
-        <Text fontSize="sm" color="fg.muted">
-          {listSummary(parsed)}
-        </Text>
+        <HStack gap="2">
+          <Text fontSize="sm" color="fg.muted">
+            {listSummary(parsed)}
+          </Text>
+          {text && (
+            <Button size="xs" variant="ghost" onClick={() => onChange("")}>
+              <LuX /> Clear
+            </Button>
+          )}
+        </HStack>
         <Button size="xs" variant="outline" onClick={() => void openList()}>
           <LuFileText /> Open file…
         </Button>

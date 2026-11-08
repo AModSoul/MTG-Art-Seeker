@@ -66,6 +66,21 @@ export const CardList: Story = {
   },
 };
 
+/** "Clear" empties the list; with nothing in it, there's nothing to clear. */
+export const ClearList: Story = {
+  beforeEach: () => {
+    useInput.setState({ text: LIST });
+  },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("textbox")).toHaveValue(LIST);
+    await userEvent.click(canvas.getByRole("button", { name: "Clear" }));
+    await expect(canvas.getByRole("textbox")).toHaveValue("");
+    await expect(useInput.getState().text).toBe("");
+    await expect(await canvas.findByText("No cards yet")).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+  },
+};
+
 /** "Open file…" reads the chosen list through the Rust side, and names its folder after the file. */
 export const OpenListFile: Story = {
   beforeEach: () => {
