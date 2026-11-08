@@ -10,6 +10,14 @@ import { allDecks } from "../src/__fixtures__/decks.ts";
 import { cardData, presets } from "../src/__fixtures__/run.ts";
 import { defaultSettings } from "../src/__fixtures__/settings.ts";
 import { api } from "../src/api.ts";
+import {
+  closeWindow,
+  isWindowMaximized,
+  minimizeWindow,
+  onWindowResized,
+  toggleMaximizeWindow,
+  windowFrame,
+} from "../src/appWindow.ts";
 import { useInput, useRun, useSettings } from "../src/store.ts";
 
 // Storybook has no Tauri backend, so every module that reaches it is mocked.
@@ -17,7 +25,9 @@ import { useInput, useRun, useSettings } from "../src/store.ts";
 // Rust side answered, and a story overrides them with `mocked(api.x)` in its
 // `beforeEach`.
 sb.mock(import("../src/api.ts"));
+sb.mock(import("../src/appWindow.ts"));
 sb.mock(import("@tauri-apps/api/core"));
+sb.mock(import("@tauri-apps/api/window"));
 sb.mock(import("@tauri-apps/plugin-dialog"));
 sb.mock(import("@tauri-apps/plugin-process"));
 sb.mock(import("@tauri-apps/plugin-updater"));
@@ -57,6 +67,13 @@ const preview: Preview = {
     mocked(open).mockResolvedValue(null);
     mocked(check).mockResolvedValue(null);
     mocked(relaunch).mockResolvedValue();
+    // The window as on Windows: the app's own title bar, not maximized.
+    mocked(windowFrame).mockReturnValue("custom");
+    mocked(minimizeWindow).mockResolvedValue();
+    mocked(toggleMaximizeWindow).mockResolvedValue();
+    mocked(closeWindow).mockResolvedValue();
+    mocked(isWindowMaximized).mockResolvedValue(false);
+    mocked(onWindowResized).mockResolvedValue(() => {});
 
     // Every story starts from the app's initial state, with settings loaded
     // and no toasts left over from the story before.

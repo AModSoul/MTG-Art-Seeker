@@ -46,8 +46,9 @@ export function UpdateOffer({ update }: { update: AvailableUpdate }) {
   }
 
   return (
+    // As small as the header's other buttons.
     <Button
-      size="sm"
+      size="2xs"
       variant="subtle"
       loading={installing}
       loadingText="Updating…"

@@ -17,10 +17,12 @@ async function openDiscord() {
 export function DiscordButton() {
   return (
     <Tooltip content="Join the Proxy Community Discord">
+      {/* As small as the header's other buttons. */}
       <IconButton
         variant="ghost"
-        size="sm"
+        size="2xs"
         aria-label="Join the Proxy Community Discord"
+        _icon={{ boxSize: "4" }}
         onClick={() => void openDiscord()}
       >
         <RiDiscordFill />
