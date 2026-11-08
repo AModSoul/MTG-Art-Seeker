@@ -6,7 +6,7 @@ import { ProgressBar, ProgressLabel, ProgressRoot, ProgressValueText } from "./p
 
 const meta = {
   component: ProgressRoot,
-  args: { value: 4, max: 7, size: "sm", colorPalette: "blue" },
+  args: { value: 4, max: 7, size: "sm" },
   render: (args) => (
     <ProgressRoot {...args} maxW="md">
       <HStack justify="space-between" mb="1">

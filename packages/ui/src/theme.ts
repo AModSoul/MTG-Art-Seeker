@@ -1,11 +1,21 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 
+import { button } from "./recipes/button.recipe";
+import { progress } from "./recipes/progress.recipe";
+import { radioCard } from "./recipes/radio-card.recipe";
+import { radioGroup } from "./recipes/radio-group.recipe";
+import { segmentGroup } from "./recipes/segment-group.recipe";
+import { switchRecipe } from "./recipes/switch.recipe";
+import { tabs } from "./recipes/tabs.recipe";
+import { toast } from "./recipes/toast.recipe";
+
 /** Chakra's own fallbacks, for the moment before Inter loads. */
 const FALLBACK_FONTS = `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`;
 
 /**
- * The app's Chakra system. Tokens, semantic tokens, recipes and slot recipes go in this config;
- * run `npm run typegen` after changing it so their props are typed.
+ * The app's Chakra system. Tokens and semantic tokens go in this config; recipes and slot recipes
+ * live in `./recipes`, one file each, and only add to Chakra's own. Run
+ * `pnpm --filter @mtg-art/ui typegen` after changing any of them so their props are typed.
  */
 const config = defineConfig({
   theme: {
@@ -18,7 +28,7 @@ const config = defineConfig({
         body: { value: `"Inter Variable", ${FALLBACK_FONTS}` },
       },
       colors: {
-        // The download button and progress bar: emerald, #50C878, at 500.
+        // The default accent (see `./recipes`): emerald, #50C878, at 500.
         emerald: {
           50: { value: "#EDFAF2" },
           100: { value: "#D3F3E0" },
@@ -56,18 +66,15 @@ const config = defineConfig({
         },
       },
     },
+    recipes: { button },
     slotRecipes: {
-      toast: {
-        // Chakra's own toast's parts, which this only adds to.
-        slots: defaultConfig.theme?.slotRecipes?.toast?.slots ?? [],
-        base: {
-          root: {
-            // An error toast's text is faded to 80%, which on Chakra's red.600 is under
-            // 4.5:1; on red.700 it reads. Dark mode keeps Chakra's.
-            "&[data-type=error]": { bg: { _light: "red.700", _dark: "red.solid" } },
-          },
-        },
-      },
+      toast,
+      switch: switchRecipe,
+      radioGroup,
+      radioCard,
+      segmentGroup,
+      progress,
+      tabs,
     },
   },
 });

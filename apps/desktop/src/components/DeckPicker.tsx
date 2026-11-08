@@ -67,7 +67,6 @@ export function DeckPicker() {
               }}
               orientation="vertical"
               size="sm"
-              colorPalette="emerald"
             >
               <RadioCardLabel srOnly>Precon decks</RadioCardLabel>
               <SimpleGrid columns={2} gap="2">
