@@ -5,8 +5,8 @@
 // A run is recorded once by `crates/core/examples/record.rs` into target/screenshots, really
 // downloading the art; `--record` records again. Then the app's front end is served with
 // `api.ts` and `tauri.ts` in place of Tauri, fed the recording, and each scene is shot in
-// headless Chromium at 1200 × 800 and 150%, as on a Windows laptop. Name scenes to take only
-// those.
+// headless Chromium at the app window's default size, 1340 × 800, and 150%, as on a Windows
+// laptop. Name scenes to take only those.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -162,7 +162,7 @@ try {
   for (const scene of scenes) {
     for (const scheme of scene.schemes) {
       const page = await browser.newPage({
-        viewport: { width: 1200, height: 800 },
+        viewport: { width: 1340, height: 800 },
         deviceScaleFactor: 1.5,
         colorScheme: scheme,
       });
