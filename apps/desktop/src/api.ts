@@ -3,13 +3,16 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 
+import type { ArtSource } from "@/bindings/ArtSource";
 import type { CardDataStatus } from "@/bindings/CardDataStatus";
+import type { KnownSource } from "@/bindings/KnownSource";
 import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { ListFile } from "@/bindings/ListFile";
 import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
 import type { RunEvent } from "@/bindings/RunEvent";
 import type { RunInput } from "@/bindings/RunInput";
+import type { SavedFile } from "@/bindings/SavedFile";
 import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 
@@ -29,6 +32,16 @@ export const api = {
 
   confirmFoundArt: (token: number, save: boolean) =>
     invoke<void>("confirm_found_art", { token, save }),
+  /** Saves image `index` of the page images named by `token`, or with `null`, none. */
+  choosePageImage: (token: number, index: number | null) =>
+    invoke<void>("choose_page_image", { token, index }),
+  /** Where a saved face's art is known to be: MTGPics, Scryfall, the copies the user found. */
+  artSources: (run: number, job: number, face: number) =>
+    invoke<KnownSource[]>("art_sources", { run, job, face }),
+  /** Saves a face's art again from `source` (for a found copy, the one `copy` names), in
+   * place of the file saved for it. */
+  saveArtFrom: (run: number, job: number, face: number, source: ArtSource, copy: number | null) =>
+    invoke<SavedFile>("save_art_from", { run, job, face, source, copy }),
   openFoundPage: (run: number, job: number, face: number) =>
     invoke<void>("open_found_page", { run, job, face }),
 

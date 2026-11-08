@@ -28,18 +28,31 @@ import { SiArtstation, SiDeviantart, SiGooglelens, SiInstagram, SiPixiv } from "
 import { api } from "@/api";
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { JobStatus } from "@/bindings/JobStatus";
+import type { KnownSource } from "@/bindings/KnownSource";
 import type { SavedFile } from "@/bindings/SavedFile";
 import type { Site } from "@/bindings/Site";
 import { Alert } from "@mtg-art/ui/alert";
 import { EmptyState } from "@mtg-art/ui/empty-state";
+import {
+  MenuContent,
+  MenuContextTrigger,
+  MenuItem,
+  MenuItemGroup,
+  MenuRoot,
+  MenuSeparator,
+} from "@mtg-art/ui/menu";
 import { ProgressBar, ProgressLabel, ProgressRoot } from "@mtg-art/ui/progress";
 import { SegmentedControl } from "@mtg-art/ui/segmented-control";
 import { Tooltip } from "@mtg-art/ui/tooltip";
 import { showError, showSuccess } from "@/notify";
 import {
+  artSources,
   findLargerCopy,
   type JobView,
   openFoundPage,
+  knownSourceName,
+  saveArtFrom,
+  SITE_NAMES,
   startRun,
   useRun,
   useSettings,
@@ -197,27 +210,35 @@ export function RunView() {
 /** The height of a saved image's line, the same under Resolution and Saved. */
 const FILE_LINE = "6";
 
+/** A face's line on a card with more than one image: twice as tall, with room
+ * for the face's own thumbnail beside it. */
+const FACE_LINE = "12";
+
 const JobRow = memo(function JobRow({ job }: { job: JobView }) {
   const { status } = job;
   const files = status.state === "done" ? status.files : [];
-  const first = files[0];
+  const line = files.length > 1 ? FACE_LINE : FILE_LINE;
 
-  return (
+  const row = (
     <Table.Row>
       <Table.Cell>
-        {first && (
-          <Image
-            src={convertFileSrc(first.path)}
-            alt=""
-            w="16"
-            h="12"
-            objectFit="cover"
-            rounded="sm"
-            loading="lazy"
-            cursor="pointer"
-            onClick={() => void api.revealFile(first.path)}
-          />
-        )}
+        {/* A thumbnail per face, level with its lines; one card shows its only one. */}
+        <Stack gap="1">
+          {files.map((file) => (
+            <Image
+              key={file.path}
+              src={convertFileSrc(file.path)}
+              alt=""
+              w="16"
+              h="12"
+              objectFit="cover"
+              rounded="sm"
+              loading="lazy"
+              cursor="pointer"
+              onClick={() => void api.revealFile(file.path)}
+            />
+          ))}
+        </Stack>
       </Table.Cell>
       <Table.Cell>
         <Text fontWeight="medium">{job.label}</Text>
@@ -239,7 +260,7 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
         {/* One line per saved image, level with its line under Saved. */}
         <Stack gap="1">
           {files.map((file) => (
-            <Flex key={file.path} h={FILE_LINE} align="center" title="Width × height, in pixels">
+            <Flex key={file.path} h={line} align="center" title="Width × height, in pixels">
               <Text fontSize="sm" color="fg.muted" fontVariantNumeric="tabular-nums">
                 {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
               </Text>
@@ -250,13 +271,13 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
       <Table.Cell>
         <Stack gap="1">
           {files.map((file) => (
-            <HStack key={file.path} h={FILE_LINE} gap="1">
+            <HStack key={file.path} h={line} gap="1">
               <HStack
                 flex="1"
                 minW="0"
                 gap="2"
                 cursor="pointer"
-                title={`${file.path}\nClick to show it in its folder`}
+                title={`${file.path}\nClick to show it in its folder, or right-click the row for its other sources`}
                 onClick={() => void api.revealFile(file.path)}
               >
                 <SourceBadge source={file.source} />
@@ -271,7 +292,101 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
       </Table.Cell>
     </Table.Row>
   );
+  // A row with saved art opens its menu anywhere on it.
+  return files.length > 0 ? (
+    <RowMenu job={job.id} files={files}>
+      {row}
+    </RowMenu>
+  ) : (
+    row
+  );
 });
+
+/** What a choice in a row's menu does. */
+type RowAction =
+  | { kind: "reveal"; file: SavedFile }
+  | { kind: "use"; file: SavedFile; known: KnownSource };
+
+/** A row's right-click menu: for each saved image, the places its art is known
+ * to be, to save it again from one, and a way to show it in its folder. */
+function RowMenu({
+  job,
+  files,
+  children,
+}: {
+  job: number;
+  files: SavedFile[];
+  children: React.ReactNode;
+}) {
+  // Per file, where its art is known to be; `null` while they're asked for.
+  const [known, setKnown] = useState<KnownSource[][] | null>(null);
+  const actions = new Map<string, RowAction>();
+
+  async function load() {
+    setKnown(null);
+    setKnown(await Promise.all(files.map((file) => artSources(job, file.faceIndex))));
+  }
+
+  const groups = files.map((file, position) => {
+    const reveal = `${file.faceIndex}:reveal`;
+    actions.set(reveal, { kind: "reveal", file });
+    const sources = known?.[position];
+    return (
+      <MenuItemGroup
+        key={file.faceIndex}
+        title={files.length > 1 ? `${file.face}: use the art from` : "Use the art from"}
+      >
+        {sources === undefined ? (
+          <MenuItem value={`${file.faceIndex}:loading`} disabled>
+            <Spinner size="xs" /> Looking…
+          </MenuItem>
+        ) : (
+          sources.map((source, index) => {
+            const value = `${file.faceIndex}:${index}`;
+            actions.set(value, { kind: "use", file, known: source });
+            return (
+              <MenuItem key={value} value={value} disabled={source.current}>
+                <Stack gap="0">
+                  <Text>
+                    {knownSourceName(source)}
+                    {source.size && ` · ${source.size.width} × ${source.size.height}`}
+                    {source.current && " (saved now)"}
+                  </Text>
+                  {source.site && (
+                    <Text fontSize="xs" color="fg.muted">
+                      Found from {SITE_NAMES[source.site]}
+                    </Text>
+                  )}
+                </Stack>
+              </MenuItem>
+            );
+          })
+        )}
+        <MenuItem value={reveal}>Show in folder</MenuItem>
+      </MenuItemGroup>
+    );
+  });
+
+  return (
+    <MenuRoot
+      onOpenChange={(event) => {
+        if (event.open) void load();
+      }}
+      onSelect={(event) => {
+        const action = actions.get(event.value);
+        if (action?.kind === "reveal") void api.revealFile(action.file.path);
+        if (action?.kind === "use") void saveArtFrom(job, action.file.faceIndex, action.known);
+      }}
+    >
+      <MenuContextTrigger asChild>{children}</MenuContextTrigger>
+      <MenuContent>
+        {groups.flatMap((group, index) =>
+          index === 0 ? [group] : [<MenuSeparator key={`separator-${index}`} />, group],
+        )}
+      </MenuContent>
+    </MenuRoot>
+  );
+}
 
 /** The places a larger copy of Scryfall's art can be looked for, by logo. */
 const SITES: { site: Site; icon: IconType; tip: (file: SavedFile) => string }[] = [

@@ -3,13 +3,16 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { api } from "@/api";
-import { toaster } from "@/components/ui/toaster";
+import { toaster } from "@mtg-art/ui/toaster";
+import type { ArtSource } from "@/bindings/ArtSource";
 import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { JobInfo } from "@/bindings/JobInfo";
+import type { KnownSource } from "@/bindings/KnownSource";
 import type { JobStatus } from "@/bindings/JobStatus";
 import type { RunEvent } from "@/bindings/RunEvent";
 import type { RunInput } from "@/bindings/RunInput";
 import type { RunSummary } from "@/bindings/RunSummary";
+import type { SavedFile } from "@/bindings/SavedFile";
 import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
@@ -94,6 +97,10 @@ export type JobView = JobInfo & { status: JobStatus };
  * copy of the art, waiting for them to say whether to save it anyway. */
 export type FoundDoubt = Extract<FoundEvent, { event: "doubtful" }>;
 
+/** The images of a page the user asked to find the art on, for them to choose
+ * from. */
+export type PageImages = Extract<FoundEvent, { event: "choose" }>;
+
 interface RunState {
   runId: number | null;
   running: boolean;
@@ -107,6 +114,8 @@ interface RunState {
   listFolder: string | undefined;
   /** Found images waiting on the user, oldest first. They outlast a run. */
   doubts: FoundDoubt[];
+  /** A page's images, while the user chooses one. They outlast a run. */
+  pageImages: PageImages | null;
 }
 
 const idle: RunState = {
@@ -119,6 +128,7 @@ const idle: RunState = {
   folder: null,
   listFolder: undefined,
   doubts: [],
+  pageImages: null,
 };
 
 export const useRun = create<RunState>()(() => idle);
@@ -171,6 +181,7 @@ export async function startRun(input: RunInput) {
     running: true,
     listFolder: input.kind === "list" ? input.folder : undefined,
     doubts: state.doubts,
+    pageImages: state.pageImages,
   }));
 
   let queue: RunEvent[] = [];
@@ -222,6 +233,72 @@ export async function openFoundPage(job: number, face: number) {
   }
 }
 
+/** Where face `face` of job `job` is known to have art; empty if that can't be told. */
+export async function artSources(job: number, face: number): Promise<KnownSource[]> {
+  const { runId } = useRun.getState();
+  if (runId === null) return [];
+  try {
+    return await api.artSources(runId, job, face);
+  } catch (error) {
+    showError("Couldn't tell where the art is", error);
+    return [];
+  }
+}
+
+/** What each source is called where the user picks one. */
+const SOURCE_NAMES: Record<ArtSource, string> = {
+  mtgpics: "MTGPics",
+  scryfall: "Scryfall",
+  web: "a copy you found",
+};
+
+/** The sites a copy was found from, by name. */
+export const SITE_NAMES: Record<Site, string> = {
+  lens: "Google Lens",
+  artstation: "ArtStation",
+  deviantart: "DeviantArt",
+  pixiv: "Pixiv",
+  instagram: "Instagram",
+  website: "the artist's website",
+};
+
+/** Where `known` is, in a few words: MTGPics, Scryfall, or the site a copy was on. */
+export function knownSourceName(known: KnownSource): string {
+  if (known.source !== "web") return SOURCE_NAMES[known.source];
+  return known.host ?? (known.site ? SITE_NAMES[known.site] : SOURCE_NAMES.web);
+}
+
+/** Saves face `face` of job `job` again from `known`, in place of its file. */
+export async function saveArtFrom(job: number, face: number, known: KnownSource) {
+  const { runId } = useRun.getState();
+  if (runId === null) return;
+  const toast = `source-${job}-${face}`;
+  const name = knownSourceName(known);
+  showLoading(`Saving the art from ${name}…`, toast);
+  try {
+    const file = await api.saveArtFrom(runId, job, face, known.source, known.copy);
+    replaceFile(runId, job, file);
+    showSuccess(`Saved ${file.face}'s art from ${name}`, toast);
+  } catch (error) {
+    showError("Couldn't save the art", error, toast);
+  }
+}
+
+/** Puts `file` in its face's place among job `job`'s files, if run `run` is still shown. */
+function replaceFile(run: number, job: number, file: SavedFile) {
+  useRun.setState((state) => {
+    const shown = state.jobs[job - 1];
+    if (state.runId !== run || !shown || shown.status.state !== "done") return {};
+    const files = shown.status.files
+      .filter((other) => other.faceIndex !== file.faceIndex)
+      .concat(file)
+      .toSorted((a, b) => a.faceIndex - b.faceIndex);
+    const jobs = state.jobs.slice();
+    jobs[job - 1] = { ...shown, status: { ...shown.status, files } };
+    return { jobs };
+  });
+}
+
 /** Answers the oldest waiting image: saves it anyway, or throws it away. */
 export async function answerDoubt(save: boolean) {
   const [first, ...rest] = useRun.getState().doubts;
@@ -234,6 +311,19 @@ export async function answerDoubt(save: boolean) {
   }
 }
 
+/** Saves image `index` of the page's images as the art, or with `null`, none. */
+export async function choosePageImage(index: number | null) {
+  const { pageImages } = useRun.getState();
+  if (!pageImages) return;
+  useRun.setState({ pageImages: null });
+  if (index !== null) showLoading(`Saving ${pageImages.face}'s art…`, FOUND_TOAST);
+  try {
+    await api.choosePageImage(pageImages.token, index);
+  } catch (error) {
+    showError("Couldn't save the image", error, FOUND_TOAST);
+  }
+}
+
 /** The toast that says what the finder window's images came to: one at a time,
  * a spinner while they're checked and then the result. */
 const FOUND_TOAST = "found";
@@ -243,24 +333,13 @@ function onFound(event: FoundEvent) {
     case "checking":
       showLoading(
         event.page
-          ? `Looking for ${event.face}'s art on the page…`
+          ? "Downloading the images on the page…"
           : `Checking the image you saved for ${event.face}…`,
         FOUND_TOAST,
       );
       break;
     case "saved":
-      useRun.setState((state) => {
-        const job = state.jobs[event.job - 1];
-        if (state.runId !== event.run || !job || job.status.state !== "done") return {};
-        // The found image takes its face's place in the job's files.
-        const files = job.status.files
-          .filter((file) => file.faceIndex !== event.file.faceIndex)
-          .concat(event.file)
-          .toSorted((a, b) => a.faceIndex - b.faceIndex);
-        const jobs = state.jobs.slice();
-        jobs[event.job - 1] = { ...job, status: { ...job.status, files } };
-        return { jobs };
-      });
+      replaceFile(event.run, event.job, event.file);
       showSuccess(`Saved the larger copy of ${event.file.face}`, FOUND_TOAST);
       break;
     case "doubtful":
@@ -268,12 +347,15 @@ function onFound(event: FoundEvent) {
       toaster.dismiss(FOUND_TOAST);
       useRun.setState((state) => ({ doubts: [...state.doubts, event] }));
       break;
-    case "noMatch":
+    case "choose":
+      // The dialog shows them; the spinner has nothing left to say.
+      toaster.dismiss(FOUND_TOAST);
+      useRun.setState({ pageImages: event });
+      break;
+    case "noImages":
       showInfo(
-        `None of the images on this page look like ${event.face}'s art`,
-        event.images === 0
-          ? "The page has no images large enough."
-          : `Looked at the ${event.images === 1 ? "one image" : `${event.images} largest images`} it has.`,
+        "No image on this page is large enough",
+        `None could be a larger copy of ${event.face}'s art.`,
         FOUND_TOAST,
       );
       break;

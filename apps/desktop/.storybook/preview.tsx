@@ -43,6 +43,11 @@ const preview: Preview = {
     mocked(api.startRun).mockResolvedValue(1);
     mocked(api.findLargerCopy).mockResolvedValue();
     mocked(api.confirmFoundArt).mockResolvedValue();
+    mocked(api.choosePageImage).mockResolvedValue();
+    mocked(api.artSources).mockResolvedValue([
+      { source: "scryfall", copy: null, site: null, host: null, size: null, current: true },
+    ]);
+    mocked(api.saveArtFrom).mockRejectedValue(new Error("No art in Storybook"));
     mocked(api.openFoundPage).mockResolvedValue();
     // Saved art lives on disk, which Storybook can't read; show a local stand-in.
     mocked(convertFileSrc).mockReturnValue(PLACEHOLDER_ART);

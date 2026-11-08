@@ -13,6 +13,7 @@ pub mod faces;
 pub mod history;
 pub mod http;
 pub mod imagesize;
+pub mod known;
 pub mod list;
 pub mod manual;
 pub mod mtgpics;

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { DiscordButton } from "@/components/DiscordButton";
 import { FoundArtDialog } from "@/components/FoundArtDialog";
 import { InputPanel } from "@/components/InputPanel";
+import { PageImagesDialog } from "@/components/PageImagesDialog";
 import { RunView } from "@/components/RunView";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { ColorModeButton } from "@mtg-art/ui/color-mode";
@@ -44,6 +45,7 @@ export function App() {
         </Center>
       )}
       <FoundArtDialog />
+      <PageImagesDialog />
     </Flex>
   );
 }

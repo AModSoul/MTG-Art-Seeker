@@ -12,6 +12,7 @@ import {
 } from "@/__fixtures__/run";
 import { defaultSettings } from "@/__fixtures__/settings";
 import { api } from "@/api";
+import type { KnownSource } from "@/bindings/KnownSource";
 import { useRun, useSettings } from "@/store";
 
 import { RunView } from "./RunView";
@@ -279,12 +280,12 @@ export const SavesAFoundCopy: Story = {
   },
 };
 
-/** Asked to find the art on a page, the app found none of it there. */
+/** Asked to find the art on a page, the app found no image there large enough. */
 export const NothingOnThePage: Story = {
   beforeEach: () => {
     useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
     mocked(api.findLargerCopy).mockImplementation(async (_run, _job, _face, _site, onEvent) => {
-      onEvent({ event: "noMatch", face: "Lightning Bolt", images: 4 });
+      onEvent({ event: "noImages", face: "Lightning Bolt" });
     });
   },
   play: async ({ canvas }) => {
@@ -292,11 +293,44 @@ export const NothingOnThePage: Story = {
       canvas.getByRole("button", { name: "Search Google Lens for this art, for Lightning Bolt" }),
     );
     await waitFor(() =>
-      expect(
-        screen.getByText("None of the images on this page look like Lightning Bolt's art"),
-      ).toBeVisible(),
+      expect(screen.getByText("No image on this page is large enough")).toBeVisible(),
     );
-    await expect(screen.getByText("Looked at the 4 largest images it has.")).toBeVisible();
+    await expect(
+      screen.getByText("None could be a larger copy of Lightning Bolt's art."),
+    ).toBeVisible();
+  },
+};
+
+/** Asked to find the art on a page, the app has its images to choose from. */
+export const ImagesOnThePage: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.findLargerCopy).mockImplementation(async (_run, _job, _face, _site, onEvent) => {
+      onEvent({ event: "checking", face: "Lightning Bolt", page: true });
+      onEvent({
+        event: "choose",
+        token: 9,
+        face: "Lightning Bolt",
+        images: [
+          {
+            path: "C:/cache/page-1.jpg",
+            size: { width: 2400, height: 1752 },
+            doubt: null,
+            host: "cdna.artstation.com",
+          },
+        ],
+      });
+    });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Search Google Lens for this art, for Lightning Bolt" }),
+    );
+    await waitFor(() => expect(useRun.getState().pageImages?.token).toBe(9));
+    // The dialog takes over from the spinner.
+    await waitFor(() =>
+      expect(screen.queryByText("Downloading the images on the page…")).not.toBeInTheDocument(),
+    );
   },
 };
 
@@ -323,6 +357,135 @@ export const FoundArt: Story = {
       canvas.getByRole("button", { name: "Open the page Lightning Bolt's art came from" }),
     );
     await expect(api.openFoundPage).toHaveBeenCalledWith(3, 2, 0);
+  },
+};
+
+/** Where Lightning Bolt's art is known to be, the found copy saved now. */
+const boltSources: KnownSource[] = [
+  {
+    source: "mtgpics",
+    copy: null,
+    site: null,
+    host: null,
+    size: { width: 1600, height: 1168 },
+    current: false,
+  },
+  {
+    source: "scryfall",
+    copy: null,
+    site: null,
+    host: null,
+    size: { width: 626, height: 457 },
+    current: false,
+  },
+  {
+    source: "web",
+    copy: 7,
+    site: "lens",
+    host: "artstation.com",
+    size: { width: 2400, height: 1752 },
+    current: true,
+  },
+  {
+    source: "web",
+    copy: 8,
+    site: "instagram",
+    host: "instagram.com",
+    size: { width: 1440, height: 1051 },
+    current: false,
+  },
+];
+
+/** A found copy replaced the art by mistake: a right-click anywhere on the row
+ * offers the other places its art is known to be, and saves it from one. */
+export const SaveArtFromAnotherSource: Story = {
+  beforeEach: () => {
+    useRun.setState({
+      runId: 3,
+      jobs: finishedJobs.map((job) =>
+        job.id === 2
+          ? { ...job, status: { state: "done", files: [foundBoltFile], missing: [] } }
+          : job,
+      ),
+      summary: finishedSummary,
+    });
+    mocked(api.artSources).mockResolvedValue(boltSources);
+    mocked(api.saveArtFrom).mockResolvedValue({
+      ...boltFile,
+      path: boltFile.path.replace("Scryfall", "MTGPics"),
+      source: "mtgpics",
+      size: { width: 1600, height: 1168 },
+    });
+  },
+  play: async ({ canvas }) => {
+    // The resolution cell, away from the file's own line.
+    await userEvent.pointer({ keys: "[MouseRight]", target: canvas.getByText("2400 × 1752") });
+    await expect(api.artSources).toHaveBeenCalledWith(3, 2, 0);
+    // Each with its size.
+    const mtgpics = await screen.findByRole("menuitem", { name: "MTGPics · 1600 × 1168" });
+    await waitFor(() => expect(mtgpics).toBeVisible());
+    await waitFor(() =>
+      expect(screen.getByRole("menuitem", { name: "Scryfall · 626 × 457" })).toBeVisible(),
+    );
+    // Each found copy, with its site, size and where it was found from; the
+    // one saved now can't be chosen again.
+    await expect(
+      screen.getByRole("menuitem", { name: /artstation\.com · 2400 × 1752 \(saved now\)/ }),
+    ).toHaveAttribute("aria-disabled", "true");
+    const instagram = screen.getByRole("menuitem", { name: /instagram\.com · 1440 × 1051/ });
+    await expect(instagram).toHaveTextContent("Found from Instagram");
+    await expect(instagram).not.toHaveAttribute("aria-disabled");
+
+    await userEvent.click(mtgpics);
+    await expect(api.saveArtFrom).toHaveBeenCalledWith(3, 2, 0, "mtgpics", null);
+    await waitFor(() =>
+      expect(screen.getByText("Saved Lightning Bolt's art from MTGPics")).toBeVisible(),
+    );
+    await expect(canvas.getByText("1600 × 1168")).toBeVisible();
+    await expect(canvas.queryByText("Found")).not.toBeInTheDocument();
+  },
+};
+
+/** A two-faced card's row offers each face's sources, under the face's name. */
+export const SourcesForEachFace: Story = {
+  beforeEach: () => {
+    const front = { ...boltFile, face: "Delver of Secrets", artist: "Matt Stewart" };
+    const back = {
+      ...front,
+      face: "Insectile Aberration",
+      faceIndex: 1,
+      path: `${boltFile.path}-back`,
+    };
+    useRun.setState({
+      runId: 3,
+      jobs: [
+        {
+          id: 1,
+          label: "Delver of Secrets",
+          line: "Delver of Secrets",
+          status: { state: "done", files: [front, back], missing: [] },
+        },
+      ],
+      summary: finishedSummary,
+    });
+    mocked(api.artSources).mockResolvedValue([
+      { source: "scryfall", copy: null, site: null, host: null, size: null, current: true },
+    ]);
+  },
+  play: async ({ canvas, canvasElement }) => {
+    // Each face has its own thumbnail and a line twice as tall as one card's.
+    await expect(canvasElement.querySelectorAll("img")).toHaveLength(2);
+    const sizes = canvas.getAllByTitle("Width × height, in pixels");
+    await expect(sizes).toHaveLength(2);
+    await expect(sizes[0]?.getBoundingClientRect().height).toBe(48);
+    await userEvent.pointer({ keys: "[MouseRight]", target: canvas.getByText("Done") });
+    await waitFor(() =>
+      expect(screen.getByText("Insectile Aberration: use the art from")).toBeVisible(),
+    );
+    await expect(screen.getByText("Delver of Secrets: use the art from")).toBeVisible();
+    await expect(api.artSources).toHaveBeenCalledWith(3, 1, 0);
+    await expect(api.artSources).toHaveBeenCalledWith(3, 1, 1);
+    await expect(screen.getAllByRole("menuitem", { name: "Show in folder" })).toHaveLength(2);
   },
 };
 

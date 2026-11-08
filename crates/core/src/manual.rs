@@ -14,16 +14,18 @@
 //! unless the user says to: a person picked it, but may have picked wrong.
 //!
 //! Some sites cover their images so they can't be saved. For those, the user
-//! asks the app to look at the page they have open, and [`import_from_page`]
-//! is handed the images the page lists: it tries them, largest first, and
-//! saves the one that is the art.
+//! asks the app to look at the page they have open, and [`fetch_page_images`]
+//! is handed the images the page lists: it downloads and checks them, and the
+//! user chooses which to save.
 
 use std::{
+    cmp::Reverse,
     collections::HashSet,
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use futures::{stream, StreamExt};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -34,8 +36,9 @@ use crate::{
     carddb::CardDb,
     engine::{face_dir, face_stem, output_dir_for, place, ArtSource, PathReserver, SavedFile, TempFile},
     faces::{plan_faces, FacePlan},
-    history::{FoundByHand, History, KnownWebsite},
+    history::{FoundByHand, FoundCopy, History, KnownWebsite},
     http::{Http, ImageKind},
+    imagesize::{image_size, ImageSize},
     mtgpics::{self, Artists},
     scryfall::{self, Identifier},
     settings::Settings,
@@ -157,6 +160,32 @@ pub enum Site {
 }
 
 impl Site {
+    const ALL: [Self; 6] = [
+        Self::Lens,
+        Self::Artstation,
+        Self::Deviantart,
+        Self::Pixiv,
+        Self::Instagram,
+        Self::Website,
+    ];
+
+    /// The site's name in the history, as the front end names it too.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Lens => "lens",
+            Self::Artstation => "artstation",
+            Self::Deviantart => "deviantart",
+            Self::Pixiv => "pixiv",
+            Self::Instagram => "instagram",
+            Self::Website => "website",
+        }
+    }
+
+    /// The site [`Site::key`] names.
+    pub fn from_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|site| site.key() == key)
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             Self::Lens => "Google Lens",
@@ -243,10 +272,45 @@ pub enum FoundEvent {
     /// It doesn't look like a larger copy of `face`'s art, and is kept until
     /// the user says whether to save it anyway; `token` names it.
     Doubtful { token: u32, face: String, doubt: Doubt },
-    /// None of the `images` on the page the user asked about is `face`'s art.
-    NoMatch { face: String, images: u32 },
+    /// The images of the page the user asked about, for them to choose
+    /// `face`'s art from; `token` names them.
+    Choose {
+        token: u32,
+        face: String,
+        images: Vec<PageChoice>,
+    },
+    /// The page the user asked about has no image large enough to be `face`'s art.
+    NoImages { face: String },
     /// It couldn't be saved.
     Failed { message: String },
+}
+
+/// One of a page's images, as the user chooses from them: the downloaded
+/// file, to show; its size; what the check said of it; and the site it's on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PageChoice {
+    pub path: String,
+    pub size: ImageSize,
+    /// Why it isn't a larger copy of the art; `null` when it is.
+    pub doubt: Option<Doubt>,
+    /// The host the image is on, such as `cdna.artstation.com`.
+    pub host: String,
+}
+
+impl From<&PageCandidate> for PageChoice {
+    fn from(candidate: &PageCandidate) -> Self {
+        Self {
+            path: candidate.downloaded.to_string_lossy().into_owned(),
+            size: candidate.size,
+            doubt: candidate.doubt,
+            host: Url::parse(&candidate.image_url)
+                .ok()
+                .and_then(|url| url.host_str().map(str::to_owned))
+                .unwrap_or_default(),
+        }
+    }
 }
 
 /// What became of an image the user saved.
@@ -268,6 +332,8 @@ pub struct Found<'a> {
     pub image_url: &'a str,
     /// The page they were on when they saved it.
     pub page: Option<&'a str>,
+    /// Where they started looking for it.
+    pub site: Option<Site>,
 }
 
 /// Where the face's art was saved by the run it came from.
@@ -310,27 +376,70 @@ pub async fn import(
         }
     }
 
-    let Destination {
-        settings,
-        list_folder,
-        replace,
-    } = destination;
-    let (card, face) = (&target.card, &target.face);
-    let dir = face_dir(&output_dir_for(list_folder, settings), settings, ArtSource::Web, face);
+    let dir = source_dir(target, destination, ArtSource::Web);
     tokio::fs::create_dir_all(&dir).await?;
     let temp = TempFile::beside(&dir, TEMP_IDS.fetch_add(1, Ordering::Relaxed));
     tokio::fs::copy(downloaded, temp.path()).await?;
-
-    let stem = face_stem(settings, card, face);
-    let named = dir.join(format!("{stem}.{}", kind.extension()));
-    // Taking the place of the file it replaces is no clash; any other is.
-    let overwrite = settings.overwrite || replace == Some(named.as_path());
-    let path = PathReserver::default().reserve(&dir, &stem, kind.extension(), overwrite);
-    let file = place(temp, kind, &path, card, face, ArtSource::Web).await?;
+    let (file, replaced) = put_in_place(target, destination, ArtSource::Web, &dir, temp, kind).await?;
     let file = SavedFile {
         page: found.page.map(str::to_owned),
         ..file
     };
+
+    let (card, face) = (&target.card, &target.face);
+    if let (Some(history), Some(art)) = (history, card.illustration(face.index)) {
+        // The file is saved either way; only the next run, or going back to
+        // this copy, would miss it.
+        let _ = history.remember_found_by_hand(
+            art,
+            &FoundByHand {
+                url: found.image_url.to_owned(),
+                page: found.page.map(str::to_owned),
+            },
+        );
+        let _ = history.remember_found_copy(
+            art,
+            &FoundCopy {
+                url: found.image_url.to_owned(),
+                page: found.page.map(str::to_owned),
+                site: found.site.map(|site| site.key().to_owned()),
+                size: file.size,
+            },
+        );
+    }
+    Ok(Imported::Saved { file, replaced })
+}
+
+/// The folder the face's art from `source` goes in, as the run saved it.
+pub(crate) fn source_dir(target: &Target, destination: Destination<'_>, source: ArtSource) -> PathBuf {
+    let settings = destination.settings;
+    face_dir(
+        &output_dir_for(destination.list_folder, settings),
+        settings,
+        source,
+        &target.face,
+    )
+}
+
+/// Moves `temp`, an image of kind `kind` in `dir` (see [`source_dir`]), into
+/// place as the face's art from `source`, in place of the file the run saved,
+/// which is deleted. Says which file that was, if there was one.
+pub(crate) async fn put_in_place(
+    target: &Target,
+    destination: Destination<'_>,
+    source: ArtSource,
+    dir: &Path,
+    temp: TempFile,
+    kind: ImageKind,
+) -> Result<(SavedFile, Option<String>)> {
+    let Destination { settings, replace, .. } = destination;
+    let (card, face) = (&target.card, &target.face);
+    let stem = face_stem(settings, card, face);
+    let named = dir.join(format!("{stem}.{}", kind.extension()));
+    // Taking the place of the file it replaces is no clash; any other is.
+    let overwrite = settings.overwrite || replace == Some(named.as_path());
+    let path = PathReserver::default().reserve(dir, &stem, kind.extension(), overwrite);
+    let file = place(temp, kind, &path, card, face, source).await?;
 
     let replaced = match replace {
         Some(old) if old != path => match tokio::fs::remove_file(old).await {
@@ -341,16 +450,7 @@ pub async fn import(
         Some(old) => Some(old.to_string_lossy().into_owned()),
         None => None,
     };
-
-    if let (Some(history), Some(art)) = (history, card.illustration(face.index)) {
-        let found = FoundByHand {
-            url: found.image_url.to_owned(),
-            page: found.page.map(str::to_owned),
-        };
-        // The file is saved either way; only the next run would miss it.
-        let _ = history.remember_found_by_hand(art, &found);
-    }
-    Ok(Imported::Saved { file, replaced })
+    Ok((file, replaced))
 }
 
 /// Why `downloaded` isn't a larger copy of the face's art, if it isn't.
@@ -396,8 +496,11 @@ impl Drop for ArtCrop {
     }
 }
 
-/// The most images of a page tried, largest first.
-pub const MAX_PAGE_IMAGES: usize = 12;
+/// The most images of a page offered to choose from.
+pub const MAX_PAGE_IMAGES: usize = 24;
+
+/// How many of a page's images are downloaded at once.
+const PAGE_DOWNLOADS: usize = 4;
 
 /// An image on the page the user has open, as the page gives it: its address,
 /// and its size in pixels when the page knows it (`0` when it doesn't).
@@ -410,92 +513,83 @@ pub struct PageImage {
     pub height: u32,
 }
 
-/// What came of looking for the art among a page's images.
+/// One of a page's images, downloaded for the user to choose from.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FromPage {
-    Saved {
-        file: SavedFile,
-        replaced: Option<String>,
-    },
-    /// None was a larger copy, but the one at `image_url`, downloaded to
-    /// `downloaded`, may be the art: a card scan, or a copy no larger. It's
-    /// saved if the user says so, by [`import`] with `force`.
-    Doubtful {
-        doubt: Doubt,
-        image_url: String,
-        downloaded: PathBuf,
-    },
-    /// None of the `images` tried is the art.
-    NoMatch {
-        images: usize,
-    },
+pub struct PageCandidate {
+    pub image_url: String,
+    /// Where it was downloaded, named with its type's extension. Saving it
+    /// is [`import`] with `force`, since the user saw what the check said.
+    pub downloaded: PathBuf,
+    /// Its size in pixels, read from the file.
+    pub size: ImageSize,
+    /// Why it isn't a larger copy of the art; `None` when it is.
+    pub doubt: Option<Doubt>,
 }
 
-/// Looks for `target`'s art among `images`, from the page at `page`: each is
-/// downloaded into `dir`, largest first, and checked against the art crop;
-/// the first that's a larger copy is saved, as [`import`] saves it.
-pub async fn import_from_page(
+/// Downloads the `images` of a page into `dir` and checks each against
+/// `target`'s art crop, for the user to choose from: a larger copy of the art
+/// first, then near misses (a card scan, a copy no larger), then the rest,
+/// each largest first. One that won't download, isn't a JPEG, PNG or WebP,
+/// or can't be read is left out.
+pub async fn fetch_page_images(
     http: &Http,
-    history: Option<&History>,
     target: &Target,
-    destination: Destination<'_>,
     images: &[PageImage],
-    page: Option<&str>,
     dir: &Path,
-) -> Result<FromPage> {
-    let candidates = page_candidates(images);
-    if candidates.is_empty() {
-        return Ok(FromPage::NoMatch { images: 0 });
+) -> Result<Vec<PageCandidate>> {
+    let wanted = page_candidates(images);
+    if wanted.is_empty() {
+        return Ok(Vec::new());
     }
     tokio::fs::create_dir_all(dir).await?;
     let crop = ArtCrop::fetch(http, target, dir).await?;
-    let mut doubtful: Option<(Doubt, &PageImage, PathBuf)> = None;
-    for image in &candidates {
-        let file = dir.join(format!(".page-{}.part", TEMP_IDS.fetch_add(1, Ordering::Relaxed)));
-        // An image that won't download, or isn't a JPEG, PNG or WebP, is skipped.
-        if !matches!(http.download(&image.url, &file).await, Ok(Some(_))) {
-            let _ = tokio::fs::remove_file(&file).await;
-            continue;
-        }
-        match crop.doubt(&file).await {
-            Ok(None) => {
-                let found = Found {
-                    image_url: &image.url,
-                    page,
-                };
-                let imported = import(http, history, target, destination, &file, found, true).await;
-                let _ = tokio::fs::remove_file(&file).await;
-                if let Some((.., kept)) = &doubtful {
-                    let _ = tokio::fs::remove_file(kept).await;
-                }
-                return match imported? {
-                    Imported::Saved { file, replaced } => Ok(FromPage::Saved { file, replaced }),
-                    Imported::Doubtful(doubt) => Err(Error::Other(format!("not saved: {doubt:?}"))),
-                };
-            }
-            // The first near miss is kept to ask about, if nothing better turns up.
-            Ok(Some(doubt @ (Doubt::Smaller | Doubt::CardScan))) if doubtful.is_none() => {
-                doubtful = Some((doubt, image, file));
-            }
-            _ => {
-                let _ = tokio::fs::remove_file(&file).await;
-            }
-        }
-    }
-    Ok(match doubtful {
-        Some((doubt, image, downloaded)) => FromPage::Doubtful {
-            doubt,
-            image_url: image.url.clone(),
-            downloaded,
-        },
-        None => FromPage::NoMatch {
-            images: candidates.len(),
-        },
-    })
+    let crop = &crop;
+    let mut found: Vec<PageCandidate> = stream::iter(wanted)
+        .map(|image| async move { fetch_candidate(http, crop, image, dir).await })
+        .buffer_unordered(PAGE_DOWNLOADS)
+        .filter_map(|candidate| async move { candidate })
+        .collect()
+        .await;
+    found.sort_by_key(|candidate| {
+        let rank = match candidate.doubt {
+            None => 0,
+            Some(Doubt::Smaller | Doubt::CardScan) => 1,
+            Some(Doubt::Different) => 2,
+        };
+        let area = u64::from(candidate.size.width) * u64::from(candidate.size.height);
+        (rank, Reverse(area))
+    });
+    Ok(found)
 }
 
-/// The images worth trying: web addresses, each once, none known to be too
-/// small to be a larger copy of an art crop, largest first, at most
+async fn fetch_candidate(http: &Http, crop: &ArtCrop, image: PageImage, dir: &Path) -> Option<PageCandidate> {
+    let part = dir.join(format!("page-{}.part", TEMP_IDS.fetch_add(1, Ordering::Relaxed)));
+    let Ok(Some(kind)) = http.download(&image.url, &part).await else {
+        let _ = tokio::fs::remove_file(&part).await;
+        return None;
+    };
+    // Named for its type, so the app's window can show it.
+    let downloaded = part.with_extension(kind.extension());
+    if tokio::fs::rename(&part, &downloaded).await.is_err() {
+        let _ = tokio::fs::remove_file(&part).await;
+        return None;
+    }
+    match (image_size(&downloaded, kind), crop.doubt(&downloaded).await) {
+        (Some(size), Ok(doubt)) => Some(PageCandidate {
+            image_url: image.url,
+            downloaded,
+            size,
+            doubt,
+        }),
+        _ => {
+            let _ = tokio::fs::remove_file(&downloaded).await;
+            None
+        }
+    }
+}
+
+/// The images worth downloading: web addresses, each once, none known to be
+/// too small to be a larger copy of an art crop, largest first, at most
 /// [`MAX_PAGE_IMAGES`]. Ones whose size the page didn't give come last.
 fn page_candidates(images: &[PageImage]) -> Vec<PageImage> {
     // Scryfall's art crops are 626 pixels wide; a copy has to be wider still.

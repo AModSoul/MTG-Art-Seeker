@@ -11,7 +11,7 @@ use mtg_art_core::{
     engine::{run, ArtSource, JobStatus, Local, RunEvent, RunInput, RunSummary},
     history::{FoundByHand, History},
     http::{Endpoints, Http, HttpConfig},
-    manual,
+    known, manual,
     scryfall::{search, SearchOptions, Unique},
     settings::Settings,
 };
@@ -818,6 +818,7 @@ async fn saves_a_larger_copy_the_user_found_in_place_of_scryfalls() {
     let found = manual::Found {
         image_url: "https://cdna.artstation.com/p/assets/images/karn/4k/karn.jpg",
         page: Some("https://www.artstation.com/artwork/karn"),
+        site: Some(manual::Site::Artstation),
     };
     let destination = manual::Destination {
         settings: &settings,
@@ -861,6 +862,7 @@ async fn asks_before_saving_an_image_that_is_not_the_art() {
     let found = manual::Found {
         image_url: "https://example.com/other.jpg",
         page: None,
+        site: None,
     };
     let destination = manual::Destination {
         settings: &settings,
@@ -1050,7 +1052,7 @@ async fn opens_the_website_mtgpics_links_for_the_artist() {
 }
 
 #[tokio::test]
-async fn finds_the_art_among_the_images_of_a_page() {
+async fn offers_the_images_of_a_page_art_first() {
     let servers = Servers::start().await;
     let art = karn_with_art(&servers).await;
     // The page's images: an avatar, another painting, a card scan of the art,
@@ -1075,25 +1077,50 @@ async fn finds_the_art_among_the_images_of_a_page() {
     let settings = settings(out.path());
     let dir = tempfile::tempdir().unwrap();
     let target = manual::prepare(&http, None, &settings, "dom", "1", 0).await.unwrap();
+    let images = vec![
+        image("avatar.jpg", 150, 150),
+        image("scan.jpg", 745, 1040),
+        image("other.jpg", 900, 675),
+        image("missing.jpg", 2000, 1500),
+        image("art.jpg", 1200, 900),
+    ];
+    let found = manual::fetch_page_images(&http, &target, &images, dir.path())
+        .await
+        .unwrap();
+
+    // The avatar is too small to try and the missing image is left out; the
+    // art comes first, then the card scan, then the other painting.
+    let seen: Vec<_> = found
+        .iter()
+        .map(|c| (c.image_url.rsplit('/').next().unwrap(), c.size.width, c.doubt))
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            ("art.jpg", 1200, None),
+            ("scan.jpg", 745, Some(manual::Doubt::CardScan)),
+            ("other.jpg", 900, Some(manual::Doubt::Different)),
+        ]
+    );
+    assert!(found.iter().all(|c| c.downloaded.exists()));
+    assert_eq!(found[0].downloaded.extension().unwrap(), "jpg");
+
+    // The one the user chooses is saved as the art.
     let destination = manual::Destination {
         settings: &settings,
         list_folder: None,
         replace: None,
     };
     let page = Some("https://www.instagram.com/p/karn/");
-    let found = |images: Vec<manual::PageImage>| {
-        let (http, target, dir) = (&http, &target, dir.path());
-        async move { manual::import_from_page(http, None, target, destination, &images, page, dir).await }
+    let from = manual::Found {
+        image_url: &found[0].image_url,
+        page,
+        site: Some(manual::Site::Instagram),
     };
-
-    // Largest first: the card scan and the other painting are passed over.
-    let images = vec![
-        image("avatar.jpg", 150, 150),
-        image("scan.jpg", 745, 1040),
-        image("other.jpg", 900, 675),
-        image("art.jpg", 1200, 900),
-    ];
-    let manual::FromPage::Saved { file, .. } = found(images).await.unwrap() else {
+    let imported = manual::import(&http, None, &target, destination, &found[0].downloaded, from, true)
+        .await
+        .unwrap();
+    let manual::Imported::Saved { file, .. } = imported else {
         panic!("the art wasn't saved");
     };
     assert_eq!(
@@ -1103,21 +1130,166 @@ async fn finds_the_art_among_the_images_of_a_page() {
     assert_eq!(file.page.as_deref(), page);
     assert_eq!(file.size.map(|s| s.width), Some(1200));
 
-    // Only a card scan of the art: kept, to ask about.
-    let outcome = found(vec![image("other.jpg", 900, 675), image("scan.jpg", 745, 1040)]).await;
-    let manual::FromPage::Doubtful {
-        doubt,
-        image_url,
-        downloaded,
-    } = outcome.unwrap()
-    else {
-        panic!("the card scan wasn't kept");
-    };
-    assert_eq!(doubt, manual::Doubt::CardScan);
-    assert!(image_url.ends_with("/scan.jpg"));
-    assert!(downloaded.exists());
+    // A page with nothing large enough has nothing to choose from.
+    let none = manual::fetch_page_images(&http, &target, &[image("avatar.jpg", 150, 150)], dir.path())
+        .await
+        .unwrap();
+    assert!(none.is_empty());
+}
 
-    // Nothing of it.
-    let outcome = found(vec![image("other.jpg", 900, 675), image("missing.jpg", 2000, 1500)]).await;
-    assert_eq!(outcome.unwrap(), manual::FromPage::NoMatch { images: 2 });
+#[tokio::test]
+async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
+    let servers = Servers::start().await;
+    let art = karn_with_art(&servers).await;
+    Servers::image(
+        &servers.mtgpics,
+        "/pics/art/dom/001_1.jpg",
+        &jpeg(&painting(1600, 1200, 5)),
+    )
+    .await;
+    Servers::image(&servers.cdn, "/found/karn.jpg", &jpeg(&art)).await;
+    let http = servers.http();
+    let out = tempfile::tempdir().unwrap();
+    let settings = settings(out.path());
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let target = manual::prepare(&http, None, &settings, "DOM", "1", 0).await.unwrap();
+    let scryfall = target.face.scryfall_url.clone().unwrap();
+    // Scryfall's image is the art crop karn_with_art serves.
+
+    // MTGPics had Karn's art, and the user found two larger copies, the
+    // ArtStation one saved last.
+    let mtgpics = format!("{}/pics/art/dom/001_1.jpg", servers.mtgpics.uri());
+    history
+        .remember(&target.card, &[Some(mtgpics)], std::time::SystemTime::now())
+        .unwrap();
+    let artstation = format!("{}/found/karn.jpg", servers.cdn.uri());
+    let copies = [
+        ("https://cdn.example/lens.jpg", None, manual::Site::Lens, 1000),
+        (
+            artstation.as_str(),
+            Some("https://www.artstation.com/artwork/karn"),
+            manual::Site::Artstation,
+            1200,
+        ),
+    ];
+    for (url, page, site, width) in copies {
+        let copy = mtg_art_core::history::FoundCopy {
+            url: url.into(),
+            page: page.map(Into::into),
+            site: Some(site.key().into()),
+            size: Some(mtg_art_core::imagesize::ImageSize { width, height: 900 }),
+        };
+        history.remember_found_copy(KARN_ART, &copy).unwrap();
+    }
+    let in_use = mtg_art_core::history::FoundByHand {
+        url: artstation.clone(),
+        page: Some("https://www.artstation.com/artwork/karn".into()),
+    };
+    history.remember_found_by_hand(KARN_ART, &in_use).unwrap();
+    let web_file = out.path().join("web/Karn, Scion of Urza [DOM] {1}.jpg");
+    std::fs::create_dir_all(web_file.parent().unwrap()).unwrap();
+    std::fs::write(&web_file, jpeg(&art)).unwrap();
+
+    let saved_now = mtg_art_core::engine::SavedFile {
+        path: web_file.to_string_lossy().into_owned(),
+        face: target.face.name.clone(),
+        face_index: 0,
+        source: ArtSource::Web,
+        set: "DOM".into(),
+        number: "1".into(),
+        artist: target.face.artist.clone(),
+        size: Some(mtg_art_core::imagesize::ImageSize {
+            width: 1200,
+            height: 900,
+        }),
+        page: None,
+    };
+
+    let known = known::known_sources(&http, Some(&history), &target, &settings, &saved_now).await;
+    let seen: Vec<_> = known
+        .iter()
+        .map(|k| {
+            let size = k.size.map(|size| (size.width, size.height));
+            (k.source, k.site, k.host.as_deref(), size, k.current)
+        })
+        .collect();
+    // MTGPics' and Scryfall's sizes are read from the start of their images.
+    assert_eq!(
+        seen,
+        [
+            (ArtSource::Mtgpics, None, None, Some((1600, 1200)), false),
+            (ArtSource::Scryfall, None, None, Some((626, 457)), false),
+            (
+                ArtSource::Web,
+                Some(manual::Site::Artstation),
+                Some("artstation.com"),
+                Some((1200, 900)),
+                true
+            ),
+            (
+                ArtSource::Web,
+                Some(manual::Site::Lens),
+                Some("cdn.example"),
+                Some((1000, 900)),
+                false
+            ),
+        ]
+    );
+    // And noted, so they aren't read again.
+    assert_eq!(history.image_size(&scryfall).unwrap().map(|size| size.width), Some(626));
+    let artstation_copy = known[2].copy;
+    // Without the log, only Scryfall is known.
+    let without = known::known_sources(&http, None, &target, &settings, &saved_now).await;
+    assert_eq!(without.len(), 1);
+
+    // Back to MTGPics: the found copy's file goes, and later runs stop saving it.
+    let destination = |replace| manual::Destination {
+        settings: &settings,
+        list_folder: None,
+        replace,
+    };
+    let (file, replaced) = known::save_from(
+        &http,
+        Some(&history),
+        &target,
+        destination(Some(&web_file)),
+        ArtSource::Mtgpics,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        relative(&file.path, out.path()),
+        "mtgpics/Karn, Scion of Urza [DOM] {1}.jpg"
+    );
+    assert_eq!((file.source, file.page.as_deref()), (ArtSource::Mtgpics, None));
+    assert_eq!(replaced.as_deref(), Some(web_file.to_string_lossy().as_ref()));
+    assert!(!web_file.exists());
+    assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
+    // Every found copy is still offered, none of them saved now.
+    let known = known::known_sources(&http, Some(&history), &target, &settings, &file).await;
+    assert_eq!(known.len(), 4);
+    assert!(known[0].current && !known[2].current);
+
+    // And back to the ArtStation copy, downloaded again from where it was.
+    let mtgpics_file = std::path::PathBuf::from(&file.path);
+    let (file, _) = known::save_from(
+        &http,
+        Some(&history),
+        &target,
+        destination(Some(&mtgpics_file)),
+        ArtSource::Web,
+        artstation_copy,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        relative(&file.path, out.path()),
+        "web/Karn, Scion of Urza [DOM] {1}.jpg"
+    );
+    assert_eq!(file.page.as_deref(), Some("https://www.artstation.com/artwork/karn"));
+    assert_eq!(file.size.map(|s| s.width), Some(1200));
+    assert!(!mtgpics_file.exists());
+    assert_eq!(history.found_by_hand(KARN_ART).unwrap(), Some(in_use));
 }

@@ -12,7 +12,10 @@ use tokio::{
     time::{sleep, sleep_until, Instant},
 };
 
-use crate::{Error, Result};
+use crate::{
+    imagesize::{image_size_of, ImageSize},
+    Error, Result,
+};
 
 pub const USER_AGENT: &str = concat!(
     "MTGArtDownloaderRust/",
@@ -151,6 +154,29 @@ impl Http {
             url: url.to_owned(),
             reason: "the response is not a JPEG, PNG or WebP image".into(),
         })
+    }
+
+    /// The size of the image at `url`, read from as little of it as holds
+    /// its header; `None` for a 404, or if the header isn't in its first
+    /// [`SIZE_PROBE_LIMIT`] bytes or can't be read.
+    pub async fn image_size(&self, url: &str) -> Result<Option<ImageSize>> {
+        let response = self.send(url, |client| client.get(url)).await?;
+        let Some(response) = ok_or_missing(url, response).await? else {
+            return Ok(None);
+        };
+        let mut head = Vec::new();
+        let mut body = response.bytes_stream();
+        while let Some(chunk) = body.next().await {
+            head.extend_from_slice(&chunk?);
+            if let Some(size) = image_size_of(&head) {
+                // The rest isn't read: dropping the response ends it.
+                return Ok(Some(size));
+            }
+            if head.len() >= SIZE_PROBE_LIMIT {
+                break;
+            }
+        }
+        Ok(None)
     }
 
     /// Streams a large file to `dest`, with longer to finish than other
@@ -304,6 +330,10 @@ fn url_authority(url: &Url) -> Option<String> {
 
 /// How many of a download's first bytes [`ImageKind::sniff`] needs.
 const SNIFF_LEN: usize = 12;
+
+/// How much of an image [`Http::image_size`] reads looking for its header.
+/// A JPEG's metadata, which comes first, is rarely larger.
+const SIZE_PROBE_LIMIT: usize = 512 * 1024;
 
 /// The image formats a download is accepted as, told apart by their first bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

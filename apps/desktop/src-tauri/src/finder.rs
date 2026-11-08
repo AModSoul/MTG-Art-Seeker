@@ -96,7 +96,7 @@ pub struct Saved {
 }
 
 /// Draws the app's toast in the corner of the page: `kind` (`loading`,
-/// `success`, `warning` or `error`) colours it, and `text` is set as text, not
+/// `info`, `success`, `warning` or `error`) colours it, and `text` is set as text, not
 /// markup. It sits in a shadow root, so the page's styles don't reach it, and
 /// goes after a few seconds unless it's `loading`. Another replaces it.
 const TOAST: &str = r##"((kind, text) => {
@@ -111,7 +111,7 @@ const TOAST: &str = r##"((kind, text) => {
     (document.body || document.documentElement).appendChild(host);
   }
   const colours = {
-    loading: "#3b82f6", success: "#22c55e", warning: "#f59e0b", error: "#ef4444",
+    loading: "#3b82f6", info: "#3b82f6", success: "#22c55e", warning: "#f59e0b", error: "#ef4444",
   };
   const box = document.createElement("div");
   box.setAttribute("role", "status");
@@ -144,6 +144,12 @@ pub fn toast(app: &AppHandle, kind: &str, text: &str) {
 /// Where the window's downloads go until they're dealt with.
 pub fn downloads_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
     Ok(app.path().app_cache_dir()?.join("finder-downloads"))
+}
+
+/// Where the images of a page the user asked to find the art on are
+/// downloaded, for the main window to show them.
+pub fn page_images_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
+    Ok(downloads_dir(app)?.join("page"))
 }
 
 /// Deletes downloads an earlier session left behind.

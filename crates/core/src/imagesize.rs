@@ -2,7 +2,7 @@
 
 use std::{
     fs::File,
-    io::{BufReader, Read, Seek, SeekFrom},
+    io::{BufReader, Cursor, Read, Seek, SeekFrom},
     path::Path,
 };
 
@@ -25,6 +25,17 @@ pub fn image_size(path: &Path, kind: ImageKind) -> Option<ImageSize> {
         ImageKind::Png => png_size(&mut file),
         ImageKind::Jpeg => jpeg_size(&mut file),
         ImageKind::Webp => webp_size(&mut file),
+    }
+}
+
+/// The size of the image whose first bytes are `head`, or `None` if they
+/// don't hold its header.
+pub fn image_size_of(head: &[u8]) -> Option<ImageSize> {
+    let mut bytes = Cursor::new(head);
+    match ImageKind::sniff(head)? {
+        ImageKind::Png => png_size(&mut bytes),
+        ImageKind::Jpeg => jpeg_size(&mut bytes),
+        ImageKind::Webp => webp_size(&mut bytes),
     }
 }
 

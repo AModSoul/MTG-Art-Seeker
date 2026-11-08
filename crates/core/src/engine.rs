@@ -111,7 +111,7 @@ pub enum JobStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum ArtSource {
@@ -738,7 +738,12 @@ async fn save(
     };
     let stem = face_stem(settings, card, face);
     let path = context.paths.reserve(&dir, &stem, kind.extension(), settings.overwrite);
-    Ok(Some(place(temp, kind, &path, card, face, source).await?))
+    let file = place(temp, kind, &path, card, face, source).await?;
+    // Noted, so the image's size can be shown without downloading it again.
+    if let (Some(history), Some(size)) = (context.history, file.size) {
+        let _ = history.remember_image_size(url, size);
+    }
+    Ok(Some(file))
 }
 
 /// The folder a face's art from `source` goes in, inside `output_dir`.
