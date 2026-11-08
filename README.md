@@ -54,6 +54,11 @@ where TCGplayer has one. Search them in Scryfall's words: `set:eoc`, `type:comma
 before any of them to leave out what it matches. Downloading a deck saves the exact printings in
 the box, its commander first.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/decks-dark.png" />
+  <img alt="The Decks tab searching set:eoc, with World Shaper picked and its 93 cards downloaded into a folder of its own" src="docs/screenshots/decks-light.png" />
+</picture>
+
 Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and by default go in
 `mtgpics/` and `scryfall/` folders (and `web/` for copies you find), with a folder for each layout:
 `MDFC Front` and `MDFC Back`, `Adventure`, `Saga`, `Basic`. A double-faced card is saved as one
@@ -75,19 +80,25 @@ largest copy you can, open it, and choose **Save image**. The app checks it's th
 larger than Scryfall's, then saves it in place of Scryfall's file, in a `web/` folder, marked
 **Found** in the results with a link to the page it came from. If it doesn't look like a larger copy
 of the art (a card scan, a smaller copy, or another painting), the app asks before saving it. Every
-later download of that art gets your copy.
+later download of that art gets your copy, checked again each time in case what's at that address
+has changed.
+
+<img alt="Sol Ring's art saved from Scryfall, with its six buttons to look for a larger copy, and the Google Lens button's tooltip" src="docs/screenshots/find-copy-dark.png" />
 
 Replaced an image by mistake? Right-click its card in the results to save its art again from another
 place it's known to be: MTGPics (if an earlier download found it there), Scryfall, or any copy you
 found, listed with its site and size. The app keeps only where each one is, and downloads it again
 when you go back to it. Later downloads of the card use the one you chose last.
 
+<img alt="Karn's row right-clicked: use the art from MTGPics, 1024 × 768 and saved now, or from Scryfall, 633 × 468, or show it in its folder" src="docs/screenshots/sources-dark.png" />
+
 Some sites, Instagram among them, cover their images so they can't be saved. On those, open the post
-and choose **Find the art on this page** from the window's menu: the app downloads the images the
-page has and shows them in its main window, each with its size and whether it looks like the art,
-and saves the one you choose. It reads the page only when you ask, and only its images. You can
-sign in to a site in that window; **Sign out of sites** forgets it. Whatever you save or ask about, a note in the window's corner says what came of it: saved, too
-small, a card scan, or not the art.
+and choose **Find the art on this page** from the window's menu (on macOS, the **Find Art** menu in
+the menu bar): the app downloads the images the page has and shows them in its main window, each
+with its size and whether it looks like the art, and saves the one you choose. It reads the page
+only when you ask, and only its images. You can sign in to a site in that window; **Sign out of
+sites** forgets it. Whatever you save or ask about, a note in the window's corner says what came of
+it: saved, too small, a card scan, or not the art.
 
 ### Settings
 
@@ -162,8 +173,12 @@ it has been added.
 An image you save in that window is checked against Scryfall's art crop: the crop has to be found
 inside it, at any size, and it has to be at least 10% wider than the crop. A match that covers too
 little of the image, where the picture stops at the match's edges as at a card's frame, is a card
-scan. Where you saved it from is logged by artwork, so every printing of the art is saved from
-there, before MTGPics is asked; if the image is gone from there, it's forgotten. The app opens the
+scan. A split card's half is checked against only its own part of the crop, which shows both halves.
+Where you saved it from is logged by artwork, so every printing of the art is saved from there,
+before MTGPics is asked. Each time, it's asked for as the page you found it on asked for it (some
+sites, Pixiv among them, refuse an image to anyone else) and checked again; if it's gone, or isn't
+that art any more, it's forgotten. One you saved though the check doubted it stays yours while it's
+the size it was. The app opens the
 page and listens for what you save; it doesn't search or click for you, and reads a page only when
 you choose **Find the art on this page**, and then only its images. A website is the one the
 artist's MTGPics page links, kept for a month. Pixiv's artist search needs an account, so its button
@@ -225,8 +240,10 @@ project on its first run; the domain is attached to that project in Cloudflare's
 [`AGENTS.md`](AGENTS.md), `.agents/skills/` and `.agents/mcp.json` are the sources of truth for
 coding agents. `pnpm install` copies them to where Claude Code, Cursor and VS Code look for them
 (`CLAUDE.md`, `.claude/skills/`, `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`); those copies
-are gitignored. The MCP servers are Chakra UI's docs and each Storybook's, which VS Code starts when
-the folder opens.
+are gitignored, and the Git hooks copy them again after every checkout and merge. The MCP servers
+are Chakra UI's docs and each Storybook's, which VS Code starts when the folder opens. The skills
+come from `npx skills add` and are pinned in `skills-lock.json`: Chakra UI's three, a code review
+guide, and the Hugging Face CLI's.
 
 ### Releasing
 
@@ -245,8 +262,8 @@ the private key whose public half is in `tauri.conf.json`, and `TAURI_SIGNING_PR
 (empty if the key has none). Losing the private key means installed apps can't update to a build
 signed with a new one, so keep a copy somewhere safe.
 
-The app icon is a placeholder. To replace it, run `pnpm --filter desktop tauri icon path/to/icon.png` with a square
-PNG or SVG of at least 1024 pixels.
+The app icon's source is `apps/desktop/src-tauri/app-icon.svg`. After changing it, run
+`pnpm --filter desktop tauri icon src-tauri/app-icon.svg` to make every size each platform needs.
 
 ## License
 
