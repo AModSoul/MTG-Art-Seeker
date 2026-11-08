@@ -53,11 +53,12 @@ const config = defineConfig({
           warning: { value: { _light: "{colors.orange.700}", _dark: "{colors.orange.300}" } },
         },
         // What `colorPalette="emerald"` reads. The fill is #50C878 in both modes; its text is
-        // a dark green, since white on it is too faint to read.
+        // a dark green, since white on it is too faint to read. Light mode's fg is 800: 700
+        // reads on white but not on `subtle` (3.9:1), as a subtle button's text is.
         emerald: {
           solid: { value: "{colors.emerald.500}" },
           contrast: { value: "{colors.emerald.950}" },
-          fg: { value: { _light: "{colors.emerald.700}", _dark: "{colors.emerald.300}" } },
+          fg: { value: { _light: "{colors.emerald.800}", _dark: "{colors.emerald.300}" } },
           muted: { value: { _light: "{colors.emerald.200}", _dark: "{colors.emerald.800}" } },
           subtle: { value: { _light: "{colors.emerald.100}", _dark: "{colors.emerald.900}" } },
           emphasized: { value: { _light: "{colors.emerald.300}", _dark: "{colors.emerald.700}" } },
