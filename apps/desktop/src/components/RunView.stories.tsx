@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, mocked, screen, userEvent, waitFor } from "storybook/test";
+import { expect, mocked, screen, userEvent, waitFor, within } from "storybook/test";
 
 import {
   boltFile,
@@ -579,6 +579,19 @@ export const OneLineEach: Story = {
   },
 };
 
+/** A card with the longest name there is, as a list names it. */
+const LONG_LABEL = "Avacyn's Collar, the Symbol of Her Church (SLD) 1234";
+
+/** Its saved art: a long card name by a short artist credit. */
+const longFaceFile = { ...boltFile, face: "Avacyn's Collar, the Symbol of Her Church" };
+
+/** A short card name by an artist credit as long. */
+const longArtistFile = {
+  ...boltFile,
+  path: `${boltFile.path}.2`,
+  artist: "Christopher Moeller & Rebecca Guay-Mitchell",
+};
+
 /** The longest card name there is, and an artist credit as long, in a narrow
  * window: every row, even one whose names are short, puts its card and artist on
  * a line each, the Saved column keeps room for each name, and the table scrolls
@@ -593,37 +606,32 @@ export const LongNames: Story = {
     ),
   ],
   beforeEach: () => {
-    const longFace = { ...boltFile, face: "Avacyn's Collar, the Symbol of Her Church" };
-    const longArtist = {
-      ...boltFile,
-      path: `${boltFile.path}.2`,
-      artist: "Christopher Moeller & Rebecca Guay-Mitchell",
-    };
     useRun.setState({
       runId: 1,
       jobs: [
         {
           ...karnJob,
-          label: "Avacyn's Collar, the Symbol of Her Church (SLD) 1234",
-          status: { state: "done", files: [longFace], missing: [] },
+          label: LONG_LABEL,
+          status: { state: "done", files: [longFaceFile], missing: [] },
         },
-        { ...delverJob, status: { state: "done", files: [longArtist], missing: [] } },
+        { ...delverJob, status: { state: "done", files: [longArtistFile], missing: [] } },
       ],
     });
   },
   play: async ({ canvas }) => {
-    const label = canvas.getByText("Avacyn's Collar, the Symbol of Her Church (SLD) 1234");
+    // The card's name: two lines, none cut off below them.
+    const cell = canvas.getByRole("cell", { name: LONG_LABEL });
+    const label = within(cell).getByRole("paragraph");
     await waitFor(() => expect(lineCount(label)).toBe(2));
-    // Two lines, none cut off below them.
     await expect(label.scrollHeight).toBeLessThanOrEqual(label.clientHeight);
 
-    for (const name of [/^Avacyn's Collar/, /^Lightning Bolt · /]) {
-      const button = canvas.getByRole("button", { name });
+    // Each saved file's card and artist: a line each, neither cut short.
+    for (const file of [longFaceFile, longArtistFile]) {
+      const button = canvas.getByRole("button", { name: new RegExp(`^${file.face}\\s+·`) });
       await waitFor(() => expect(lineCount(button)).toBe(2));
-      for (const text of button.children) {
-        // Skip the dot only screen readers hear.
-        if (getComputedStyle(text).position === "absolute") continue;
-        await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth);
+      for (const text of [file.face, file.artist]) {
+        const line = within(button).getByText(text, { exact: true });
+        await expect(line.scrollWidth).toBeLessThanOrEqual(line.clientWidth);
       }
     }
   },
