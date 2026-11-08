@@ -5,6 +5,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { CardDataStatus } from "@/bindings/CardDataStatus";
+import type { DeckSearch } from "@/bindings/DeckSearch";
 import type { KnownSource } from "@/bindings/KnownSource";
 import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { ListFile } from "@/bindings/ListFile";
@@ -23,6 +24,11 @@ export const api = {
   listPresets: () => invoke<PresetInfo[]>("list_presets"),
   countSearch: (query: string, settings: Settings) =>
     invoke<number>("count_search", { query, settings }),
+  /** The precon decks `query` matches, newest first, up to `limit` of them. */
+  searchDecks: (query: string, limit: number) =>
+    invoke<DeckSearch>("search_decks", { query, limit }),
+  /** Where the picture of a deck's box is saved; `null` when there's none. */
+  deckBox: (fileName: string) => invoke<string | null>("deck_box", { fileName }),
   readCardList: (path: string) => invoke<ListFile>("read_card_list", { path }),
   cancelRun: (id: number) => invoke<void>("cancel_run", { id }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { open } from "@tauri-apps/plugin-dialog";
 import { expect, mocked, screen, userEvent, waitFor } from "storybook/test";
 
+import { abzanArmor } from "@/__fixtures__/decks";
 import { defaultSettings } from "@/__fixtures__/settings";
 import { api } from "@/api";
 import type { ParsedList } from "@/bindings/ParsedList";
@@ -209,5 +210,49 @@ export const ChooseOutputFolder: Story = {
     );
     await waitFor(() => expect(useSettings.getState().settings?.outputDir).toBe("/home/user/Art"));
     await expect(canvas.getByText("/home/user/Art")).toBeVisible();
+  },
+};
+
+/** A precon deck picked on the Decks tab is downloaded into a folder named after it. The
+ * field for the folder only shows while the setting is on. */
+export const Deck: Story = {
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole("tab", { name: "Decks" }));
+    await expect(
+      canvas.queryByRole("textbox", { name: /folder for this deck/i }),
+    ).not.toBeInTheDocument();
+    const download = canvas.getByRole("button", { name: /download art/i });
+    await expect(download).toBeDisabled();
+    await userEvent.click(await canvas.findByRole("button", { name: /Abzan Armor/ }));
+    await expect(download).toBeEnabled();
+    await userEvent.click(download);
+    await expect(api.startRun).toHaveBeenCalledWith(
+      { kind: "deck", fileName: abzanArmor.fileName, folder: abzanArmor.name },
+      defaultSettings,
+      expect.any(Function),
+    );
+  },
+};
+
+/** With "A folder for each list" on, picking a deck names its folder, which can be changed. */
+export const DeckFolder: Story = {
+  beforeEach: () => {
+    useSettings.setState({ settings: { ...defaultSettings, listFolders: true } });
+    useInput.setState({ tab: "deck" });
+  },
+  play: async ({ canvas }) => {
+    const folder = canvas.getByRole("textbox", { name: /folder for this deck/i });
+    await expect(folder).toHaveValue("");
+    await userEvent.click(await canvas.findByRole("button", { name: /Abzan Armor/ }));
+    await expect(folder).toHaveValue("Abzan Armor");
+
+    await userEvent.clear(folder);
+    await userEvent.type(folder, "Precons");
+    await userEvent.click(canvas.getByRole("button", { name: /download art/i }));
+    await expect(api.startRun).toHaveBeenCalledWith(
+      { kind: "deck", fileName: abzanArmor.fileName, folder: "Precons" },
+      { ...defaultSettings, listFolders: true },
+      expect.any(Function),
+    );
   },
 };

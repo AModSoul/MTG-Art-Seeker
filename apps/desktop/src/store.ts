@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware";
 import { api } from "@/api";
 import { toaster } from "@mtg-art/ui/toaster";
 import type { ArtSource } from "@/bindings/ArtSource";
+import type { DeckSummary } from "@/bindings/DeckSummary";
 import type { FoundEvent } from "@/bindings/FoundEvent";
 import type { JobInfo } from "@/bindings/JobInfo";
 import type { KnownSource } from "@/bindings/KnownSource";
@@ -20,7 +21,10 @@ import { errorText, showError, showInfo, showLoading, showSuccess } from "@/noti
 
 // --- What the user is about to download, remembered between launches -------
 
-export type InputTab = "list" | "search" | "preset";
+export type InputTab = "list" | "search" | "preset" | "deck";
+
+/** The precon deck picked to download, as much of it as the panel shows. */
+export type PickedDeck = Pick<DeckSummary, "fileName" | "name" | "code" | "setName">;
 
 interface InputState {
   tab: InputTab;
@@ -29,8 +33,19 @@ interface InputState {
   folder: string;
   query: string;
   presetId: string;
+  /** The search typed above the precon decks. */
+  deckQuery: string;
+  deck: PickedDeck | null;
+  /** The folder a deck's art goes in, when the setting for it is on: the
+   * deck's name when it's picked, and whatever the user makes it after. */
+  deckFolder: string;
   setInput: (
-    patch: Partial<Pick<InputState, "tab" | "text" | "folder" | "query" | "presetId">>,
+    patch: Partial<
+      Pick<
+        InputState,
+        "tab" | "text" | "folder" | "query" | "presetId" | "deckQuery" | "deck" | "deckFolder"
+      >
+    >,
   ) => void;
 }
 
@@ -42,6 +57,9 @@ export const useInput = create<InputState>()(
       folder: "",
       query: "",
       presetId: "edhrec-top-year",
+      deckQuery: "",
+      deck: null,
+      deckFolder: "",
       setInput: (patch) => set(patch),
     }),
     { name: "input" },

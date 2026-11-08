@@ -6,4 +6,5 @@
 export type RunInput =
   | { kind: "list"; text: string; folder?: string }
   | { kind: "search"; query: string }
-  | { kind: "preset"; id: string };
+  | { kind: "preset"; id: string }
+  | { kind: "deck"; fileName: string; folder?: string };

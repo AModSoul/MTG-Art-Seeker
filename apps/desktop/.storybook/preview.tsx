@@ -6,6 +6,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import { mocked, sb } from "storybook/test";
 
+import { allDecks } from "../src/__fixtures__/decks.ts";
 import { cardData, presets } from "../src/__fixtures__/run.ts";
 import { defaultSettings } from "../src/__fixtures__/settings.ts";
 import { api } from "../src/api.ts";
@@ -35,6 +36,8 @@ const preview: Preview = {
     mocked(api.listPresets).mockResolvedValue(presets);
     mocked(api.countSearch).mockResolvedValue(0);
     mocked(api.readCardList).mockResolvedValue({ text: "", name: "" });
+    mocked(api.searchDecks).mockResolvedValue(allDecks);
+    mocked(api.deckBox).mockResolvedValue(null);
     mocked(api.cardDataStatus).mockResolvedValue(cardData);
     mocked(api.openDiscord).mockResolvedValue();
     mocked(api.cancelRun).mockResolvedValue();

@@ -7,8 +7,9 @@ Guide for coding agents working in this repo. Read [README.md](README.md) for wh
 A pnpm workspace and a Cargo workspace in one repo. A Rust core does all the work; two thin shells
 drive it. A marketing site sits beside them.
 
-- `crates/core` (`mtg-art-core`) — parsing, Scryfall and its card data (`carddb`), MTGPics, the run
-  loop, settings. Nothing in it knows about Tauri.
+- `crates/core` (`mtg-art-core`) — parsing, Scryfall and its card data (`carddb`), MTGPics,
+  MTGJSON's precon decks and their boxes' pictures (`decks`), the run loop, settings. Nothing in it
+  knows about Tauri.
 - `crates/cli` (`mtg-art`) — prints the core's events.
 - `apps/desktop` (package `desktop`) — the desktop app.
   - `src-tauri` — Tauri commands over the core. A run reports progress on a `Channel<RunEvent>`

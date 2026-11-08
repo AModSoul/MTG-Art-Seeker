@@ -15,6 +15,7 @@ use std::{
 
 use mtg_art_core::{
     carddb::{default_card_data_dir, CardData, CardDataStatus},
+    decks::{default_decks_dir, DeckSearch, Decks},
     engine::{self, ArtSource, JobStatus, Local, RunEvent, RunInput, SavedFile},
     history::{default_history_path, History},
     http::{Http, HttpConfig},
@@ -40,6 +41,8 @@ struct AppState {
     settings_path: PathBuf,
     cards: Arc<CardData>,
     history: Option<Arc<History>>,
+    /// MTGJSON's precon decks and their boxes' pictures.
+    decks: Decks,
     runs: Mutex<HashMap<u32, CancellationToken>>,
     next_run: AtomicU32,
     /// What recent runs saved, by run id.
@@ -172,6 +175,28 @@ fn list_presets() -> Vec<PresetInfo> {
     presets()
 }
 
+/// The precon decks `query` matches, newest first, up to `limit` of them.
+#[tauri::command]
+async fn search_decks(state: State<'_, AppState>, query: String, limit: u32) -> CommandResult<DeckSearch> {
+    state
+        .decks
+        .search(&state.http, &query, limit as usize)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Where the picture of deck `file_name`'s box is saved, downloading it the
+/// first time; `None` when there's no picture of it.
+#[tauri::command]
+async fn deck_box(state: State<'_, AppState>, file_name: String) -> CommandResult<Option<String>> {
+    let path = state
+        .decks
+        .box_image(&state.http, &file_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.map(|path| path.to_string_lossy().into_owned()))
+}
+
 #[tauri::command]
 async fn count_search(state: State<'_, AppState>, query: String, settings: Settings) -> CommandResult<u32> {
     engine::count_search(&state.http, &query, &settings)
@@ -212,10 +237,7 @@ fn start_run(
     {
         let mut records = lock(&state.records);
         records.retain(|run, _| *run + RUNS_KEPT > id);
-        let list_folder = match &input {
-            RunInput::List { folder, .. } => folder.clone(),
-            _ => None,
-        };
+        let list_folder = input.folder().map(str::to_owned);
         records.insert(
             id,
             RunRecord {
@@ -693,11 +715,19 @@ pub fn run() {
                         None
                     }
                 });
+            let decks_dir = default_decks_dir()
+                .or_else(|| app.path().app_local_data_dir().ok().map(|dir| dir.join("decks")))
+                .ok_or("no data folder to keep decks in")?;
+            let decks = Decks::open(decks_dir);
+            // The main window shows the pictures of the decks' boxes.
+            std::fs::create_dir_all(decks.images_dir())?;
+            app.asset_protocol_scope().allow_directory(decks.images_dir(), false)?;
             app.manage(AppState {
                 http: http.clone(),
                 settings_path,
                 cards: cards.clone(),
                 history,
+                decks,
                 runs: Mutex::new(HashMap::new()),
                 next_run: AtomicU32::new(1),
                 records: Mutex::new(HashMap::new()),
@@ -729,6 +759,8 @@ pub fn run() {
             parse_card_list,
             list_presets,
             count_search,
+            search_decks,
+            deck_box,
             read_card_list,
             start_run,
             cancel_run,

@@ -1,7 +1,7 @@
 # MTG Art Downloader
 
-Download Magic: The Gathering card art in bulk. Paste a deck list, run a Scryfall search, or pick an
-EDHREC top list, and the app saves each card's art — from [MTGPics](https://www.mtgpics.com) where
+Download Magic: The Gathering card art in bulk. Paste a deck list, run a Scryfall search, pick an
+EDHREC top list or a preconstructed deck, and the app saves each card's art — from [MTGPics](https://www.mtgpics.com) where
 it has it, since its art is larger and uncropped, and from [Scryfall](https://scryfall.com)
 otherwise.
 
@@ -47,6 +47,13 @@ many first.
 
 **Presets.** EDHREC's lists of the most-played Commander cards.
 
+**Decks.** Every preconstructed deck [MTGJSON](https://mtgjson.com) lists — Commander decks, Secret
+Lair drops, theme decks, Jumpstart packs and the rest — newest first, with a picture of its box
+where TCGplayer has one. Search them in Scryfall's words: `set:eoc`, `type:commander`,
+`name:abzan`, `year>=2024`, `date<2020-06`, bare words for the deck's or its set's name, and `-`
+before any of them to leave out what it matches. Downloading a deck saves the exact printings in
+the box, its commander first.
+
 Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and by default go in
 `mtgpics/` and `scryfall/` folders (and `web/` for copies you find), with a folder for each layout:
 `MDFC Front` and `MDFC Back`, `Adventure`, `Saga`, `Basic`. A double-faced card is saved as one
@@ -57,7 +64,8 @@ image of the whole card. When a run ends, **Retry failed** runs the cards that f
 
 With **A folder for each list** on, a card list's art goes in a folder of its own inside the save
 folder, named in the field under the list. Opening a list file fills that field in with the file's
-name; leave it empty to save in the save folder itself.
+name; leave it empty to save in the save folder itself. The Decks tab has the same field, which
+picking a deck fills in with the deck's name.
 
 **Find a larger copy.** Scryfall's art is small. Next to each image that came from Scryfall, six
 buttons open a window of the app's own to look for a bigger one: Google Lens, searching for that
@@ -112,6 +120,7 @@ The settings live in `settings.json` in the app's config folder
 mtg-art cards.txt                       # a card list file
 mtg-art --search "set:mh2 t:creature"   # a Scryfall search
 mtg-art --preset edhrec-top-year        # a preset; --presets lists them
+mtg-art --deck AbzanArmor_TDC           # a precon, by its file's name on MTGJSON
 mtg-art cards.txt --out ./art           # somewhere other than the settings' folder
 mtg-art cards.txt --folder "Atraxa"     # in an Atraxa folder inside it
 ```
