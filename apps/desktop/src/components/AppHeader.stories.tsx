@@ -60,6 +60,30 @@ export const WithSettingsOpen: Story = {
   },
 };
 
+/** The settings button closes the drawer it opened, rather than starting to close it as a click
+ * outside it and then opening it again. */
+export const SettingsButtonCloses: Story = {
+  play: async ({ canvas }) => {
+    const button = canvas.getByRole("button", { name: "Settings" });
+    await userEvent.click(button);
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "Settings" })).toBeVisible());
+
+    // Pressed as a person does, the button down a moment before it's let go: the drawer saw the
+    // press as one outside it and started to close, and the click then opened it again.
+    // One session for both halves, so letting go makes the click.
+    const user = userEvent.setup();
+    await user.pointer({ keys: "[MouseLeft>]", target: button });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await user.pointer({ keys: "[/MouseLeft]", target: button });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument(),
+    );
+    // And it stays closed once the drawer has slid away.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument();
+  },
+};
+
 /** Outside Tauri there's no window to drive: no window buttons, and nothing to drag. */
 export const Browser: Story = {
   beforeEach: () => {

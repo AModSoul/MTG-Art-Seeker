@@ -1,5 +1,5 @@
 import { Button, Code, Fieldset, HStack, IconButton, Input, Stack, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LuFolderOpen, LuSettings } from "react-icons/lu";
 
 import { api } from "@/api";
@@ -103,13 +103,18 @@ type BooleanSetting = {
 
 export function SettingsDrawer() {
   const settings = useSettings((state) => state.settings);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   return (
-    <DrawerRoot size="md">
+    // The button that opens the drawer stays in reach above it, in the header. A click on it
+    // isn't one outside the drawer, which would start it closing only for the button to open
+    // it again: it closes the drawer, as it opened it.
+    <DrawerRoot size="md" persistentElements={[() => trigger.current]}>
       <Tooltip content="Settings">
         <DrawerTrigger asChild>
           {/* As small as the header's other buttons. */}
           <IconButton
+            ref={trigger}
             variant="ghost"
             size="2xs"
             aria-label="Settings"
