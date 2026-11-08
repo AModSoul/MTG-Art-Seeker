@@ -1,6 +1,6 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { expect, userEvent, waitFor } from "storybook/test";
 
 import { ScrollArea } from "./scroll-area";
 
@@ -23,13 +23,37 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A fixed height: the content scrolls inside it. */
+/** A fixed height: the content scrolls inside it, and while it does, Tab
+ * reaches it so the arrow keys can scroll it. */
 export const Default: Story = {
-  play: async ({ canvasElement }) => {
+  args: { label: "Cards" },
+  play: async ({ canvas, canvasElement }) => {
     const viewport = canvasElement.querySelector<HTMLElement>("[data-part=viewport]");
     await expect(viewport).not.toBeNull();
     if (!viewport) return;
     await expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+    await waitFor(() => expect(canvas.getByRole("region", { name: "Cards" })).toBe(viewport));
+    await userEvent.tab();
+    await expect(viewport).toHaveFocus();
+  },
+};
+
+/** Content that fits: nothing to scroll, so nothing to focus. */
+export const NothingToScroll: Story = {
+  args: { label: "Cards", height: "auto" },
+  render: (args) => (
+    <ScrollArea {...args}>
+      <Text px="3" py="1">
+        Card 1
+      </Text>
+    </ScrollArea>
+  ),
+  play: async ({ canvas, canvasElement }) => {
+    const viewport = canvasElement.querySelector<HTMLElement>("[data-part=viewport]");
+    // Until it has measured its content, a scroll area takes it to overflow.
+    await waitFor(() => expect(viewport).not.toHaveAttribute("data-overflow-y"));
+    await expect(viewport).not.toHaveAttribute("tabindex");
+    await expect(canvas.queryByRole("region")).not.toBeInTheDocument();
   },
 };
 
