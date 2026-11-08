@@ -50,9 +50,9 @@ many first.
 Files are named from a template, `NAME (ARTIST) [SET] {NUMBER}` by default, and by default go in
 `mtgpics/` and `scryfall/` folders (and `web/` for copies you find), with a folder for each layout:
 `MDFC Front` and `MDFC Back`, `Adventure`, `Saga`, `Basic`. A double-faced card is saved as one
-image per face, and so is a split card such as Fire // Ice when MTGPics has both halves' paintings;
-otherwise it's Scryfall's image of the whole card. When a run ends, **Retry failed** runs the cards
-that failed again, and **Copy failed** copies them as a list.
+image per face, and so is a split card such as Fire // Ice, Cut // Ribbons or a Room when MTGPics
+has both halves' paintings; otherwise it's Scryfall's image of the whole card. When a run ends,
+**Retry failed** runs the cards that failed again, and **Copy failed** copies them as a list.
 
 With **A folder for each list** on, a card list's art goes in a folder of its own inside the save
 folder, named in the field under the list. Opening a list file fills that field in with the file's

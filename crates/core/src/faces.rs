@@ -1,11 +1,12 @@
 //! Which images a card has, and where each is saved.
 //!
 //! A card whose faces each carry an image (transform, modal double-faced,
-//! reversible…) is downloaded once per face. A split card's halves have a
-//! painting each, which MTGPics has apart and Scryfall only together: with
-//! MTGPics in use, each half is its own image, and when MTGPics hasn't both,
-//! the run saves Scryfall's image of the whole card instead ([`whole_card`]).
-//! Everything else, adventure and flip cards among them, is one download.
+//! reversible…) is downloaded once per face. A split card's halves (aftermath
+//! cards and Rooms are split cards too) have a painting each, which MTGPics has
+//! apart and Scryfall only together: with MTGPics in use, each half is its own
+//! image, and when MTGPics hasn't both, the run saves Scryfall's image of the
+//! whole card instead ([`whole_card`]). Everything else, adventure and flip
+//! cards among them, is one download.
 
 use crate::{
     card::Card,

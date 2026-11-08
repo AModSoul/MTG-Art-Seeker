@@ -175,6 +175,20 @@ mod tests {
     }
 
     #[test]
+    fn gives_a_split_cards_halves_their_own_art_in_order() {
+        let halves = |name: &str| -> Vec<Option<String>> {
+            let arts = extract_arts(&fixture(name), ORIGIN);
+            pick_arts(&arts, 2).into_iter().map(|a| a.map(|a| a.number)).collect()
+        };
+        // Fire // Ice reprints its Izzet vs. Golgari paintings, neither of
+        // which is the page's scan: they keep the page's order, Fire's first.
+        assert_eq!(halves("card_mh2290.html"), [Some("032".into()), Some("091".into())]);
+        // An aftermath card lists the second half's art first; the first
+        // half's is the one numbered as the card, as its scan is.
+        assert_eq!(halves("card_akh223.html"), [Some("223".into()), Some("312".into())]);
+    }
+
+    #[test]
     fn a_back_face_without_art_is_none() {
         let arts = extract_arts(&fixture("card_khm252.html"), ORIGIN);
         assert_eq!(numbers(&arts), ["252"]);
