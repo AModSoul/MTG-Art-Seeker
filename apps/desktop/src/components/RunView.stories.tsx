@@ -85,7 +85,7 @@ export const Finished: Story = {
     await userEvent.click(canvas.getByRole("radio", { name: "Failed 2" }));
     await expect(canvas.getByText("Not A Real Card")).toBeVisible();
     await expect(canvas.getByText("No art found for Insectile Aberration")).toBeVisible();
-    await expect(canvas.queryByText("Lightning Bolt")).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("row", { name: /Lightning Bolt/ })).not.toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole("radio", { name: "MTGPics 1" }));
     await expect(canvas.getByText("Karn, Scion of Urza (DOM) 1")).toBeVisible();
@@ -124,7 +124,9 @@ export const RevealFiles: Story = {
     useRun.setState({ jobs: finishedJobs, summary: finishedSummary });
   },
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByText("Karn, Scion of Urza · Chase Stone"));
+    // Stacked on two lines, the name has a space more either side of the dot.
+    const karn = /^Karn, Scion of Urza\s+·\s+Chase Stone$/;
+    await userEvent.click(canvas.getByRole("button", { name: karn }));
     await expect(api.revealFile).toHaveBeenCalledWith(karnFile.path);
 
     mocked(api.revealFile).mockClear();
@@ -134,7 +136,7 @@ export const RevealFiles: Story = {
     await expect(api.revealFile).toHaveBeenCalledWith(karnFile.path);
 
     mocked(api.revealFile).mockClear();
-    canvas.getByRole("button", { name: /Karn, Scion of Urza · Chase Stone/ }).focus();
+    canvas.getByRole("button", { name: karn }).focus();
     await userEvent.keyboard("{Enter}");
     await expect(api.revealFile).toHaveBeenCalledWith(karnFile.path);
 
@@ -304,7 +306,7 @@ export const SavesAFoundCopy: Story = {
     );
     await expect(canvas.getByText("2400 × 1752")).toBeVisible();
     await userEvent.click(canvas.getByRole("radio", { name: "Found 1" }));
-    await expect(canvas.getByText("Lightning Bolt")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /^Lightning Bolt · / })).toBeVisible();
   },
 };
 
@@ -549,6 +551,82 @@ const delverJob: JobView = {
   line: "",
   images: 2,
   status: { state: "downloading", images: 2 },
+};
+
+/** How many lines of text an element takes up. */
+function lineCount(element: HTMLElement): number {
+  return Math.round(element.offsetHeight / parseFloat(getComputedStyle(element).lineHeight));
+}
+
+/** With room, every saved file's card and artist share a line. */
+export const OneLineEach: Story = {
+  decorators: [
+    (Story) => (
+      <div style={{ width: "1200px" }}>
+        <Story />
+      </div>
+    ),
+  ],
+  beforeEach: () => {
+    useRun.setState({ jobs: finishedJobs, summary: finishedSummary });
+  },
+  play: async ({ canvas }) => {
+    const buttons = canvas.getAllByRole("button", { name: / · / });
+    await expect(buttons.length).toBeGreaterThan(1);
+    for (const button of buttons) {
+      await waitFor(() => expect(lineCount(button)).toBe(1));
+    }
+  },
+};
+
+/** The longest card name there is, and an artist credit as long, in a narrow
+ * window: every row, even one whose names are short, puts its card and artist on
+ * a line each, the Saved column keeps room for each name, and the table scrolls
+ * sideways rather than cut either short. The Card column keeps room for its
+ * longest name on two lines. */
+export const LongNames: Story = {
+  decorators: [
+    (Story) => (
+      <div style={{ width: "600px" }}>
+        <Story />
+      </div>
+    ),
+  ],
+  beforeEach: () => {
+    const longFace = { ...boltFile, face: "Avacyn's Collar, the Symbol of Her Church" };
+    const longArtist = {
+      ...boltFile,
+      path: `${boltFile.path}.2`,
+      artist: "Christopher Moeller & Rebecca Guay-Mitchell",
+    };
+    useRun.setState({
+      runId: 1,
+      jobs: [
+        {
+          ...karnJob,
+          label: "Avacyn's Collar, the Symbol of Her Church (SLD) 1234",
+          status: { state: "done", files: [longFace], missing: [] },
+        },
+        { ...delverJob, status: { state: "done", files: [longArtist], missing: [] } },
+      ],
+    });
+  },
+  play: async ({ canvas }) => {
+    const label = canvas.getByText("Avacyn's Collar, the Symbol of Her Church (SLD) 1234");
+    await waitFor(() => expect(lineCount(label)).toBe(2));
+    // Two lines, none cut off below them.
+    await expect(label.scrollHeight).toBeLessThanOrEqual(label.clientHeight);
+
+    for (const name of [/^Avacyn's Collar/, /^Lightning Bolt · /]) {
+      const button = canvas.getByRole("button", { name });
+      await waitFor(() => expect(lineCount(button)).toBe(2));
+      for (const text of button.children) {
+        // Skip the dot only screen readers hear.
+        if (getComputedStyle(text).position === "absolute") continue;
+        await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth);
+      }
+    }
+  },
 };
 
 /** A row is as tall as it will be once its art is saved: a line per image the
