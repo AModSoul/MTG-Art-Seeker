@@ -135,7 +135,12 @@ function Home() {
           bodyProps={{ gap: 4 }}
         >
           {/* A line too long for a phone scrolls sideways. */}
-          <ScrollArea orientation="horizontal" rounded="md" bg="bg.muted">
+          <ScrollArea
+            orientation="horizontal"
+            label="Command line examples"
+            rounded="md"
+            bg="bg.muted"
+          >
             <Box as="pre" p={4} fontSize="sm">
               <code>
                 {[
