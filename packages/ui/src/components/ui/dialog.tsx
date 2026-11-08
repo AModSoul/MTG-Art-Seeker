@@ -1,6 +1,7 @@
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
 
 import { CloseButton } from "./close-button";
+import { ScrollArea } from "./scroll-area";
 
 interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;
@@ -45,9 +46,32 @@ export function DialogCloseTrigger({
 export const DialogRoot = ChakraDialog.Root;
 export const DialogFooter = ChakraDialog.Footer;
 export const DialogHeader = ChakraDialog.Header;
-export const DialogBody = ChakraDialog.Body;
 export const DialogBackdrop = ChakraDialog.Backdrop;
 export const DialogTitle = ChakraDialog.Title;
 export const DialogDescription = ChakraDialog.Description;
 export const DialogTrigger = ChakraDialog.Trigger;
 export const DialogActionTrigger = ChakraDialog.ActionTrigger;
+
+/** The dialog's body, which scrolls in a scroll area when it's taller than the dialog. Chakra's
+ * padding for it is on the scrolling content, so the scrollbar sits at the dialog's edge. */
+export function DialogBody({
+  ref,
+  children,
+  ...rest
+}: ChakraDialog.BodyProps & { ref?: React.Ref<HTMLDivElement> }) {
+  return (
+    <ChakraDialog.Body
+      ref={ref}
+      display="flex"
+      flexDirection="column"
+      minH="0"
+      p="0"
+      overflow="hidden"
+      {...rest}
+    >
+      <ScrollArea flex="1" minH="0" contentProps={{ px: "6", pt: "2", pb: "6" }}>
+        {children}
+      </ScrollArea>
+    </ChakraDialog.Body>
+  );
+}
