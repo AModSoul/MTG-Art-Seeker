@@ -35,7 +35,7 @@ use crate::{
     card::Card,
     carddb::CardDb,
     engine::{face_dir, face_stem, output_dir_for, place, ArtSource, PathReserver, SavedFile, TempFile},
-    faces::{plan_faces, FacePlan},
+    faces::{plan_faces, whole_card, FacePlan},
     history::{FoundByHand, FoundCopy, History, KnownWebsite},
     http::{Http, ImageKind},
     imagesize::{image_size, ImageSize},
@@ -199,7 +199,9 @@ impl Site {
 }
 
 /// The face `face_index` of the printing `set` `number`, as a run with
-/// `settings` would save it. Looked up in the card data first.
+/// `settings` would save it; with `face_name`, the image saved under that
+/// name, which tells a split card saved whole from its first half. Looked up
+/// in the card data first.
 pub async fn prepare(
     http: &Http,
     cards: Option<&CardDb>,
@@ -207,6 +209,7 @@ pub async fn prepare(
     set: &str,
     number: &str,
     face_index: usize,
+    face_name: Option<&str>,
 ) -> Result<Target> {
     let local = cards.and_then(|db| db.by_number(set, number).ok().flatten());
     let card = match local {
@@ -224,9 +227,11 @@ pub async fn prepare(
                 .ok_or_else(|| Error::Other(format!("Scryfall has no card {} {number}", set.to_uppercase())))?
         }
     };
-    let face = plan_faces(&card, settings)
+    let mut faces = plan_faces(&card, settings);
+    faces.push(whole_card(&card, settings));
+    let face = faces
         .into_iter()
-        .find(|face| face.index == face_index)
+        .find(|face| face.index == face_index && face_name.map_or(true, |name| face.name == name))
         .ok_or_else(|| Error::Other(format!("{} has no image {face_index}", card.name)))?;
     if card.art_crop(face.index).is_none() {
         return Err(Error::Other(format!(
@@ -386,8 +391,7 @@ pub async fn import(
         ..file
     };
 
-    let (card, face) = (&target.card, &target.face);
-    if let (Some(history), Some(art)) = (history, card.illustration(face.index)) {
+    if let (Some(history), Some(art)) = (history, target.face.illustration.as_deref()) {
         // The file is saved either way; only the next run, or going back to
         // this copy, would miss it.
         let _ = history.remember_found_by_hand(

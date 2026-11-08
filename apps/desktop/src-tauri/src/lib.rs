@@ -325,6 +325,7 @@ async fn saved_face(
         &file.set,
         &file.number,
         face as usize,
+        Some(&file.face),
     )
     .await
     .map_err(|e| e.to_string())?;

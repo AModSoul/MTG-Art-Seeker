@@ -19,7 +19,7 @@ use ts_rs::TS;
 use crate::{
     card::Card,
     carddb::{CardDb, NameQuery},
-    faces::{plan_faces, FacePlan},
+    faces::{plan_faces, whole_card, FacePlan},
     history::{History, Remembered},
     http::{Http, ImageKind},
     imagesize::{image_size, ImageSize},
@@ -569,6 +569,10 @@ async fn download_card(
     // Per face, where its MTGPics art was saved from; `None` if it wasn't.
     let mut log = Vec::with_capacity(faces.len());
     let mut mtgpics_failed = false;
+    // This card's files start here: a job saves every printing it's asked for.
+    let first_file = files.len();
+    // A split card's halves MTGPics had no art for: Scryfall has none of a half.
+    let mut halves_missing = Vec::new();
 
     for (index, face) in faces.iter().enumerate() {
         // An image the user picked themselves comes before anything found for them.
@@ -597,6 +601,10 @@ async fn download_card(
             }
         }
         log.push(None);
+        if face.is_split_half() {
+            halves_missing.push(face.name.clone());
+            continue;
+        }
         if settings.sources != SourceMode::MtgpicsOnly {
             match &face.scryfall_url {
                 Some(url) => match save(card, face, ArtSource::Scryfall, url, context).await {
@@ -611,6 +619,36 @@ async fn download_card(
             }
         }
         missing.push(face.name.clone());
+    }
+
+    if !halves_missing.is_empty() {
+        if settings.sources == SourceMode::MtgpicsOnly {
+            missing.extend(halves_missing);
+        } else {
+            // Not both halves' art from MTGPics: the whole card, as Scryfall
+            // has it, rather than one half from each.
+            for file in files.drain(first_file..) {
+                let _ = tokio::fs::remove_file(&file.path).await;
+            }
+            let whole = whole_card(card, settings);
+            match &whole.scryfall_url {
+                Some(url) => match save(card, &whole, ArtSource::Scryfall, url, context).await {
+                    Ok(Some(file)) => files.push(file),
+                    Ok(None) => {
+                        errors.push("Scryfall's image is missing".into());
+                        missing.push(whole.name);
+                    }
+                    Err(error) => {
+                        errors.push(format!("Scryfall: {error}"));
+                        missing.push(whole.name);
+                    }
+                },
+                None => {
+                    errors.push("Scryfall has no image of this card".into());
+                    missing.push(whole.name);
+                }
+            }
+        }
     }
 
     // Logged once MTGPics' answer for every face is known. A face it failed
@@ -636,7 +674,7 @@ async fn found_by_hand(
         return None;
     }
     let history = context.history?;
-    let art = card.illustration(face.index)?;
+    let art = face.illustration.as_deref()?;
     let found = history.found_by_hand(art).ok().flatten()?;
     match save(card, face, ArtSource::Web, &found.url, context).await {
         Ok(Some(file)) => Some(SavedFile {

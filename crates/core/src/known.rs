@@ -73,7 +73,7 @@ pub async fn known_sources(
     };
     plain(ArtSource::Mtgpics, mtgpics_url(history, target, settings));
     plain(ArtSource::Scryfall, target.face.scryfall_url.clone());
-    let art = target.card.illustration(target.face.index);
+    let art = target.face.illustration.as_deref();
     if let (Some(history), Some(art)) = (history, art) {
         // The copy in use is the one later runs save, and so the one saved now.
         let in_use = history.found_by_hand(art).ok().flatten().map(|found| found.url);
@@ -116,7 +116,12 @@ async fn image_size(http: &Http, history: Option<&History>, url: &str) -> Option
 }
 
 fn mtgpics_url(history: Option<&History>, target: &Target, settings: &Settings) -> Option<String> {
-    let faces = plan_faces(&target.card, settings).len();
+    let faces = plan_faces(&target.card, settings);
+    // A split card saved whole has no MTGPics art: MTGPics has its halves.
+    if !faces.contains(&target.face) {
+        return None;
+    }
+    let faces = faces.len();
     let remembered = history?.remembered(&target.card, faces).ok().flatten()?;
     remembered.mtgpics.get(target.face.index).cloned().flatten()
 }
@@ -135,7 +140,7 @@ pub async fn save_from(
     copy: Option<i64>,
 ) -> Result<(SavedFile, Option<String>)> {
     let name = &target.face.name;
-    let art = target.card.illustration(target.face.index);
+    let art = target.face.illustration.as_deref();
     let (url, page) = match source {
         ArtSource::Mtgpics => mtgpics_url(history, target, destination.settings)
             .map(|url| (url, None))

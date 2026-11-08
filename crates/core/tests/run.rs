@@ -813,7 +813,9 @@ async fn saves_a_larger_copy_the_user_found_in_place_of_scryfalls() {
     let downloaded = dir.path().join("lens-0.part");
     std::fs::write(&downloaded, jpeg(&art)).unwrap();
 
-    let target = manual::prepare(&http, None, &settings, "DOM", "1", 0).await.unwrap();
+    let target = manual::prepare(&http, None, &settings, "DOM", "1", 0, None)
+        .await
+        .unwrap();
     assert_eq!(target.face.name, "Karn, Scion of Urza");
     let found = manual::Found {
         image_url: "https://cdna.artstation.com/p/assets/images/karn/4k/karn.jpg",
@@ -858,7 +860,9 @@ async fn asks_before_saving_an_image_that_is_not_the_art() {
     let dir = tempfile::tempdir().unwrap();
     let downloaded = dir.path().join("lens-0.part");
     std::fs::write(&downloaded, jpeg(&painting(1200, 900, 2))).unwrap();
-    let target = manual::prepare(&http, None, &settings, "dom", "1", 0).await.unwrap();
+    let target = manual::prepare(&http, None, &settings, "dom", "1", 0, None)
+        .await
+        .unwrap();
     let found = manual::Found {
         image_url: "https://example.com/other.jpg",
         page: None,
@@ -1076,7 +1080,9 @@ async fn offers_the_images_of_a_page_art_first() {
     let out = tempfile::tempdir().unwrap();
     let settings = settings(out.path());
     let dir = tempfile::tempdir().unwrap();
-    let target = manual::prepare(&http, None, &settings, "dom", "1", 0).await.unwrap();
+    let target = manual::prepare(&http, None, &settings, "dom", "1", 0, None)
+        .await
+        .unwrap();
     let images = vec![
         image("avatar.jpg", 150, 150),
         image("scan.jpg", 745, 1040),
@@ -1153,7 +1159,9 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
     let settings = settings(out.path());
     let dir = tempfile::tempdir().unwrap();
     let history = History::open(&dir.path().join("history.sqlite")).unwrap();
-    let target = manual::prepare(&http, None, &settings, "DOM", "1", 0).await.unwrap();
+    let target = manual::prepare(&http, None, &settings, "DOM", "1", 0, None)
+        .await
+        .unwrap();
     let scryfall = target.face.scryfall_url.clone().unwrap();
     // Scryfall's image is the art crop karn_with_art serves.
 
@@ -1292,4 +1300,58 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
     assert_eq!(file.size.map(|s| s.width), Some(1200));
     assert!(!mtgpics_file.exists());
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), Some(in_use));
+}
+
+/// Fire // Ice from Modern Horizons 2 (`mh2/290`), as Scryfall has it, its
+/// image links pointed at the mock CDN: a split card, with a painting per half.
+fn fire_ice(servers: &Servers) -> Value {
+    let json = String::from_utf8(fixture("card_mh2_290.json")).unwrap();
+    serde_json::from_str(&json.replace("https://cards.scryfall.io", &servers.cdn.uri())).unwrap()
+}
+
+#[tokio::test]
+async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall() {
+    let servers = Servers::start().await;
+    let card = fire_ice(&servers);
+    let crop = card["image_uris"]["art_crop"].as_str().unwrap();
+    let crop = reqwest::Url::parse(crop).unwrap().path().to_owned();
+    Servers::image(&servers.cdn, &crop, JPEG).await;
+    Mock::given(method("POST"))
+        .and(path("/cards/collection"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "data": [card], "not_found": [] })))
+        .mount(&servers.scryfall)
+        .await;
+    let input = || RunInput::List {
+        text: "Fire // Ice (MH2) 290".into(),
+        folder: None,
+    };
+    let saved_in = |out: &Path| -> Vec<String> { walk(out).iter().map(|file| relative(file, out)).collect() };
+
+    // MTGPics has neither half: the whole card, as Scryfall has it.
+    let out = tempfile::tempdir().unwrap();
+    let (summary, _) = run_to_end(&servers.http(), input(), &settings(out.path())).await;
+    assert_eq!((summary.done, summary.scryfall_files), (1, 1));
+    assert_eq!(saved_in(out.path()), ["scryfall/Split/Fire - Ice [MH2] {290}.jpg"]);
+
+    // MTGPics has a painting for each half, Fire's first: one image each, as
+    // a two-faced card has.
+    servers.mtgpics_page("mh2290", fixture("card_mh2290.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/ivg/032.jpg", JPEG).await;
+    Servers::image(&servers.mtgpics, "/pics/art/ivg/091.jpg", PNG).await;
+    let out = tempfile::tempdir().unwrap();
+    let (summary, jobs) = run_to_end(&servers.http(), input(), &settings(out.path())).await;
+    assert_eq!((summary.done, summary.mtgpics_files), (1, 2));
+    assert_eq!(
+        saved_in(out.path()),
+        [
+            "mtgpics/Split/Fire [MH2] {290}.jpg",
+            "mtgpics/Split/Ice [MH2] {290}.png"
+        ]
+    );
+    let JobStatus::Done { files, missing } = &jobs[0].1 else {
+        panic!("{jobs:?}");
+    };
+    let faces: Vec<_> = files.iter().map(|f| (f.face_index, f.face.as_str())).collect();
+    assert_eq!(faces, [(0, "Fire"), (1, "Ice")]);
+    assert!(missing.is_empty());
 }

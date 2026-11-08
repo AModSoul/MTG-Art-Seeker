@@ -1,12 +1,15 @@
 //! Which images a card has, and where each is saved.
 //!
 //! A card whose faces each carry an image (transform, modal double-faced,
-//! reversible…) is downloaded once per face. Everything else — including split,
-//! adventure and flip cards, whose halves share one image — is one download.
+//! reversible…) is downloaded once per face. A split card's halves have a
+//! painting each, which MTGPics has apart and Scryfall only together: with
+//! MTGPics in use, each half is its own image, and when MTGPics hasn't both,
+//! the run saves Scryfall's image of the whole card instead ([`whole_card`]).
+//! Everything else, adventure and flip cards among them, is one download.
 
 use crate::{
     card::Card,
-    settings::{ScryfallImage, Settings},
+    settings::{ScryfallImage, Settings, SourceMode},
 };
 
 /// One image to download.
@@ -20,7 +23,19 @@ pub struct FacePlan {
     /// Folders between the source folder and the file, outermost first.
     pub folders: Vec<String>,
     /// Scryfall's image of this face, in the format the settings ask for.
+    /// `None` for a split card's half: Scryfall has only the whole card.
     pub scryfall_url: Option<String>,
+    /// The artwork this image is, by which a copy the user found is kept:
+    /// Scryfall's illustration id, and for a split card's half, the half's
+    /// number after it, since Scryfall gives the halves one id between them.
+    pub illustration: Option<String>,
+}
+
+impl FacePlan {
+    /// Whether this is one half of a split card.
+    pub fn is_split_half(&self) -> bool {
+        self.illustration.as_deref().is_some_and(|art| art.contains('#'))
+    }
 }
 
 /// Card types a type folder can be, in the order a type line is checked:
@@ -46,16 +61,30 @@ const CARD_TYPES: [&str; 17] = [
 ];
 
 pub fn plan_faces(card: &Card, settings: &Settings) -> Vec<FacePlan> {
-    let image_key = |uris: &crate::card::ImageUris| match settings.scryfall_image {
-        ScryfallImage::ArtCrop => uris.art_crop.clone(),
-        ScryfallImage::FullCard => uris.png.clone(),
-    };
+    let image_key = |uris: &crate::card::ImageUris| image_url(uris, settings);
     let type_folder = settings.type_folders.then(|| type_folder(card));
     let layout_folder = if settings.layout_folders {
         layout_folder(card)
     } else {
         None
     };
+
+    if has_split_halves(card, settings) {
+        let art = card.front_illustration();
+        return card
+            .card_faces
+            .iter()
+            .enumerate()
+            .map(|(index, face)| FacePlan {
+                index,
+                name: face.name.clone(),
+                artist: artist(face.artist.as_deref().or(card.artist.as_deref())),
+                folders: folders(&type_folder, layout_folder.clone()),
+                scryfall_url: None,
+                illustration: art.map(|art| format!("{art}#{index}")),
+            })
+            .collect();
+    }
 
     if card.has_face_images() {
         return card
@@ -73,11 +102,24 @@ pub fn plan_faces(card: &Card, settings: &Settings) -> Vec<FacePlan> {
                         layout_folder.as_ref().map(|layout| format!("{layout} {side}")),
                     ),
                     scryfall_url: face.image_uris.as_ref().and_then(image_key),
+                    illustration: face.illustration_id.clone(),
                 }
             })
             .collect();
     }
+    vec![whole_card(card, settings)]
+}
 
+/// The card as one image, as Scryfall has it: a split card's halves together,
+/// under the card's full name. What [`plan_faces`] plans for any card whose
+/// faces don't each have an image of their own, except a split card's halves.
+pub fn whole_card(card: &Card, settings: &Settings) -> FacePlan {
+    let type_folder = settings.type_folders.then(|| type_folder(card));
+    let layout_folder = if settings.layout_folders {
+        layout_folder(card)
+    } else {
+        None
+    };
     // Adventure and flip cards are saved under their main half's name.
     let name = match card.layout.as_str() {
         "adventure" | "flip" => card.front_name().to_owned(),
@@ -88,13 +130,27 @@ pub fn plan_faces(card: &Card, settings: &Settings) -> Vec<FacePlan> {
             .as_deref()
             .or_else(|| card.card_faces.first()?.artist.as_deref()),
     );
-    vec![FacePlan {
+    FacePlan {
         index: 0,
         name,
         artist,
         folders: folders(&type_folder, layout_folder),
-        scryfall_url: card.image_uris.as_ref().and_then(image_key),
-    }]
+        scryfall_url: card.image_uris.as_ref().and_then(|uris| image_url(uris, settings)),
+        illustration: card.front_illustration().map(str::to_owned),
+    }
+}
+
+/// Whether a split card is planned half by half: a painting each, from
+/// MTGPics, so only when MTGPics is asked.
+fn has_split_halves(card: &Card, settings: &Settings) -> bool {
+    card.layout == "split" && card.card_faces.len() == 2 && settings.sources != SourceMode::ScryfallOnly
+}
+
+fn image_url(uris: &crate::card::ImageUris, settings: &Settings) -> Option<String> {
+    match settings.scryfall_image {
+        ScryfallImage::ArtCrop => uris.art_crop.clone(),
+        ScryfallImage::FullCard => uris.png.clone(),
+    }
 }
 
 fn artist(name: Option<&str>) -> String {
@@ -224,18 +280,55 @@ mod tests {
         assert!(plan_faces(&card("Agadeem"), &flat).iter().all(|f| f.folders.is_empty()));
     }
 
-    #[test]
-    fn a_split_card_is_one_image_under_its_full_name() {
-        let split: Card = serde_json::from_value(serde_json::json!({
+    fn fire_ice() -> Card {
+        serde_json::from_value(serde_json::json!({
             "name": "Fire // Ice", "layout": "split", "set": "mh2", "collector_number": "290",
-            "artist": "Franz Vohwinkel", "type_line": "Instant // Instant",
+            "artist": "Dan Murayama Scott", "type_line": "Instant // Instant",
+            "illustration_id": "fire-ice-art",
             "image_uris": { "art_crop": "https://cards.scryfall.io/art_crop/x.jpg" },
-            "card_faces": [{ "name": "Fire" }, { "name": "Ice" }]
+            "card_faces": [
+                { "name": "Fire", "artist": "Dan Murayama Scott", "illustration_id": "fire-ice-art" },
+                { "name": "Ice", "artist": "Dan Murayama Scott" }
+            ]
         }))
-        .unwrap();
-        let faces = plan_faces(&split, &Settings::default());
-        assert_eq!(faces.len(), 1);
+        .unwrap()
+    }
+
+    #[test]
+    fn a_split_card_is_an_image_per_half_from_mtgpics() {
+        let faces = plan_faces(&fire_ice(), &Settings::default());
+        let halves: Vec<_> = faces
+            .iter()
+            .map(|f| {
+                (
+                    f.index,
+                    f.name.as_str(),
+                    f.illustration.as_deref(),
+                    f.scryfall_url.is_some(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            halves,
+            [
+                (0, "Fire", Some("fire-ice-art#0"), false),
+                (1, "Ice", Some("fire-ice-art#1"), false),
+            ]
+        );
+        assert!(faces.iter().all(|f| f.folders == ["Split"] && f.is_split_half()));
+    }
+
+    #[test]
+    fn a_split_card_from_scryfall_is_one_image_under_its_full_name() {
+        let scryfall_only = Settings {
+            sources: SourceMode::ScryfallOnly,
+            ..Settings::default()
+        };
+        let faces = plan_faces(&fire_ice(), &scryfall_only);
+        assert_eq!(faces, [whole_card(&fire_ice(), &scryfall_only)]);
         assert_eq!(faces[0].name, "Fire // Ice");
         assert_eq!(faces[0].folders, ["Split"]);
+        assert_eq!(faces[0].illustration.as_deref(), Some("fire-ice-art"));
+        assert!(faces[0].scryfall_url.is_some() && !faces[0].is_split_half());
     }
 }
