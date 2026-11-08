@@ -193,7 +193,10 @@ export function RunView() {
               <Table.ColumnHeader>Card</Table.ColumnHeader>
               <Table.ColumnHeader w="32">Status</Table.ColumnHeader>
               <Table.ColumnHeader w="28">Resolution</Table.ColumnHeader>
-              <Table.ColumnHeader>Saved</Table.ColumnHeader>
+              {/* Saved takes the width left over, and its names are cut short to fit it. */}
+              <Table.ColumnHeader w="full" maxW="0">
+                Saved
+              </Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -230,6 +233,7 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
               src={convertFileSrc(file.path)}
               alt=""
               w="16"
+              maxW="none"
               h="12"
               objectFit="cover"
               rounded="sm"
@@ -261,14 +265,19 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
         <Stack gap="1">
           {files.map((file) => (
             <Flex key={file.path} h={line} align="center" title="Width × height, in pixels">
-              <Text fontSize="sm" color="fg.muted" fontVariantNumeric="tabular-nums">
+              <Text
+                fontSize="sm"
+                color="fg.muted"
+                fontVariantNumeric="tabular-nums"
+                whiteSpace="nowrap"
+              >
                 {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
               </Text>
             </Flex>
           ))}
         </Stack>
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell w="full" maxW="0">
         <Stack gap="1">
           {files.map((file) => (
             <HStack key={file.path} h={line} gap="1">
