@@ -503,7 +503,8 @@ async fn fetch_page(
             }
         }
     };
-    let images = match manual::fetch_page_images(&state.http, &search.target, images, &dir).await {
+    let referer = page.as_ref().map(tauri::Url::as_str);
+    let images = match manual::fetch_page_images(&state.http, &search.target, images, referer, &dir).await {
         Ok(images) if images.is_empty() => return FoundEvent::NoImages { face },
         Ok(images) => images,
         Err(error) => {

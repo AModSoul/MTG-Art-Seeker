@@ -22,7 +22,7 @@ use std::{
     cmp::Reverse,
     collections::HashSet,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
+    sync::Arc,
 };
 
 use futures::{stream, StreamExt};
@@ -34,7 +34,7 @@ use ts_rs::TS;
 use crate::{
     card::Card,
     carddb::CardDb,
-    engine::{face_dir, face_stem, output_dir_for, place, ArtSource, PathReserver, SavedFile, TempFile},
+    engine::{face_dir, face_stem, next_temp_id, output_dir_for, place, ArtSource, PathReserver, SavedFile, TempFile},
     faces::{plan_faces, whole_card, FacePlan},
     history::{FoundByHand, FoundCopy, History, KnownWebsite},
     http::{Http, ImageKind},
@@ -42,12 +42,15 @@ use crate::{
     mtgpics::{self, Artists},
     scryfall::{self, Identifier},
     settings::Settings,
-    verify::{self, Verdict},
+    verify::{CropPart, Reference, Verdict},
     Error, Result,
 };
 
-/// Numbers temporary files, so two imports at once can't share one.
-static TEMP_IDS: AtomicU64 = AtomicU64::new(0);
+/// Whether `url` is a web address an image can be downloaded from again:
+/// not a `blob:` or `data:` URL a page made.
+pub(crate) fn is_web_url(url: &str) -> bool {
+    Url::parse(url).is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.has_host())
+}
 
 /// The face a larger copy is being looked for.
 #[derive(Debug, Clone)]
@@ -58,7 +61,9 @@ pub struct Target {
 
 impl Target {
     /// Scryfall's art crop of the face: what Lens is asked to search for, and
-    /// what an image the user saves is checked against.
+    /// what an image the user saves is checked against. A split card's half
+    /// has the whole card's, both halves side by side; only the half's part of
+    /// it is checked against ([`CropPart`]).
     pub fn art_crop(&self) -> &str {
         self.card
             .art_crop(self.face.index)
@@ -383,7 +388,7 @@ pub async fn import(
 
     let dir = source_dir(target, destination, ArtSource::Web);
     tokio::fs::create_dir_all(&dir).await?;
-    let temp = TempFile::beside(&dir, TEMP_IDS.fetch_add(1, Ordering::Relaxed));
+    let temp = TempFile::beside(&dir);
     tokio::fs::copy(downloaded, temp.path()).await?;
     let (file, replaced) = put_in_place(target, destination, ArtSource::Web, &dir, temp, kind).await?;
     let file = SavedFile {
@@ -391,7 +396,10 @@ pub async fn import(
         ..file
     };
 
-    if let (Some(history), Some(art)) = (history, target.face.illustration.as_deref()) {
+    let art = target.face.illustration.as_deref();
+    // Only an address it can be downloaded from again is kept: a page's
+    // `blob:` or `data:` image is saved this once.
+    if let (Some(history), Some(art), true) = (history, art, is_web_url(found.image_url)) {
         // The file is saved either way; only the next run, or going back to
         // this copy, would miss it.
         let _ = history.remember_found_by_hand(
@@ -459,30 +467,98 @@ pub(crate) async fn put_in_place(
 
 /// Why `downloaded` isn't a larger copy of the face's art, if it isn't.
 async fn doubt(http: &Http, target: &Target, downloaded: &Path) -> Result<Option<Doubt>> {
-    let crop = ArtCrop::fetch(http, target, downloaded.parent().unwrap_or(Path::new("."))).await?;
+    let dir = downloaded.parent().unwrap_or(Path::new("."));
+    let crop = ArtCrop::fetch(http, &target.card, &target.face, dir).await?;
     crop.doubt(downloaded).await
 }
 
-/// Scryfall's art crop of a face, downloaded to check images against;
-/// deleted when dropped.
-struct ArtCrop(PathBuf);
+/// A copy the user found before, as the history has it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct FoundCopyAt<'a> {
+    pub url: &'a str,
+    /// The page it was on.
+    pub page: Option<&'a str>,
+    /// Its size when the user saved it, if known.
+    pub accepted: Option<ImageSize>,
+}
+
+/// What downloading a copy the user found again came to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Refetched {
+    /// Downloaded, and still the copy the user saved.
+    Ready(ImageKind),
+    /// Gone from where it was, or never at an address to download from.
+    Gone,
+    /// Something else is there now: neither a larger copy of the art nor the
+    /// image the user saved though the check doubted it.
+    Changed,
+}
+
+/// Downloads `copy` again to `dest`, as the page it was on asks for it, and
+/// checks it against the face's art crop. A copy the user saved though the
+/// check doubted it passes if it's the size it was then.
+pub(crate) async fn refetch_found_copy(
+    http: &Http,
+    card: &Card,
+    face: &FacePlan,
+    copy: FoundCopyAt<'_>,
+    dest: &Path,
+) -> Result<Refetched> {
+    if !is_web_url(copy.url) {
+        return Ok(Refetched::Gone);
+    }
+    let Some(kind) = http.download_from(copy.url, copy.page, dest).await? else {
+        return Ok(Refetched::Gone);
+    };
+    let unchanged = copy.accepted.is_some() && image_size(dest, kind) == copy.accepted;
+    let dir = dest.parent().unwrap_or(Path::new("."));
+    let checked = match ArtCrop::fetch(http, card, face, dir).await {
+        Ok(crop) => crop.doubt(dest).await.map(|doubt| doubt.is_none()),
+        Err(error) => Err(error),
+    };
+    match checked {
+        Ok(true) => Ok(Refetched::Ready(kind)),
+        _ if unchanged => Ok(Refetched::Ready(kind)),
+        Ok(false) => Ok(Refetched::Changed),
+        // The check couldn't be made.
+        Err(error) => Err(error),
+    }
+}
+
+/// Which part of Scryfall's art crop `face`'s art is.
+fn crop_part(face: &FacePlan) -> CropPart {
+    match (face.is_split_half(), face.index) {
+        (false, _) => CropPart::Whole,
+        (true, 0) => CropPart::FirstHalf,
+        (true, _) => CropPart::SecondHalf,
+    }
+}
+
+/// Scryfall's art crop of a face, decoded once to check any number of images
+/// against.
+struct ArtCrop(Arc<Reference>);
 
 impl ArtCrop {
-    async fn fetch(http: &Http, target: &Target, dir: &Path) -> Result<Self> {
-        let crop = Self(dir.join(format!(".art-crop-{}", TEMP_IDS.fetch_add(1, Ordering::Relaxed))));
-        if http.download(target.art_crop(), &crop.0).await?.is_none() {
-            return Err(Error::Other(format!(
-                "Scryfall's art crop of {} is gone",
-                target.face.name
-            )));
+    /// Downloads the art crop into `dir`, and deletes it once it's read.
+    async fn fetch(http: &Http, card: &Card, face: &FacePlan, dir: &Path) -> Result<Self> {
+        let url = card
+            .art_crop(face.index)
+            .ok_or_else(|| Error::Other(format!("Scryfall has no art crop of {}", face.name)))?;
+        let temp = TempFile::beside(dir);
+        if http.download(url, temp.path()).await?.is_none() {
+            return Err(Error::Other(format!("Scryfall's art crop of {} is gone", face.name)));
         }
-        Ok(crop)
+        let (path, part) = (temp.path().to_owned(), crop_part(face));
+        let reference = tokio::task::spawn_blocking(move || Reference::open(&path, part))
+            .await
+            .map_err(|error| Error::Other(error.to_string()))??;
+        Ok(Self(Arc::new(reference)))
     }
 
     /// Why `candidate` isn't a larger copy of the art, if it isn't.
     async fn doubt(&self, candidate: &Path) -> Result<Option<Doubt>> {
-        let (crop, candidate) = (self.0.clone(), candidate.to_owned());
-        let verdict = tokio::task::spawn_blocking(move || verify::compare(&crop, &candidate))
+        let (reference, candidate) = (Arc::clone(&self.0), candidate.to_owned());
+        let verdict = tokio::task::spawn_blocking(move || reference.compare_file(&candidate))
             .await
             .map_err(|error| Error::Other(error.to_string()))??;
         Ok(match verdict {
@@ -491,12 +567,6 @@ impl ArtCrop {
             Verdict::CardScan => Some(Doubt::CardScan),
             Verdict::Different => Some(Doubt::Different),
         })
-    }
-}
-
-impl Drop for ArtCrop {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
     }
 }
 
@@ -530,15 +600,16 @@ pub struct PageCandidate {
     pub doubt: Option<Doubt>,
 }
 
-/// Downloads the `images` of a page into `dir` and checks each against
-/// `target`'s art crop, for the user to choose from: a larger copy of the art
-/// first, then near misses (a card scan, a copy no larger), then the rest,
-/// each largest first. One that won't download, isn't a JPEG, PNG or WebP,
-/// or can't be read is left out.
+/// Downloads the `images` of a page into `dir`, as the page at `page` asks
+/// for them, and checks each against `target`'s art crop, for the user to
+/// choose from: a larger copy of the art first, then near misses (a card
+/// scan, a copy no larger), then the rest, each largest first. One that won't
+/// download, isn't a JPEG, PNG or WebP, or can't be read is left out.
 pub async fn fetch_page_images(
     http: &Http,
     target: &Target,
     images: &[PageImage],
+    page: Option<&str>,
     dir: &Path,
 ) -> Result<Vec<PageCandidate>> {
     let wanted = page_candidates(images);
@@ -546,10 +617,10 @@ pub async fn fetch_page_images(
         return Ok(Vec::new());
     }
     tokio::fs::create_dir_all(dir).await?;
-    let crop = ArtCrop::fetch(http, target, dir).await?;
+    let crop = ArtCrop::fetch(http, &target.card, &target.face, dir).await?;
     let crop = &crop;
     let mut found: Vec<PageCandidate> = stream::iter(wanted)
-        .map(|image| async move { fetch_candidate(http, crop, image, dir).await })
+        .map(|image| async move { fetch_candidate(http, crop, image, page, dir).await })
         .buffer_unordered(PAGE_DOWNLOADS)
         .filter_map(|candidate| async move { candidate })
         .collect()
@@ -566,9 +637,15 @@ pub async fn fetch_page_images(
     Ok(found)
 }
 
-async fn fetch_candidate(http: &Http, crop: &ArtCrop, image: PageImage, dir: &Path) -> Option<PageCandidate> {
-    let part = dir.join(format!("page-{}.part", TEMP_IDS.fetch_add(1, Ordering::Relaxed)));
-    let Ok(Some(kind)) = http.download(&image.url, &part).await else {
+async fn fetch_candidate(
+    http: &Http,
+    crop: &ArtCrop,
+    image: PageImage,
+    page: Option<&str>,
+    dir: &Path,
+) -> Option<PageCandidate> {
+    let part = dir.join(format!("page-{}.part", next_temp_id()));
+    let Ok(Some(kind)) = http.download_from(&image.url, page, &part).await else {
         let _ = tokio::fs::remove_file(&part).await;
         return None;
     };
@@ -601,7 +678,7 @@ fn page_candidates(images: &[PageImage]) -> Vec<PageImage> {
     let mut seen = HashSet::new();
     let mut candidates: Vec<PageImage> = images
         .iter()
-        .filter(|image| image.url.starts_with("https://") || image.url.starts_with("http://"))
+        .filter(|image| is_web_url(&image.url))
         .filter(|image| image.width == 0 || image.width >= TOO_NARROW)
         .filter(|image| seen.insert(image.url.clone()))
         .cloned()

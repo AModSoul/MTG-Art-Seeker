@@ -3,8 +3,6 @@
 //! found themselves ([`crate::manual`]). Only addresses are kept: saving the
 //! art from one downloads it again, in place of the file the run saved.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-
 use futures::future::join_all;
 use reqwest::Url;
 use serde::Serialize;
@@ -16,13 +14,10 @@ use crate::{
     history::{FoundByHand, History},
     http::Http,
     imagesize::ImageSize,
-    manual::{put_in_place, source_dir, Destination, Site, Target},
+    manual::{put_in_place, refetch_found_copy, source_dir, Destination, FoundCopyAt, Refetched, Site, Target},
     settings::Settings,
     Error, Result,
 };
-
-/// Numbers temporary files, so two saves at once can't share one.
-static TEMP_IDS: AtomicU64 = AtomicU64::new(0);
 
 /// A place a face's art is known to be.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -141,35 +136,60 @@ pub async fn save_from(
 ) -> Result<(SavedFile, Option<String>)> {
     let name = &target.face.name;
     let art = target.face.illustration.as_deref();
-    let (url, page) = match source {
+    let (url, page, accepted) = match source {
         ArtSource::Mtgpics => mtgpics_url(history, target, destination.settings)
-            .map(|url| (url, None))
+            .map(|url| (url, None, None))
             .ok_or_else(|| Error::Other(format!("MTGPics' art for {name} isn't known. Download the card again.")))?,
         ArtSource::Scryfall => target
             .face
             .scryfall_url
             .clone()
-            .map(|url| (url, None))
+            .map(|url| (url, None, None))
             .ok_or_else(|| Error::Other(format!("Scryfall has no image of {name}.")))?,
         ArtSource::Web => {
-            let found = history
+            let (_, found) = history
                 .zip(copy)
                 .and_then(|(history, id)| history.found_copy(id).ok().flatten())
                 // Only a copy of this face's art.
                 .filter(|(of, _)| Some(of.as_str()) == art)
                 .ok_or_else(|| Error::Other(format!("That copy of {name}'s art is no longer known.")))?;
-            (found.1.url, found.1.page)
+            (found.url, found.page, found.size)
         }
     };
 
     let dir = source_dir(target, destination, source);
     tokio::fs::create_dir_all(&dir).await?;
-    let temp = TempFile::beside(&dir, TEMP_IDS.fetch_add(1, Ordering::Relaxed));
-    let Some(kind) = http.download(&url, temp.path()).await? else {
-        if let (Some(history), Some(id), ArtSource::Web) = (history, copy, source) {
+    let temp = TempFile::beside(&dir);
+    let forget = || {
+        if let (Some(history), Some(id)) = (history, copy) {
             let _ = history.forget_found_copy(id);
         }
-        return Err(Error::Other(format!("{name}'s art is gone from {url}")));
+    };
+    let kind = if source == ArtSource::Web {
+        // Anything could be at a copy's address now: it's checked again.
+        let found = FoundCopyAt {
+            url: &url,
+            page: page.as_deref(),
+            accepted,
+        };
+        match refetch_found_copy(http, &target.card, &target.face, found, temp.path()).await? {
+            Refetched::Ready(kind) => kind,
+            Refetched::Gone => {
+                forget();
+                return Err(Error::Other(format!("{name}'s art is gone from {url}")));
+            }
+            Refetched::Changed => {
+                forget();
+                return Err(Error::Other(format!(
+                    "The image at {url} isn't the copy of {name}'s art you saved any more, so it's been forgotten."
+                )));
+            }
+        }
+    } else {
+        match http.download(&url, temp.path()).await? {
+            Some(kind) => kind,
+            None => return Err(Error::Other(format!("{name}'s art is gone from {url}"))),
+        }
     };
     let (file, replaced) = put_in_place(target, destination, source, &dir, temp, kind).await?;
 
