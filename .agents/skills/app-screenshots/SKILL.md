@@ -20,8 +20,8 @@ pnpm --filter desktop screenshots decks        # only the scenes named
 pnpm --filter desktop screenshots --record     # download the runs again first
 ```
 
-They're 1200 × 800 at 150%, as on a Windows laptop, so 1800 × 1200 files, and the settings say
-art is saved to `C:\MTG Art`.
+They're the app window's default size, 1340 × 800, at 150%, as on a Windows laptop, so
+2010 × 1200 files, and the settings say art is saved to `C:\MTG Art`.
 
 ## How it works
 
