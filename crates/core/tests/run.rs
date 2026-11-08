@@ -8,6 +8,7 @@ use std::{
 
 use mtg_art_core::{
     carddb::CardData,
+    decks::Decks,
     engine::{run, ArtSource, JobStatus, Local, RunEvent, RunInput, RunSummary},
     history::{FoundByHand, History},
     http::{Endpoints, Http, HttpConfig},
@@ -46,6 +47,8 @@ impl Servers {
                 scryfall_api: self.scryfall.uri(),
                 mtgpics: self.mtgpics.uri(),
                 edhrec: self.cdn.uri(),
+                mtgjson: self.cdn.uri(),
+                box_images: self.cdn.uri(),
             },
             max_attempts: 3,
             retry_delay: Duration::from_millis(5),
@@ -1447,4 +1450,152 @@ async fn puts_a_split_cards_paintings_under_the_halves_they_belong_to() {
             ),
         ]
     );
+}
+
+fn gzip(bytes: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    encoder.write_all(bytes).unwrap();
+    encoder.finish().unwrap()
+}
+
+async fn mtgjson_file(servers: &Servers, at: &str, fixture_name: &str) {
+    Mock::given(method("GET"))
+        .and(path(at))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(gzip(&fixture(fixture_name))))
+        .mount(&servers.cdn)
+        .await;
+}
+
+#[tokio::test]
+async fn downloads_a_precon_decks_printings_into_a_folder_named_for_it() {
+    let servers = Servers::start().await;
+    mtgjson_file(
+        &servers,
+        "/decks/AbzanArmor_TDC.json.gz",
+        "mtgjson_deck_AbzanArmor_TDC.json",
+    )
+    .await;
+    let out = tempfile::tempdir().unwrap();
+    let settings = Settings {
+        list_folders: true,
+        ..settings(out.path())
+    };
+    let events = Mutex::new(Vec::new());
+    let emit = |event: RunEvent| events.lock().unwrap().push(event);
+    let input = RunInput::Deck {
+        file_name: "AbzanArmor_TDC".into(),
+        folder: Some("Abzan Armor".into()),
+    };
+    run(
+        &servers.http(),
+        input,
+        &settings,
+        Local::default(),
+        &CancellationToken::new(),
+        &emit,
+    )
+    .await;
+
+    let events = events.into_inner().unwrap();
+    let RunEvent::Planned { jobs, folder, .. } = &events[0] else {
+        panic!("{events:?}");
+    };
+    assert_eq!(Path::new(folder), out.path().join("Abzan Armor"));
+    let lines: Vec<_> = jobs.iter().map(|job| job.line.as_str()).collect();
+    assert_eq!(
+        lines,
+        [
+            "Felothar the Steadfast (TDC) 4",
+            "Betor, Ancestor's Voice (TDC) 1",
+            "Protector of the Wastes (TDC) 14",
+            "Reunion of the House (TDC) 15",
+        ]
+    );
+    // Each printing is asked for by its set and number, not its name.
+    let asked: Vec<Value> = servers
+        .scryfall
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|request| request.url.path() == "/cards/collection")
+        .flat_map(|request| {
+            request.body_json::<Value>().unwrap()["identifiers"]
+                .as_array()
+                .unwrap()
+                .clone()
+        })
+        .collect();
+    assert_eq!(asked[0], json!({ "set": "tdc", "collector_number": "4" }));
+    assert_eq!(asked.len(), 4);
+}
+
+#[tokio::test]
+async fn refuses_a_deck_name_that_is_not_mtgjsons() {
+    let servers = Servers::start().await;
+    let out = tempfile::tempdir().unwrap();
+    let input = RunInput::Deck {
+        file_name: "../../SetList".into(),
+        folder: None,
+    };
+    let (summary, jobs) = run_to_end(&servers.http(), input, &settings(out.path())).await;
+    assert_eq!(summary.jobs, 0);
+    assert!(jobs.is_empty());
+    assert!(servers.cdn.received_requests().await.unwrap().is_empty());
+}
+
+/// A product photo: a dark box on a white backdrop.
+fn product_photo() -> image::DynamicImage {
+    let mut photo = image::RgbImage::from_pixel(300, 420, image::Rgb([255, 255, 255]));
+    for y in 30..390 {
+        for x in 40..260 {
+            photo.put_pixel(x, y, image::Rgb([40, 30, 60]));
+        }
+    }
+    image::DynamicImage::ImageRgb8(photo)
+}
+
+#[tokio::test]
+async fn lists_precons_and_cuts_their_boxes_out_of_tcgplayers_photos() {
+    let servers = Servers::start().await;
+    mtgjson_file(&servers, "/SetList.json.gz", "mtgjson_set_list.json").await;
+    mtgjson_file(&servers, "/DeckList.json.gz", "mtgjson_deck_list.json").await;
+    Servers::image(
+        &servers.cdn,
+        "/product/619664_in_1000x1000.jpg",
+        &jpeg(&product_photo()),
+    )
+    .await;
+    let http = servers.http();
+    let dir = tempfile::tempdir().unwrap();
+    let decks = Decks::open(dir.path().to_owned());
+
+    let found = decks.search(&http, "set:tdc abzan", 10).await.unwrap();
+    assert_eq!(found.total, 1);
+    assert_eq!(found.decks[0].set_name, "Tarkir: Dragonstorm Commander");
+    assert!(found.decks[0].has_box);
+
+    let saved = decks.box_image(&http, "AbzanArmor_TDC").await.unwrap().unwrap();
+    let cut = image::open(&saved).unwrap().to_rgba8();
+    // Cropped to the box, without the backdrop.
+    assert_eq!(cut.dimensions(), (220, 360));
+    assert!(cut.pixels().all(|pixel| pixel[3] > 0));
+    // Asked for once.
+    assert_eq!(decks.box_image(&http, "AbzanArmor_TDC").await.unwrap(), Some(saved));
+    let photos = servers
+        .cdn
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|request| request.url.path().starts_with("/product/"))
+        .count();
+    assert_eq!(photos, 1);
+
+    // The catalog is kept: a second start reads it rather than MTGJSON.
+    let again = Decks::open(dir.path().to_owned());
+    let lists_before = servers.cdn.received_requests().await.unwrap().len();
+    assert_eq!(again.search(&http, "", 100).await.unwrap().total, 12);
+    assert_eq!(servers.cdn.received_requests().await.unwrap().len(), lists_before);
 }

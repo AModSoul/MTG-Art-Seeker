@@ -19,6 +19,7 @@ use ts_rs::TS;
 use crate::{
     card::Card,
     carddb::{CardDb, NameQuery},
+    decks::deck_cards,
     faces::{plan_faces, whole_card, FacePlan},
     history::{History, Remembered},
     http::{Http, ImageKind},
@@ -59,6 +60,26 @@ pub enum RunInput {
     Search { query: String },
     /// A ready-made list, by [`crate::presets::PresetInfo::id`].
     Preset { id: String },
+    /// A preconstructed deck's cards, by [`crate::decks::DeckSummary::file_name`].
+    /// With [`Settings::list_folders`] on, its art is saved in a folder of
+    /// this name inside the output folder.
+    Deck {
+        #[serde(rename = "fileName")]
+        file_name: String,
+        #[serde(default)]
+        #[ts(optional)]
+        folder: Option<String>,
+    },
+}
+
+impl RunInput {
+    /// The folder inside the output folder a list or deck asked to be saved in.
+    pub fn folder(&self) -> Option<&str> {
+        match self {
+            Self::List { folder, .. } | Self::Deck { folder, .. } => folder.as_deref(),
+            Self::Search { .. } | Self::Preset { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
@@ -375,6 +396,10 @@ async fn plan(http: &Http, input: RunInput, settings: &Settings) -> Result<(Vec<
                 Vec::new(),
             )
         }
+        RunInput::Deck { file_name, .. } => {
+            let deck = deck_cards(http, &file_name).await?;
+            (numbered(lines(deck.lines)), Vec::new())
+        }
         RunInput::Search { query } => {
             let results = scryfall::search(http, &query, &search_options(settings, None), MAX_SEARCH_CARDS).await?;
             (
@@ -399,13 +424,10 @@ impl Job {
     }
 }
 
-/// Where a run saves: the output folder, or for a list with
+/// Where a run saves: the output folder, or for a list or deck with
 /// [`Settings::list_folders`] on and a folder name, that folder inside it.
 fn output_dir(input: &RunInput, settings: &Settings) -> PathBuf {
-    match input {
-        RunInput::List { folder, .. } => output_dir_for(folder.as_deref(), settings),
-        _ => output_dir_for(None, settings),
-    }
+    output_dir_for(input.folder(), settings)
 }
 
 /// Where a run with these settings saves, for a list named `list_folder` or

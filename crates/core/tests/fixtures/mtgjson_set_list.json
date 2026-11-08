@@ -1,0 +1,600 @@
+{
+ "meta": {
+  "date": "2026-11-07",
+  "version": "5.3.0+20261107"
+ },
+ "data": [
+  {
+   "code": "CMD",
+   "name": "Commander 2011",
+   "releaseDate": "2011-06-17",
+   "type": "commander",
+   "decks": [
+    {
+     "code": "CMD",
+     "name": "Counterpunch",
+     "releaseDate": "2011-06-17",
+     "sealedProductUuids": [
+      "0be07f70-3930-59a3-9dff-6c46eaafc4c3"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "CMD",
+     "name": "Devour for Power",
+     "releaseDate": "2011-06-17",
+     "sealedProductUuids": [
+      "252f4267-91d4-54f0-b49a-8b65a014d1c4"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "CMD",
+     "name": "Heavenly Inferno",
+     "releaseDate": "2011-06-17",
+     "sealedProductUuids": [
+      "28ec7023-333f-5768-a8e2-061d16847766"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "CMD",
+     "name": "Mirror Mastery",
+     "releaseDate": "2011-06-17",
+     "sealedProductUuids": [
+      "778214f1-3da3-5550-9504-acadae1203da"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "CMD",
+     "name": "Political Puppets",
+     "releaseDate": "2011-06-17",
+     "sealedProductUuids": [
+      "0adbf7af-d90b-51a9-a32a-ee7049d09b17"
+     ],
+     "type": "Commander Deck"
+    }
+   ],
+   "sealedProduct": [
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Counterpunch",
+        "set": "cmd"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "1100345",
+      "cardKingdomId": "184649",
+      "cardtraderId": "44776",
+      "csiId": "97499",
+      "mcmId": "246718",
+      "scgId": "SLD-MTG-MLT-CMD-EN-COUNTERPUNCH",
+      "tcgplayerProductId": "42095",
+      "tntId": "319876"
+     },
+     "name": "Commander 2011 Commander Deck Counterpunch",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/d5244f40d2522e02"
+     },
+     "setCode": "CMD",
+     "subtype": "commander",
+     "uuid": "0be07f70-3930-59a3-9dff-6c46eaafc4c3"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Devour for Power",
+        "set": "cmd"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "1100346",
+      "cardKingdomId": "184651",
+      "cardtraderId": "44777",
+      "csiId": "97500",
+      "mcmId": "246720",
+      "scgId": "SLD-MTG-MLT-CMD-EN-DEVOUR",
+      "tcgplayerProductId": "42097",
+      "tntId": "319877"
+     },
+     "name": "Commander 2011 Commander Deck Devour for Power",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/c587c1102fc4353e"
+     },
+     "setCode": "CMD",
+     "subtype": "commander",
+     "uuid": "252f4267-91d4-54f0-b49a-8b65a014d1c4"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Heavenly Inferno",
+        "set": "cmd"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "1100347",
+      "cardKingdomId": "184647",
+      "cardtraderId": "44778",
+      "csiId": "97501",
+      "mcmId": "246716",
+      "scgId": "SLD-MTG-MLT-CMD-EN-HEAVENLY",
+      "tcgplayerProductId": "42093",
+      "tntId": "319878"
+     },
+     "name": "Commander 2011 Commander Deck Heavenly Inferno",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/9ac469fa5196510e"
+     },
+     "setCode": "CMD",
+     "subtype": "commander",
+     "uuid": "28ec7023-333f-5768-a8e2-061d16847766"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Mirror Mastery",
+        "set": "cmd"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "1100348",
+      "cardKingdomId": "184648",
+      "cardtraderId": "44779",
+      "csiId": "97502",
+      "mcmId": "246717",
+      "scgId": "SLD-MTG-MLT-CMD-EN-MIRROR",
+      "tcgplayerProductId": "42094",
+      "tntId": "319879"
+     },
+     "name": "Commander 2011 Commander Deck Mirror Mastery",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/726db4a95a361f51"
+     },
+     "setCode": "CMD",
+     "subtype": "commander",
+     "uuid": "778214f1-3da3-5550-9504-acadae1203da"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Political Puppets",
+        "set": "cmd"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "1100350",
+      "cardKingdomId": "184650",
+      "cardtraderId": "44780",
+      "csiId": "97503",
+      "mcmId": "246719",
+      "scgId": "SLD-MTG-MLT-CMD-EN-POLITICAL",
+      "tcgplayerProductId": "42096",
+      "tntId": "319880"
+     },
+     "name": "Commander 2011 Commander Deck Political Puppets",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/01b00218a5aaf9af"
+     },
+     "setCode": "CMD",
+     "subtype": "commander",
+     "uuid": "0adbf7af-d90b-51a9-a32a-ee7049d09b17"
+    }
+   ]
+  },
+  {
+   "code": "EOC",
+   "name": "Edge of Eternities Commander",
+   "releaseDate": "2025-08-01",
+   "type": "commander",
+   "decks": [
+    {
+     "code": "EOC",
+     "name": "Counter Intelligence",
+     "releaseDate": "2025-08-01",
+     "sealedProductUuids": [
+      "32c97686-3e06-5ff4-962a-ca0c512d0c7b"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "EOC",
+     "name": "World Shaper",
+     "releaseDate": "2025-08-01",
+     "sealedProductUuids": [
+      "6ddddac3-0d10-5fc7-8e34-2b5fca86aeb8"
+     ],
+     "type": "Commander Deck"
+    }
+   ],
+   "sealedProduct": [
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Counter Intelligence",
+        "set": "eoc"
+       }
+      ],
+      "other": [
+       {
+        "name": "6 Double Sided Tokens"
+       },
+       {
+        "name": "4 Punch-out Counters"
+       },
+       {
+        "name": "Deck Box"
+       }
+      ],
+      "sealed": [
+       {
+        "count": 1,
+        "name": "Edge of Eternities Collector Booster Sample Pack",
+        "set": "eoe",
+        "uuid": "eeef4243-a467-5823-86dd-c4c1ca1ea2b4"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "2617210",
+      "cardKingdomId": "316077",
+      "cardtraderId": "322693",
+      "mcmId": "813328",
+      "scgId": "SLD-MTG-MLT-EOC-EN-COUNTER",
+      "tcgplayerProductId": "619677"
+     },
+     "name": "Edge of Eternities Commander Deck Counter Intelligence",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/7c7fccd3f759e300"
+     },
+     "setCode": "EOC",
+     "subtype": "commander",
+     "uuid": "32c97686-3e06-5ff4-962a-ca0c512d0c7b"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "World Shaper",
+        "set": "eoc"
+       }
+      ],
+      "other": [
+       {
+        "name": "10 Double Sided Tokens"
+       },
+       {
+        "name": "Deck Box"
+       }
+      ],
+      "sealed": [
+       {
+        "count": 1,
+        "name": "Edge of Eternities Collector Booster Sample Pack",
+        "set": "eoe",
+        "uuid": "eeef4243-a467-5823-86dd-c4c1ca1ea2b4"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "2617209",
+      "cardKingdomId": "316076",
+      "cardtraderId": "322694",
+      "mcmId": "813319",
+      "miniaturemarketId": "203b823b32052566e393d87d22821a67",
+      "scgId": "SLD-MTG-MLT-EOC-EN-WORLD",
+      "tcgplayerProductId": "619676"
+     },
+     "name": "Edge of Eternities Commander Deck World Shaper",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/5bd5c9833a00be31"
+     },
+     "setCode": "EOC",
+     "subtype": "commander",
+     "uuid": "6ddddac3-0d10-5fc7-8e34-2b5fca86aeb8"
+    }
+   ]
+  },
+  {
+   "code": "TDC",
+   "name": "Tarkir: Dragonstorm Commander",
+   "releaseDate": "2025-04-11",
+   "type": "commander",
+   "decks": [
+    {
+     "code": "TDC",
+     "name": "Abzan Armor",
+     "releaseDate": "2025-04-11",
+     "sealedProductUuids": [
+      "5bed745e-cf9f-5b5a-8378-3edc078b4d9d"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "TDC",
+     "name": "Jeskai Striker",
+     "releaseDate": "2025-04-11",
+     "sealedProductUuids": [
+      "4ba6479e-c06c-5850-9c29-53e23c13fb4b"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "TDC",
+     "name": "Mardu Surge",
+     "releaseDate": "2025-04-11",
+     "sealedProductUuids": [
+      "7922b4c9-12c3-5821-a3ec-ea444f998dc4"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "TDC",
+     "name": "Sultai Arisen",
+     "releaseDate": "2025-04-11",
+     "sealedProductUuids": [
+      "d78635bb-a3a7-5661-925d-fc3a91213447"
+     ],
+     "type": "Commander Deck"
+    },
+    {
+     "code": "TDC",
+     "name": "Temur Roar",
+     "releaseDate": "2025-04-11",
+     "sealedProductUuids": [
+      "0efe1bd4-c56d-5188-b8f6-8fa4d6cef710"
+     ],
+     "type": "Commander Deck"
+    }
+   ],
+   "sealedProduct": [
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Abzan Armor",
+        "set": "tdc"
+       }
+      ],
+      "other": [
+       {
+        "name": "10 Double Sided Tokens"
+       },
+       {
+        "name": "1 Deck Box"
+       }
+      ],
+      "sealed": [
+       {
+        "count": 1,
+        "name": "Tarkir Dragonstorm Collector Booster Sample Pack",
+        "set": "tdm",
+        "uuid": "8b9e014b-fa44-539a-9108-dd95f00311bc"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "2581972",
+      "cardKingdomId": "310822",
+      "cardtraderId": "322531",
+      "mcmId": "813092",
+      "miniaturemarketId": "702bf967995d63fb81cd146ca30212e6",
+      "scgId": "SLD-MTG-MLT-TDC-EN-ABZAN",
+      "tcgplayerProductId": "619664"
+     },
+     "name": "Tarkir Dragonstorm Commander Deck Abzan Armor",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/eade1fe92e989df5"
+     },
+     "setCode": "TDC",
+     "subtype": "commander",
+     "uuid": "5bed745e-cf9f-5b5a-8378-3edc078b4d9d"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Jeskai Striker",
+        "set": "tdc"
+       }
+      ],
+      "other": [
+       {
+        "name": "10 Double Sided Tokens"
+       },
+       {
+        "name": "1 Deck Box"
+       }
+      ],
+      "sealed": [
+       {
+        "count": 1,
+        "name": "Tarkir Dragonstorm Collector Booster Sample Pack",
+        "set": "tdm",
+        "uuid": "8b9e014b-fa44-539a-9108-dd95f00311bc"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "2581973",
+      "cardKingdomId": "310823",
+      "cardtraderId": "322532",
+      "mcmId": "813093",
+      "scgId": "SLD-MTG-MLT-TDC-EN-JESKAI",
+      "tcgplayerProductId": "619665"
+     },
+     "name": "Tarkir Dragonstorm Commander Deck Jeskai Striker",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/e1f47565f0c4e8fb"
+     },
+     "setCode": "TDC",
+     "subtype": "commander",
+     "uuid": "4ba6479e-c06c-5850-9c29-53e23c13fb4b"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Mardu Surge",
+        "set": "tdc"
+       }
+      ],
+      "other": [
+       {
+        "name": "10 Double Sided Tokens"
+       },
+       {
+        "name": "1 Deck Box"
+       }
+      ],
+      "sealed": [
+       {
+        "count": 1,
+        "name": "Tarkir Dragonstorm Collector Booster Sample Pack",
+        "set": "tdm",
+        "uuid": "8b9e014b-fa44-539a-9108-dd95f00311bc"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "2581975",
+      "cardKingdomId": "310825",
+      "cardtraderId": "322530",
+      "mcmId": "813095",
+      "miniaturemarketId": "50b0b1df5825f2a5c95041b28cc71052",
+      "scgId": "SLD-MTG-MLT-TDC-EN-MARDU",
+      "tcgplayerProductId": "619667"
+     },
+     "name": "Tarkir Dragonstorm Commander Deck Mardu Surge",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/c71da43302bea008"
+     },
+     "setCode": "TDC",
+     "subtype": "commander",
+     "uuid": "7922b4c9-12c3-5821-a3ec-ea444f998dc4"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Sultai Arisen",
+        "set": "tdc"
+       }
+      ],
+      "other": [
+       {
+        "name": "10 Double Sided Tokens"
+       },
+       {
+        "name": "1 Deck Box"
+       }
+      ],
+      "sealed": [
+       {
+        "count": 1,
+        "name": "Tarkir Dragonstorm Collector Booster Sample Pack",
+        "set": "tdm",
+        "uuid": "8b9e014b-fa44-539a-9108-dd95f00311bc"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "2581974",
+      "cardKingdomId": "310824",
+      "cardtraderId": "322533",
+      "mcmId": "813094",
+      "miniaturemarketId": "aa699914e07017b71ab0d1be0d5f9f3e",
+      "scgId": "SLD-MTG-MLT-TDC-EN-SULTAI",
+      "tcgplayerProductId": "619666"
+     },
+     "name": "Tarkir Dragonstorm Commander Deck Sultai Arisen",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/76f0e274e6eea769"
+     },
+     "setCode": "TDC",
+     "subtype": "commander",
+     "uuid": "d78635bb-a3a7-5661-925d-fc3a91213447"
+    },
+    {
+     "cardCount": 100,
+     "category": "deck",
+     "contents": {
+      "deck": [
+       {
+        "name": "Temur Roar",
+        "set": "tdc"
+       }
+      ],
+      "other": [
+       {
+        "name": "10 Double Sided Tokens"
+       },
+       {
+        "name": "1 Deck Box"
+       }
+      ],
+      "sealed": [
+       {
+        "count": 1,
+        "name": "Tarkir Dragonstorm Collector Booster Sample Pack",
+        "set": "tdm",
+        "uuid": "8b9e014b-fa44-539a-9108-dd95f00311bc"
+       }
+      ]
+     },
+     "identifiers": {
+      "abuId": "2581976",
+      "cardKingdomId": "310826",
+      "cardtraderId": "322529",
+      "mcmId": "813096",
+      "miniaturemarketId": "da5535302e2c5aa79f22e7f7e0c7f093",
+      "scgId": "SLD-MTG-MLT-TDC-EN-TEMUR",
+      "tcgplayerProductId": "619668"
+     },
+     "name": "Tarkir Dragonstorm Commander Deck Temur Roar",
+     "purchaseUrls": {
+      "tcgplayer": "https://mtgjson.com/links/28ecb42ad9c2d1e9"
+     },
+     "setCode": "TDC",
+     "subtype": "commander",
+     "uuid": "0efe1bd4-c56d-5188-b8f6-8fa4d6cef710"
+    }
+   ]
+  }
+ ]
+}

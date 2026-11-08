@@ -17,7 +17,11 @@ use tokio_util::sync::CancellationToken;
 
 /// Download Magic: The Gathering card art from MTGPics, with Scryfall as a backup.
 #[derive(Parser)]
-#[command(version, group(ArgGroup::new("input").required(true).args(["list", "search", "preset", "presets"])))]
+#[command(
+    version,
+    group(ArgGroup::new("input").required(true).args(["list", "search", "preset", "presets", "deck"])),
+    group(ArgGroup::new("named").args(["list", "deck"]))
+)]
 struct Args {
     /// A card list file, one card per line (`4 Damnation (TSR) 106`).
     list: Option<PathBuf>,
@@ -34,14 +38,19 @@ struct Args {
     #[arg(long)]
     presets: bool,
 
+    /// Download a preconstructed deck's cards, by the name of its file on
+    /// MTGJSON (https://mtgjson.com/downloads/all-decks/), e.g. AbzanArmor_TDC.
+    #[arg(long, short)]
+    deck: Option<String>,
+
     /// Save art here instead of the folder in the settings.
     #[arg(long, short)]
     out: Option<PathBuf>,
 
-    /// Save the list's art in a folder of this name inside the output folder.
-    /// With "A folder for each list" on in the settings, the list file's name
-    /// is used when this isn't given.
-    #[arg(long, short, requires = "list")]
+    /// Save the list's or deck's art in a folder of this name inside the
+    /// output folder. With "A folder for each list" on in the settings, the
+    /// list file's name is used when this isn't given.
+    #[arg(long, short, requires = "named")]
     folder: Option<String>,
 
     /// Read settings from this file instead of the app's.
@@ -97,6 +106,11 @@ async fn run(args: Args) -> Result<ExitCode, String> {
         RunInput::Search { query }
     } else if let Some(id) = args.preset {
         RunInput::Preset { id }
+    } else if let Some(file_name) = args.deck {
+        RunInput::Deck {
+            file_name,
+            folder: args.folder,
+        }
     } else {
         unreachable!("clap requires an input");
     };

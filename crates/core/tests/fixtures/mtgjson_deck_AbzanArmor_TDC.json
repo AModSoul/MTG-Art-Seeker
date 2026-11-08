@@ -1,0 +1,77 @@
+{
+ "meta": {
+  "date": "2026-11-07",
+  "version": "5.3.0+20261107"
+ },
+ "data": {
+  "code": "TDC",
+  "name": "Abzan Armor",
+  "releaseDate": "2025-04-11",
+  "source": "https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists#Abzan",
+  "type": "Commander Deck",
+  "commander": [
+   {
+    "name": "Felothar the Steadfast",
+    "setCode": "TDC",
+    "number": "4",
+    "uuid": "e5e9df6e-5e08-52f3-9faa-ea0251b4a059",
+    "count": 1,
+    "isFoil": true,
+    "layout": "normal",
+    "identifiers": {
+     "scryfallId": "2c3549f6-25df-4ea7-84ad-922ccd4af6b2"
+    }
+   }
+  ],
+  "displayCommander": [],
+  "mainBoard": [
+   {
+    "name": "Betor, Ancestor's Voice",
+    "setCode": "TDC",
+    "number": "1",
+    "uuid": "8c4e8f73-7016-5d26-9872-bf90c438b159",
+    "count": 1,
+    "isFoil": true,
+    "layout": "normal",
+    "identifiers": {
+     "scryfallId": "2e261489-8dde-4594-8868-69f432f03d03"
+    }
+   },
+   {
+    "name": "Protector of the Wastes",
+    "setCode": "TDC",
+    "number": "14",
+    "uuid": "9c08f2e5-fcd8-58d2-833f-3360a6b72643",
+    "count": 1,
+    "isFoil": false,
+    "layout": "normal",
+    "identifiers": {
+     "scryfallId": "fd68208b-761f-4aa0-bc8e-59977d784211"
+    }
+   },
+   {
+    "name": "Reunion of the House",
+    "setCode": "TDC",
+    "number": "15",
+    "uuid": "a6610b7b-2ab9-52a4-b296-faf9853babc2",
+    "count": 1,
+    "isFoil": false,
+    "layout": "normal",
+    "identifiers": {
+     "scryfallId": "71e4a360-89dd-4f25-9b85-75d0b131e208"
+    }
+   }
+  ],
+  "sideBoard": [],
+  "tokens": [],
+  "planes": [],
+  "schemes": [],
+  "sealedProductUuids": [
+   "5bed745e-cf9f-5b5a-8378-3edc078b4d9d"
+  ],
+  "sourceSetCodes": [
+   "TDC",
+   "TDM"
+  ]
+ }
+}

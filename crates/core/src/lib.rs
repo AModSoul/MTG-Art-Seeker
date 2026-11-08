@@ -7,6 +7,7 @@
 
 pub mod card;
 pub mod carddb;
+pub mod decks;
 pub mod engine;
 pub mod error;
 pub mod faces;

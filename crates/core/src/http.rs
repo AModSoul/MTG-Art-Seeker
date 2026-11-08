@@ -29,6 +29,10 @@ pub struct Endpoints {
     pub scryfall_api: String,
     pub mtgpics: String,
     pub edhrec: String,
+    /// MTGJSON's files, for the precon decks.
+    pub mtgjson: String,
+    /// TCGplayer's product pictures, for the boxes precons come in.
+    pub box_images: String,
 }
 
 impl Default for Endpoints {
@@ -37,6 +41,8 @@ impl Default for Endpoints {
             scryfall_api: "https://api.scryfall.com".into(),
             mtgpics: "https://www.mtgpics.com".into(),
             edhrec: "https://json.edhrec.com".into(),
+            mtgjson: "https://mtgjson.com/api/v5".into(),
+            box_images: "https://tcgplayer-cdn.tcgplayer.com".into(),
         }
     }
 }
@@ -140,6 +146,14 @@ impl Http {
     pub async fn get_text(&self, url: &str) -> Result<Option<String>> {
         match ok_or_missing(url, self.get(url).await?).await? {
             Some(response) => Ok(Some(response.text().await?)),
+            None => Ok(None),
+        }
+    }
+
+    /// GETs a response's body whole; `None` for a 404.
+    pub async fn get_bytes(&self, url: &str) -> Result<Option<Vec<u8>>> {
+        match ok_or_missing(url, self.get(url).await?).await? {
+            Some(response) => Ok(Some(response.bytes().await?.to_vec())),
             None => Ok(None),
         }
     }
