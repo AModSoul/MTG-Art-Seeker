@@ -1,11 +1,11 @@
 ---
 name: release
-description: Cut a release of the MTG Art Downloader desktop app - the version bump PR, the release notes, the v* tag, the draft GitHub release the Release workflow builds, checking its installers and update manifest, and publishing it. Use whenever the user wants to release, ship, publish, tag or cut a new version of the app, bump the version, write release notes, or finish or fix a release that is still a draft or whose build failed, even if they do not say "release".
+description: Cut a release of the MTG Art Seeker desktop app - the version bump PR, the release notes, the v* tag, the draft GitHub release the Release workflow builds, checking its installers and update manifest, and publishing it. Use whenever the user wants to release, ship, publish, tag or cut a new version of the app, bump the version, write release notes, or finish or fix a release that is still a draft or whose build failed, even if they do not say "release".
 ---
 
 # Releasing the desktop app
 
-A release is a GitHub release named **MTG Art Downloader v<version>**, holding the Windows, macOS
+A release is a GitHub release named **MTG Art Seeker v<version>**, holding the Windows, macOS
 and Linux installers, their `.sig` files and `latest.json`, the signed manifest the in-app updater
 reads. Pushing a `v*` tag makes `.github/workflows/release.yml` build all three platforms and attach
 them to a draft. Publishing the draft is what ships it.
@@ -171,7 +171,7 @@ The three platforms build independently (`fail-fast: false`). If one fails:
 gh api 'repos/{owner}/{repo}/releases?per_page=20' --jq '.[] | select(.tag_name=="v<version>" or .tag_name=="<last-tag>") | {tag_name, name, draft, assets: [.assets[].name]}'
 ```
 
-It should be a draft named `MTG Art Downloader v<version>`, with the same kinds of files as the last
+It should be a draft named `MTG Art Seeker v<version>`, with the same kinds of files as the last
 release under the new version: `latest.json`; Windows `_x64-setup.exe` and `_x64_en-US.msi`; macOS
 `_universal.dmg` and `_universal.app.tar.gz`; Linux `.AppImage`, `.deb` and `.rpm`; and a `.sig`
 beside every one but the `.dmg`. Then the manifest:

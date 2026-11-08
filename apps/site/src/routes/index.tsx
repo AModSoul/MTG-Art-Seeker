@@ -27,7 +27,7 @@ import {
 } from "react-icons/lu";
 
 import { Screenshot } from "@/components/Screenshot";
-import { GITHUB_REPO_URL } from "@/site-config";
+import { APP_NAME, GITHUB_REPO_URL } from "@/site-config";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -76,8 +76,8 @@ function Home() {
           </Heading>
           <Text fontSize={{ base: "lg", md: "xl" }} color="fg.muted">
             Paste a deck list, run a Scryfall search, or pick an EDHREC list or a preconstructed
-            deck, and MTG Art Downloader saves the art for every card. A desktop app for Windows,
-            macOS and Linux, and a command line tool.
+            deck, and {APP_NAME} saves the art for every card. A desktop app for Windows, macOS and
+            Linux, and a command line tool.
           </Text>
           <HStack gap={3} wrap="wrap" justify="center">
             <LinkButton asChild size="lg">

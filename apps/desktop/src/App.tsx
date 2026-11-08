@@ -24,7 +24,7 @@ export function App() {
     <Flex direction="column" h="100vh" bg="bg">
       <HStack px="5" py="3" borderBottomWidth="1px" gap="3">
         <Heading size="md" flex="1">
-          MTG Art Downloader
+          MTG Art Seeker
         </Heading>
         <UpdateButton />
         <DiscordButton />

@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "MTG Art Downloader",
+  "productName": "MTG Art Seeker",
   "version": "0.2.0",
   "identifier": "io.github.amodsoul.mtg-art-downloader",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "MTG Art Downloader",
+        "title": "MTG Art Seeker",
         "width": 1340,
         "height": 800,
         "minWidth": 900,

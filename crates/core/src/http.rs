@@ -18,7 +18,7 @@ use crate::{
 };
 
 pub const USER_AGENT: &str = concat!(
-    "MTGArtDownloaderRust/",
+    "MTGArtSeeker/",
     env!("CARGO_PKG_VERSION"),
     " (+https://github.com/AModSoul/mtg-art-downloader-rust)"
 );

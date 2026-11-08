@@ -118,12 +118,9 @@ fn report(app: &AppHandle, search: &Search, event: FoundEvent) {
                 Doubt::CardScan => format!("That's the card, not {face}'s art on its own."),
                 Doubt::Different => format!("That doesn't look like {face}'s art."),
             };
-            (
-                "warning",
-                format!("{what} Save it anyway? Answer in MTG Art Downloader."),
-            )
+            ("warning", format!("{what} Save it anyway? Answer in MTG Art Seeker."))
         }
-        FoundEvent::Choose { face, .. } => ("info", format!("Choose {face}'s art in MTG Art Downloader.")),
+        FoundEvent::Choose { face, .. } => ("info", format!("Choose {face}'s art in MTG Art Seeker.")),
         FoundEvent::NoImages { face } => (
             "warning",
             format!("No image on this page is large enough to be {face}'s art."),
