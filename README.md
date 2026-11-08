@@ -264,6 +264,9 @@ signed with a new one, so keep a copy somewhere safe.
 
 The app icon's source is `apps/desktop/src-tauri/app-icon.svg`. After changing it, run
 `pnpm --filter desktop tauri icon src-tauri/app-icon.svg` to make every size each platform needs.
+The website uses the same icon: copy `app-icon.svg` to `apps/site/public/favicon.svg`, and the
+generated `icons/32x32.png`, `icons/128x128@2x.png` and `icons/icon.png` to `favicon-32x32.png`,
+`apple-touch-icon.png` and `icon-512.png` beside it.
 
 ## License
 
