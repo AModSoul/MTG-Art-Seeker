@@ -14,8 +14,8 @@
     "tauri-dev": "pnpm --filter desktop tauri dev",
     "site-dev": "pnpm --filter site dev",
     "bindings": "cargo test -p mtg-art-core export_bindings && oxfmt apps/desktop/src/bindings",
-    "storybook": "pnpm -r --parallel storybook",
-    "ci-storybook": "pnpm -r --parallel ci-storybook",
+    "storybook": "pnpm -r --parallel --no-bail storybook",
+    "ci-storybook": "pnpm -r --parallel --no-bail ci-storybook",
     "prepare": "husky",
     "agents:sync": "node scripts/sync-agents.ts",
     "postinstall": "pnpm run agents:sync"
