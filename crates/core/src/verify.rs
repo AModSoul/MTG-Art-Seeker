@@ -118,6 +118,30 @@ impl Analysis {
 }
 
 /// Compares the image at `candidate` with the art crop at `art_crop`.
+/// How much better the other order has to match for a split card's halves'
+/// paintings to count as the wrong way round.
+const SWAP_MARGIN: f32 = 0.1;
+
+/// Whether the paintings saved for a split card's halves, `first` and
+/// `second`, are the wrong way round. Scryfall's art crop of a split card
+/// shows its halves side by side, the first on the left, though not always
+/// half and half: an aftermath card's first half takes more of it. Each half
+/// of the crop is looked for in each painting, and the order that matches
+/// clearly better wins; when neither does, they're left as they are.
+pub fn halves_swapped(art_crop: &Path, first: &Path, second: &Path) -> Result<bool> {
+    Ok(halves_swapped_images(&open(art_crop)?, &open(first)?, &open(second)?))
+}
+
+pub fn halves_swapped_images(art_crop: &DynamicImage, first: &DynamicImage, second: &DynamicImage) -> bool {
+    let (width, height) = (art_crop.width(), art_crop.height());
+    let left = art_crop.crop_imm(0, 0, width / 2, height);
+    let right = art_crop.crop_imm(width / 2, 0, width - width / 2, height);
+    let score = |part: &DynamicImage, painting: &DynamicImage| analyse(part, painting).map_or(0.0, |found| found.score);
+    let as_saved = score(&left, first) + score(&right, second);
+    let swapped = score(&left, second) + score(&right, first);
+    swapped > as_saved + SWAP_MARGIN
+}
+
 pub fn compare(art_crop: &Path, candidate: &Path) -> Result<Verdict> {
     Ok(compare_images(&open(art_crop)?, &open(candidate)?))
 }
@@ -414,6 +438,45 @@ mod tests {
         }
         image::imageops::overlay(&mut card, &crop.to_rgb8(), 60, 110);
         DynamicImage::ImageRgb8(card)
+    }
+
+    /// Scryfall's art crop of a split card: `first`'s and `second`'s art side
+    /// by side, `first_width` of `width` pixels to the first.
+    fn split_crop(
+        first: &DynamicImage,
+        second: &DynamicImage,
+        width: u32,
+        first_width: u32,
+        height: u32,
+    ) -> DynamicImage {
+        let part = |art: &DynamicImage, part_width: u32| {
+            let (w, h) = (art.width(), art.height());
+            art.crop_imm(w / 10, h / 10, w * 8 / 10, h * 8 / 10)
+                .resize_exact(part_width, height, FilterType::Triangle)
+        };
+        let mut crop = RgbImage::new(width, height);
+        image::imageops::overlay(&mut crop, &part(first, first_width).to_rgb8(), 0, 0);
+        image::imageops::overlay(
+            &mut crop,
+            &part(second, width - first_width).to_rgb8(),
+            i64::from(first_width),
+            0,
+        );
+        DynamicImage::ImageRgb8(crop)
+    }
+
+    #[test]
+    fn tells_a_split_cards_halves_apart() {
+        let (fire, ice) = (painting(1000, 680, 11), painting(960, 652, 12));
+        // Fire // Ice: half and half.
+        let crop = split_crop(&fire, &ice, 808, 404, 280);
+        assert!(!halves_swapped_images(&crop, &fire, &ice));
+        assert!(halves_swapped_images(&crop, &ice, &fire));
+        // Cut // Ribbons, an aftermath card: the first half takes more.
+        let (cut, ribbons) = (painting(1200, 446, 13), painting(1200, 705, 14));
+        let crop = split_crop(&cut, &ribbons, 1024, 625, 231);
+        assert!(!halves_swapped_images(&crop, &cut, &ribbons));
+        assert!(halves_swapped_images(&crop, &ribbons, &cut));
     }
 
     #[test]

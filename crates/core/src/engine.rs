@@ -621,11 +621,17 @@ async fn download_card(
         missing.push(face.name.clone());
     }
 
-    // MTGPics may file a split card's whole image under each half, as it
-    // does Duskmourn's Rooms: halves that are one picture are the whole card.
+    // A split card's halves from MTGPics: its page doesn't always list them
+    // in order, and may file the whole card's image under each, as it does
+    // Duskmourn's Rooms.
     if halves_missing.is_empty() && faces.iter().any(FacePlan::is_split_half) {
-        if let [first, second] = &files[first_file..] {
-            if same_contents(Path::new(&first.path), Path::new(&second.path)).await {
+        let halves = match &files[first_file..] {
+            [first, second] => split_halves(card, first, second, context).await,
+            _ => Halves::AsSaved,
+        };
+        match halves {
+            Halves::AsSaved => {}
+            Halves::OnePicture => {
                 let second = files.pop().expect("two files");
                 let _ = tokio::fs::remove_file(&second.path).await;
                 let first = files.pop().expect("two files");
@@ -636,6 +642,18 @@ async fn download_card(
                         errors.push(error.to_string());
                         missing.push(whole.name);
                     }
+                }
+            }
+            Halves::Swapped => {
+                let second = files.pop().expect("two files");
+                let first = files.pop().expect("two files");
+                match swap_pictures(first, second).await {
+                    Ok((first, second)) => {
+                        files.extend([first, second]);
+                        // Logged the right way round, for the next run.
+                        log.swap(0, 1);
+                    }
+                    Err(error) => errors.push(error.to_string()),
                 }
             }
         }
@@ -680,6 +698,72 @@ async fn download_card(
         };
         let _ = history.remember(card, &log, checked_at);
     }
+}
+
+/// What a split card's two halves saved from MTGPics turned out to be.
+enum Halves {
+    AsSaved,
+    /// One picture twice: the whole card's.
+    OnePicture,
+    /// Each the other half's painting.
+    Swapped,
+}
+
+async fn split_halves(card: &Card, first: &SavedFile, second: &SavedFile, context: &Context<'_>) -> Halves {
+    let (first_path, second_path) = (Path::new(&first.path), Path::new(&second.path));
+    if same_contents(first_path, second_path).await {
+        return Halves::OnePicture;
+    }
+    // A found copy was picked by the user, half by half.
+    if first.source != ArtSource::Mtgpics || second.source != ArtSource::Mtgpics {
+        return Halves::AsSaved;
+    }
+    // Scryfall's art crop shows the halves side by side, the first on the left.
+    let (Some(crop_url), Some(dir)) = (card.art_crop(0), first_path.parent()) else {
+        return Halves::AsSaved;
+    };
+    let crop = TempFile::beside(dir, context.temp_ids.fetch_add(1, Ordering::Relaxed));
+    if !matches!(context.http.download(crop_url, crop.path()).await, Ok(Some(_))) {
+        return Halves::AsSaved;
+    }
+    let paths = (crop.path().to_owned(), first_path.to_owned(), second_path.to_owned());
+    let swapped =
+        tokio::task::spawn_blocking(move || crate::verify::halves_swapped(&paths.0, &paths.1, &paths.2)).await;
+    match swapped {
+        Ok(Ok(true)) => Halves::Swapped,
+        _ => Halves::AsSaved,
+    }
+}
+
+/// Swaps two saved images' pictures, so each face's name holds its own: each
+/// keeps its type's extension, and its size, source and page go with it.
+async fn swap_pictures(first: SavedFile, second: SavedFile) -> Result<(SavedFile, SavedFile)> {
+    let (first_path, second_path) = (PathBuf::from(&first.path), PathBuf::from(&second.path));
+    let extension = |path: &Path| path.extension().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
+    // The first's picture goes under the second's name, and the other way round.
+    let first_picture_to = second_path.with_extension(extension(&first_path));
+    let second_picture_to = first_path.with_extension(extension(&second_path));
+    let parked = first_path.with_extension("swapping.part");
+    tokio::fs::rename(&first_path, &parked).await?;
+    tokio::fs::rename(&second_path, &second_picture_to).await?;
+    tokio::fs::rename(&parked, &first_picture_to).await?;
+    let path = |path: &Path| path.to_string_lossy().into_owned();
+    Ok((
+        SavedFile {
+            path: path(&second_picture_to),
+            face: first.face.clone(),
+            face_index: first.face_index,
+            artist: first.artist.clone(),
+            ..second.clone()
+        },
+        SavedFile {
+            path: path(&first_picture_to),
+            face: second.face,
+            face_index: second.face_index,
+            artist: second.artist,
+            ..first
+        },
+    ))
 }
 
 /// Whether two files hold the same bytes.

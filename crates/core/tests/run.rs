@@ -1303,12 +1303,12 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
 }
 
 /// A card as Scryfall has it, saved as fixture `name`, its image links
-/// pointed at the mock CDN, which serves its art crop.
-async fn scryfall_card(servers: &Servers, name: &str) -> Value {
+/// pointed at the mock CDN, which serves `crop` as its art crop.
+async fn scryfall_card(servers: &Servers, name: &str, crop: &[u8]) -> Value {
     let json = String::from_utf8(fixture(name)).unwrap();
     let card: Value = serde_json::from_str(&json.replace("https://cards.scryfall.io", &servers.cdn.uri())).unwrap();
-    let crop = card["image_uris"]["art_crop"].as_str().unwrap();
-    Servers::image(&servers.cdn, reqwest::Url::parse(crop).unwrap().path(), JPEG).await;
+    let at = card["image_uris"]["art_crop"].as_str().unwrap();
+    Servers::image(&servers.cdn, reqwest::Url::parse(at).unwrap().path(), crop).await;
     Mock::given(method("POST"))
         .and(path("/cards/collection"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "data": [card], "not_found": [] })))
@@ -1321,7 +1321,7 @@ async fn scryfall_card(servers: &Servers, name: &str) -> Value {
 async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall() {
     let servers = Servers::start().await;
     // Fire // Ice from Modern Horizons 2: a split card, with a painting per half.
-    scryfall_card(&servers, "card_mh2_290.json").await;
+    scryfall_card(&servers, "card_mh2_290.json", JPEG).await;
     let input = || RunInput::List {
         text: "Fire // Ice (MH2) 290".into(),
         folder: None,
@@ -1362,7 +1362,7 @@ async fn saves_a_split_card_whole_when_mtgpics_files_one_image_under_both_halves
     let servers = Servers::start().await;
     // Bottomless Pool // Locker Room, a Room: MTGPics lists `dsk/043` and
     // `dsk/1009` for its halves, and both are the whole card's image.
-    scryfall_card(&servers, "card_dsk_43.json").await;
+    scryfall_card(&servers, "card_dsk_43.json", JPEG).await;
     servers.mtgpics_page("dsk043", fixture("card_dsk043.html")).await;
     Servers::image(&servers.mtgpics, "/pics/art/dsk/043.jpg", JPEG).await;
     Servers::image(&servers.mtgpics, "/pics/art/dsk/1009.jpg", JPEG).await;
@@ -1384,4 +1384,67 @@ async fn saves_a_split_card_whole_when_mtgpics_files_one_image_under_both_halves
         ("Bottomless Pool // Locker Room", 0)
     );
     assert!(missing.is_empty());
+}
+
+#[tokio::test]
+async fn puts_a_split_cards_paintings_under_the_halves_they_belong_to() {
+    let servers = Servers::start().await;
+    // Fire // Ice from Dominaria Remastered: its MTGPics page lists Ice's
+    // painting (`apo/129`) before Fire's (`apo/128`). Scryfall's art crop
+    // shows Fire on the left and Ice on the right.
+    let (fire, ice) = (painting(1000, 680, 21), painting(960, 652, 22));
+    let part = |art: &image::DynamicImage| {
+        let (w, h) = (art.width(), art.height());
+        art.crop_imm(w / 10, h / 10, w * 8 / 10, h * 8 / 10)
+            .resize_exact(404, 280, image::imageops::FilterType::Triangle)
+            .to_rgb8()
+    };
+    let mut crop = image::RgbImage::new(808, 280);
+    image::imageops::overlay(&mut crop, &part(&fire), 0, 0);
+    image::imageops::overlay(&mut crop, &part(&ice), 404, 0);
+    scryfall_card(
+        &servers,
+        "card_dmr_215.json",
+        &jpeg(&image::DynamicImage::ImageRgb8(crop)),
+    )
+    .await;
+    servers.mtgpics_page("dmr215", fixture("card_dmr215.html")).await;
+    Servers::image(&servers.mtgpics, "/pics/art/apo/129.jpg", &jpeg(&ice)).await;
+    Servers::image(&servers.mtgpics, "/pics/art/apo/128.jpg", &jpeg(&fire)).await;
+
+    let out = tempfile::tempdir().unwrap();
+    let input = RunInput::List {
+        text: "Fire // Ice (DMR) 215".into(),
+        folder: None,
+    };
+    let (_, jobs) = run_to_end(&servers.http(), input, &settings(out.path())).await;
+    let JobStatus::Done { files, missing } = &jobs[0].1 else {
+        panic!("{jobs:?}");
+    };
+    assert!(missing.is_empty());
+    // Each half's own painting, under its own name and artist.
+    let saved: Vec<_> = files
+        .iter()
+        .map(|f| {
+            let width = image::image_dimensions(&f.path).unwrap().0;
+            (f.face.as_str(), f.artist.as_str(), width, relative(&f.path, out.path()))
+        })
+        .collect();
+    assert_eq!(
+        saved,
+        [
+            (
+                "Fire",
+                "David Martin",
+                1000,
+                "mtgpics/Split/Fire [DMR] {215}.jpg".to_owned()
+            ),
+            (
+                "Ice",
+                "Franz Vohwinkel",
+                960,
+                "mtgpics/Split/Ice [DMR] {215}.jpg".to_owned()
+            ),
+        ]
+    );
 }
