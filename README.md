@@ -223,6 +223,11 @@ pnpm lint       # oxlint; pnpm format runs oxfmt
 Run `pnpm --filter desktop exec playwright install chromium` once before `pnpm test`. Git hooks
 lint and format staged files on commit.
 
+The screenshots in `docs/screenshots`, here and on the website, are taken from real runs:
+`pnpm --filter desktop screenshots` downloads a card list and a precon deck the first time (into
+`target/screenshots`), then shows the results in the app's interface in headless Chromium and saves
+each shot. Retake them when a change alters what they show; `--record` downloads the runs again.
+
 ### Website
 
 `apps/site` is the website at [getmtg.art](https://getmtg.art). The Site workflow prerenders it to

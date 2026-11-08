@@ -39,6 +39,7 @@ drive it. A marketing site sits beside them.
 | Chakra theme types             | `pnpm --filter @mtg-art/ui typegen` (the apps' dev, build and typecheck do) |
 | Regenerate TypeScript bindings | `pnpm bindings`                                                             |
 | A real run, no window          | `cargo run -p mtg-art-cli -- cards.txt --out <dir>`                         |
+| Retake the app's screenshots   | `pnpm --filter desktop screenshots` (the `app-screenshots` skill)           |
 
 Run one package's script with `pnpm --filter <desktop|site|@mtg-art/ui> <script>`. Shared dependency
 versions live in the `catalog:` in `pnpm-workspace.yaml`; a package asks for one with `"catalog:"`,
@@ -101,6 +102,10 @@ The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` onc
 - **In the desktop app, errors go through `showError`** (`apps/desktop/src/notify.ts`), and a
   select, segmented control or tab list over a string union narrows its value with `findOption`
   (`apps/desktop/src/utils/options.ts`).
+- **Screenshots follow the UI.** `docs/screenshots`, which the README and the site show, are
+  taken from real runs by `pnpm --filter desktop screenshots`. A change that alters what one
+  shows (theme, colours, fonts, the panels, the run table, the settings drawer, wording) retakes
+  it in the same change; the `app-screenshots` skill says how, and how to check each image.
 - **The download page never names a file.** It fetches the latest release from GitHub and
   `apps/site/src/downloads/artifacts.ts` sorts its files with a table of rules. Files no rule knows
   are listed as "Other files", so a new kind of file shows up on its own; to give it a label and a

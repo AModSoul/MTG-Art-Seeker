@@ -13,7 +13,8 @@
     "test": "vitest run",
     "storybook": "storybook dev -p 6009",
     "ci-storybook": "storybook dev -p 6009 --quiet --ci",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "screenshots": "pnpm --filter @mtg-art/ui typegen && node screenshots/shoot.ts"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
