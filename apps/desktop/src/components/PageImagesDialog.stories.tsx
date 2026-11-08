@@ -83,6 +83,9 @@ export const Cancelled: Story = {
     );
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await expect(api.choosePageImage).toHaveBeenCalledWith(4, null);
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // Gone once it has animated out, which takes longer while a whole suite runs.
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), {
+      timeout: 3000,
+    });
   },
 };
