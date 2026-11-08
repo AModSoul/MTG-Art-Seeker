@@ -10,7 +10,9 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
+import { Card } from "@mtg-art/ui/card";
 import { LinkButton } from "@mtg-art/ui/link-button";
+import { ScrollArea } from "@mtg-art/ui/scroll-area";
 import { createFileRoute, Link as RouterLink } from "@tanstack/react-router";
 import type { IconType } from "react-icons";
 import {
@@ -78,7 +80,7 @@ function Home() {
             macOS and Linux, and a command line tool.
           </Text>
           <HStack gap={3} wrap="wrap" justify="center">
-            <LinkButton asChild colorPalette="blue" size="lg">
+            <LinkButton asChild size="lg">
               <RouterLink to="/download">
                 <LuDownload /> Download
               </RouterLink>
@@ -103,40 +105,50 @@ function Home() {
       <Container maxW="6xl" py={{ base: 14, md: 20 }}>
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={6}>
           {FEATURES.map(({ icon, title, body }) => (
-            <Stack key={title} gap={3} p={6} rounded="xl" borderWidth="1px" bg="bg.subtle">
-              <Icon as={icon} boxSize={6} color="blue.fg" aria-hidden />
-              <Heading as="h2" size="md">
-                {title}
-              </Heading>
-              <Text color="fg.muted">{body}</Text>
-            </Stack>
+            <Card
+              key={title}
+              variant="subtle"
+              icon={<Icon as={icon} boxSize={6} color="emerald.fg" aria-hidden />}
+              title={title}
+              titleProps={{ as: "h2" }}
+              description={body}
+            />
           ))}
         </SimpleGrid>
       </Container>
 
       <Container maxW="4xl">
-        <Stack gap={4} p={{ base: 6, md: 8 }} rounded="xl" borderWidth="1px">
-          <HStack gap={3}>
-            <Icon as={LuTerminal} boxSize={6} color="blue.fg" aria-hidden />
-            <Heading as="h2" size="lg">
+        <Card
+          size={{ base: "md", md: "lg" }}
+          title={
+            <>
+              <Icon as={LuTerminal} boxSize={6} color="emerald.fg" aria-hidden />
               From the command line
-            </Heading>
-          </HStack>
-          <Text color="fg.muted">
-            <Code>mtg-art</Code> does everything the app does, and reads the same settings.
-          </Text>
-          <Box as="pre" p={4} rounded="md" bg="bg.muted" overflowX="auto" fontSize="sm">
-            <code>
-              {[
-                "mtg-art cards.txt                       # a card list file",
-                'mtg-art --search "set:mh2 t:creature"   # a Scryfall search',
-                "mtg-art --preset edhrec-top-year        # a preset; --presets lists them",
-                "mtg-art --deck AbzanArmor_TDC           # a precon, by its file's name on MTGJSON",
-                "mtg-art cards.txt --out ./art           # somewhere other than the settings' folder",
-              ].join("\n")}
-            </code>
-          </Box>
-        </Stack>
+            </>
+          }
+          titleProps={{ as: "h2", display: "flex", alignItems: "center", gap: 3 }}
+          description={
+            <>
+              <Code>mtg-art</Code> does everything the app does, and reads the same settings.
+            </>
+          }
+          bodyProps={{ gap: 4 }}
+        >
+          {/* A line too long for a phone scrolls sideways. */}
+          <ScrollArea orientation="horizontal" rounded="md" bg="bg.muted">
+            <Box as="pre" p={4} fontSize="sm">
+              <code>
+                {[
+                  "mtg-art cards.txt                       # a card list file",
+                  'mtg-art --search "set:mh2 t:creature"   # a Scryfall search',
+                  "mtg-art --preset edhrec-top-year        # a preset; --presets lists them",
+                  "mtg-art --deck AbzanArmor_TDC           # a precon, by its file's name on MTGJSON",
+                  "mtg-art cards.txt --out ./art           # somewhere other than the settings' folder",
+                ].join("\n")}
+              </code>
+            </Box>
+          </ScrollArea>
+        </Card>
       </Container>
 
       <Container maxW="3xl" pt={{ base: 14, md: 20 }}>

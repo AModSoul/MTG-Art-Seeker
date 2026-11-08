@@ -1,18 +1,8 @@
-import {
-  Box,
-  Button,
-  Code,
-  Heading,
-  HStack,
-  Link,
-  List,
-  Separator,
-  Stack,
-  Tabs,
-  Text,
-} from "@chakra-ui/react";
+import { Code, Heading, HStack, Link, List, Stack, Tabs, Text } from "@chakra-ui/react";
 import { Alert } from "@mtg-art/ui/alert";
+import { Card } from "@mtg-art/ui/card";
 import { LinkButton } from "@mtg-art/ui/link-button";
+import { Skeleton } from "@mtg-art/ui/skeleton";
 import { useState, type ReactNode } from "react";
 import { LuDownload } from "react-icons/lu";
 
@@ -47,21 +37,14 @@ export type DownloadPanelProps = {
 export function DownloadPanel({ state, os, arch }: DownloadPanelProps) {
   switch (state.status) {
     case "loading":
-      return (
-        <Stack gap={3} align="flex-start">
-          <Button colorPalette="blue" size="lg" disabled>
-            <LuDownload /> Finding the latest release…
-          </Button>
-          <ReleasesLink />
-        </Stack>
-      );
+      return <LoadingDownloads />;
     case "error":
       return (
         <Stack gap={4} align="flex-start">
           <Alert status="warning" title="Couldn't load the latest release from GitHub">
             {state.message} The installers are all on GitHub's releases page.
           </Alert>
-          <LinkButton href={`${GITHUB_RELEASES_URL}/latest`} colorPalette="blue" size="lg">
+          <LinkButton href={`${GITHUB_RELEASES_URL}/latest`} size="lg">
             Go to the latest release
           </LinkButton>
         </Stack>
@@ -69,6 +52,31 @@ export function DownloadPanel({ state, os, arch }: DownloadPanelProps) {
     case "ready":
       return <ReleaseDownloads release={state.release} os={os} arch={arch} />;
   }
+}
+
+/** The shape of a release's downloads while GitHub is asked for it: the line
+ * about the release, the systems' tabs, the download button and its line. It's
+ * shown when the site was built without a snapshot of the release, so the page
+ * doesn't jump when the release arrives; and the link to GitHub's releases
+ * works without scripts. */
+function LoadingDownloads() {
+  return (
+    <Stack gap={8}>
+      <Text color="fg.muted">
+        Finding the latest release…{" "}
+        <Link href={GITHUB_RELEASES_URL} target="_blank" rel="noreferrer">
+          All releases on GitHub
+        </Link>
+      </Text>
+      <Stack gap={6} aria-hidden>
+        <Skeleton h="10" w="64" />
+        <Stack gap={2} align="flex-start">
+          <Skeleton h="12" w="64" rounded="l2" />
+          <Skeleton h="4" w="48" />
+        </Stack>
+      </Stack>
+    </Stack>
+  );
 }
 
 function ReleaseDownloads({
@@ -100,7 +108,6 @@ function ReleaseDownloads({
         <Tabs.Root
           value={tab}
           onValueChange={(details) => setPicked(OSES.find((o) => o === details.value) ?? null)}
-          colorPalette="blue"
         >
           <Tabs.List>
             {tabs.map((candidate) => (
@@ -182,7 +189,7 @@ function OsDownloads({
     <Stack gap={8}>
       {recommended ? (
         <Stack gap={2} align="flex-start">
-          <LinkButton href={recommended.asset.browser_download_url} colorPalette="blue" size="xl">
+          <LinkButton href={recommended.asset.browser_download_url} size="xl">
             <LuDownload /> Download for {OS_LABEL[os]}
           </LinkButton>
           <Text fontSize="sm" color="fg.muted">
@@ -238,11 +245,19 @@ function Section({
 
 function FileList({ files }: { files: { asset: ReleaseAsset; label: string; note?: string }[] }) {
   return (
-    <Stack as="ul" listStyleType="none" gap={0} borderWidth="1px" rounded="lg" overflow="hidden">
-      {files.map(({ asset, label, note }, index) => (
-        <Box as="li" key={asset.name}>
-          {index > 0 ? <Separator /> : null}
-          <HStack justify="space-between" align="flex-start" gap={4} px={4} py={3}>
+    // The items have their own padding, and a line between each.
+    <Card variant="outline" bodyProps={{ p: 0 }}>
+      <Stack as="ul" listStyleType="none" gap={0} divideY="1px">
+        {files.map(({ asset, label, note }) => (
+          <HStack
+            as="li"
+            key={asset.name}
+            justify="space-between"
+            align="flex-start"
+            gap={4}
+            px={4}
+            py={3}
+          >
             <Stack gap={0} minW={0}>
               <Link href={asset.browser_download_url} fontWeight="medium" wordBreak="break-all">
                 {label || asset.name}
@@ -257,9 +272,9 @@ function FileList({ files }: { files: { asset: ReleaseAsset; label: string; note
               {formatSize(asset.size)}
             </Text>
           </HStack>
-        </Box>
-      ))}
-    </Stack>
+        ))}
+      </Stack>
+    </Card>
   );
 }
 
