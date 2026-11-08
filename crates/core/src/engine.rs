@@ -111,6 +111,8 @@ pub struct JobInfo {
     pub label: String,
     /// A line the list parser reads back as this card, for retrying it.
     pub line: String,
+    /// How many images it should save, when its card is known before it starts.
+    pub images: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -120,8 +122,10 @@ pub enum JobStatus {
     Queued,
     /// Looking the card up on Scryfall.
     Resolving,
-    /// Finding and saving its art.
-    Downloading,
+    /// Finding and saving its art: `images` of them, unless some can't be found.
+    Downloading {
+        images: u32,
+    },
     /// At least one image saved. `missing` names faces that weren't.
     Done {
         files: Vec<SavedFile>,
@@ -262,14 +266,9 @@ pub async fn run(
             return finish(Vec::new(), started, emit);
         }
     };
-    emit(RunEvent::Planned {
-        jobs: jobs.iter().map(Job::info).collect(),
-        skipped,
-        folder: output_dir.to_string_lossy().into_owned(),
-    });
-
-    // Cards a list names a set for are found in the card data, and the rest
-    // looked up on Scryfall together, 75 to a request.
+    // Cards a list names a set for are found in the card data, before the
+    // jobs are announced so each says how many images it will save; the rest
+    // are looked up on Scryfall together, 75 to a request.
     let mut batched: Vec<(usize, Identifier)> = Vec::new();
     for (index, job) in jobs.iter_mut().enumerate() {
         let Request::Line { line, card } = &mut job.request else {
@@ -283,6 +282,12 @@ pub async fn run(
             None => batched.push((index, id)),
         }
     }
+    emit(RunEvent::Planned {
+        jobs: jobs.iter().map(|job| job.info(settings)).collect(),
+        skipped,
+        folder: output_dir.to_string_lossy().into_owned(),
+    });
+
     if !batched.is_empty() {
         for (index, _) in &batched {
             emit(RunEvent::Job {
@@ -365,7 +370,7 @@ fn finish(statuses: Vec<JobStatus>, started: Instant, emit: &(dyn Fn(RunEvent) +
             }
             JobStatus::Failed { .. } => summary.failed += 1,
             JobStatus::Cancelled => summary.cancelled += 1,
-            JobStatus::Queued | JobStatus::Resolving | JobStatus::Downloading => {}
+            JobStatus::Queued | JobStatus::Resolving | JobStatus::Downloading { .. } => {}
         }
     }
     emit(RunEvent::Finished {
@@ -410,17 +415,24 @@ async fn plan(http: &Http, input: RunInput, settings: &Settings) -> Result<(Vec<
 }
 
 impl Job {
-    fn info(&self) -> JobInfo {
-        let (label, line) = match &self.request {
-            Request::Line { line, .. } => (line.label(), line.line.clone()),
-            Request::Card(card) => (card.label(), card.label()),
+    fn info(&self, settings: &Settings) -> JobInfo {
+        let (label, line, card) = match &self.request {
+            Request::Line { line, card } => (line.label(), line.line.clone(), card.as_ref()),
+            Request::Card(card) => (card.label(), card.label(), Some(card)),
         };
         JobInfo {
             id: self.id,
             label,
             line,
+            images: card.map(|card| image_count(std::slice::from_ref(card), settings)),
         }
     }
+}
+
+/// How many images saving `cards` should make: one per face that has its own art.
+fn image_count(cards: &[Card], settings: &Settings) -> u32 {
+    let faces: usize = cards.iter().map(|card| plan_faces(card, settings).len()).sum();
+    u32::try_from(faces).unwrap_or(u32::MAX)
 }
 
 /// Where a run saves: the output folder, or for a list or deck with
@@ -501,7 +513,9 @@ async fn process(job: Job, context: &Context<'_>) -> JobStatus {
         }
     };
 
-    emit(JobStatus::Downloading);
+    emit(JobStatus::Downloading {
+        images: image_count(&cards, context.settings),
+    });
     let mut files = Vec::new();
     let mut missing = Vec::new();
     let mut errors = Vec::new();

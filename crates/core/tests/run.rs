@@ -716,6 +716,28 @@ async fn looks_a_list_up_in_the_card_data_without_asking_scryfall() {
             "scryfall/Lightning Bolt [LEA] {161}.jpg",
         ]
     );
+
+    // Each job says how many images it will save: a card found in the data
+    // as soon as the jobs are announced, and a name alone once it's looked up.
+    let events = events.into_inner().unwrap();
+    let Some(RunEvent::Planned { jobs, .. }) = events.iter().find(|event| matches!(event, RunEvent::Planned { .. }))
+    else {
+        panic!("no planned event: {events:?}")
+    };
+    let planned: Vec<_> = jobs.iter().map(|job| job.images).collect();
+    assert_eq!(planned, [Some(1), None, Some(2), Some(1)]);
+    let mut downloading: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event {
+            RunEvent::Job {
+                id,
+                status: JobStatus::Downloading { images },
+            } => Some((*id, *images)),
+            _ => None,
+        })
+        .collect();
+    downloading.sort_unstable();
+    assert_eq!(downloading, [(1, 1), (2, 1), (3, 2), (4, 1)]);
 }
 
 fn walk(dir: &Path) -> Vec<String> {

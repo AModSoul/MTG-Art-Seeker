@@ -10,4 +10,8 @@ export type JobInfo = {
    * A line the list parser reads back as this card, for retrying it.
    */
   line: string;
+  /**
+   * How many images it should save, when its card is known before it starts.
+   */
+  images: number | null;
 };

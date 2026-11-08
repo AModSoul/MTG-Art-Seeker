@@ -4,7 +4,7 @@ import type { SavedFile } from "./SavedFile";
 export type JobStatus =
   | { state: "queued" }
   | { state: "resolving" }
-  | { state: "downloading" }
+  | { state: "downloading"; images: number }
   | { state: "done"; files: Array<SavedFile>; missing: Array<string> }
   | { state: "failed"; error: string }
   | { state: "cancelled" };

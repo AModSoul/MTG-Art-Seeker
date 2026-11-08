@@ -29,6 +29,18 @@ export const boltFile: SavedFile = {
   size: { width: 626, height: 457 },
 };
 
+/** The front of a double-faced card; its back's art wasn't found. */
+export const delverFile: SavedFile = {
+  path: `${dir}/Scryfall/Delver of Secrets (Nils Hamm) [ISD] {51}.jpg`,
+  face: "Delver of Secrets",
+  faceIndex: 0,
+  source: "scryfall",
+  set: "isd",
+  number: "51",
+  artist: "Nils Hamm",
+  size: { width: 633, height: 468 },
+};
+
 /** A larger copy the user found in the Lens window, saved in place of Scryfall's. */
 export const foundBoltFile: SavedFile = {
   ...boltFile,
@@ -44,34 +56,39 @@ export const mixedJobs: JobView[] = [
     id: 1,
     label: "Karn, Scion of Urza (DOM) 1",
     line: "Karn, Scion of Urza (DOM) 1",
+    images: 1,
     status: { state: "done", files: [karnFile], missing: [] },
   },
   {
     id: 2,
     label: "Lightning Bolt",
     line: "Lightning Bolt",
+    images: null,
     status: { state: "done", files: [boltFile], missing: [] },
   },
   {
     id: 3,
     label: "Delver of Secrets",
     line: "Delver of Secrets",
-    status: { state: "done", files: [], missing: ["Insectile Aberration"] },
+    images: null,
+    status: { state: "done", files: [delverFile], missing: ["Insectile Aberration"] },
   },
   {
     id: 4,
     label: "Not A Real Card",
     line: "Not A Real Card",
+    images: null,
     status: { state: "failed", error: 'Scryfall has no card named "Not A Real Card"' },
   },
   {
     id: 5,
     label: "Sol Ring (C21) 263",
     line: "Sol Ring (C21) 263",
-    status: { state: "downloading" },
+    images: 1,
+    status: { state: "downloading", images: 1 },
   },
-  { id: 6, label: "Damnation", line: "Damnation", status: { state: "resolving" } },
-  { id: 7, label: "Counterspell", line: "Counterspell", status: { state: "queued" } },
+  { id: 6, label: "Damnation", line: "Damnation", images: null, status: { state: "resolving" } },
+  { id: 7, label: "Counterspell", line: "Counterspell", images: null, status: { state: "queued" } },
 ];
 
 /** A saved image whose header couldn't be read, so its size is unknown. */

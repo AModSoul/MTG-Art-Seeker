@@ -475,6 +475,7 @@ export const SourcesForEachFace: Story = {
           id: 1,
           label: "Delver of Secrets",
           line: "Delver of Secrets",
+          images: 2,
           status: { state: "done", files: [front, back], missing: [] },
         },
       ],

@@ -218,7 +218,7 @@ fn report(event: RunEvent, labels: &std::sync::Mutex<std::collections::HashMap<u
                     }
                 }
                 JobStatus::Failed { error } => println!("FAILED   {label}: {error}"),
-                JobStatus::Queued | JobStatus::Resolving | JobStatus::Downloading | JobStatus::Cancelled => {}
+                JobStatus::Queued | JobStatus::Resolving | JobStatus::Downloading { .. } | JobStatus::Cancelled => {}
             }
         }
         RunEvent::Error { message } => eprintln!("error: {message}"),
