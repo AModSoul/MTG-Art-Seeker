@@ -1,4 +1,5 @@
 import { Button, Text } from "@chakra-ui/react";
+import { useState } from "react";
 
 import type { Doubt } from "@/bindings/Doubt";
 import {
@@ -32,7 +33,10 @@ const DOUBT_LOOK: Record<Doubt, { title: string; body: (face: string) => string 
  * oldest first. */
 export function FoundArtDialog() {
   const doubt = useRun((state) => state.doubts[0]);
-  const look = doubt && DOUBT_LOOK[doubt.doubt];
+  // The last doubt stays while the dialog animates out, so it keeps its title.
+  const [shown, setShown] = useState(doubt);
+  if (doubt !== undefined && doubt !== shown) setShown(doubt);
+  const look = shown && DOUBT_LOOK[shown.doubt];
 
   return (
     <DialogRoot
@@ -45,13 +49,13 @@ export function FoundArtDialog() {
       }}
     >
       <DialogContent>
-        {doubt && look && (
+        {shown && look && (
           <>
             <DialogHeader>
               <DialogTitle>{look.title}</DialogTitle>
             </DialogHeader>
             <DialogBody>
-              <Text>{look.body(doubt.face)}</Text>
+              <Text>{look.body(shown.face)}</Text>
               <Text mt="2" color="fg.muted">
                 Save it as the art anyway?
               </Text>
