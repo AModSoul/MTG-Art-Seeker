@@ -1,4 +1,4 @@
-# MTG Art Downloader
+# MTG Art Seeker
 
 Download Magic: The Gathering card art in bulk. Paste a deck list, run a Scryfall search, pick an
 EDHREC top list or a preconstructed deck, and the app saves each card's art — from [MTGPics](https://www.mtgpics.com) where

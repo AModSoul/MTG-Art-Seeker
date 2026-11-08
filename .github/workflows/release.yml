@@ -81,7 +81,7 @@ jobs:
           # tauri-action fills __VERSION__ in from tauri.conf.json, so a run by
           # hand gets the same release as the version's tag would.
           tagName: v__VERSION__
-          releaseName: MTG Art Downloader v__VERSION__
+          releaseName: MTG Art Seeker v__VERSION__
           releaseBody: See the assets below to download and install this version.
           releaseDraft: true
           prerelease: false

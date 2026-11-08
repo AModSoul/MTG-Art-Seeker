@@ -12,7 +12,7 @@ export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
 
 export const DISCORD_INVITE_URL = "https://discord.gg/A5AkkyP8CU";
 
-export const APP_NAME = "MTG Art Downloader";
+export const APP_NAME = "MTG Art Seeker";
 
 export const DESCRIPTION =
   "Download Magic: The Gathering card art in bulk from a deck list, a Scryfall search, an EDHREC list or a preconstructed deck. MTGPics' larger, uncropped art where it has it, Scryfall's otherwise.";
