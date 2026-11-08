@@ -62,17 +62,17 @@ The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` onc
   Never match on a name alone: one set can print a name many times.
 - **The front end never passes URLs or file paths to download.** It sends text input and settings;
   the core builds every URL and path, and file names go through `naming::sanitize`.
-- **The finder window is the user's to drive.** `src-tauri/src/finder.rs` opens the page the core
-  chose (`manual::site_url`: Google Lens on an art crop, a search for the artist, or the website
-  MTGPics links for them) and then listens for downloads. It reads a page only when the user picks
-  **Find the art on this page** from the window's menu, and then only the addresses and sizes of its
-  images (`PAGE_IMAGES`); it never clicks, scrolls or navigates for the user, and reads nothing
-  else. The only thing it adds to a page is its own toast in the corner (`finder::toast`), set as
-  text in a shadow root, to say what came of an image. Images reach the core from `src-tauri`
-  (`manual::import`, `manual::fetch_page_images`), never from React: the main window is shown a
-  page's images to choose from, and answers with an index. One `verify` doesn't accept is only
-  saved if the user says so. Its pages get no capabilities: `capabilities/` names only
-  `main`.
+- **The finder window is the user's to drive.** `apps/desktop/src-tauri/src/finder.rs` opens the
+  page the core chose (`manual::site_url`: Google Lens on an art crop, a search for the artist, or
+  the website MTGPics links for them) and then listens for downloads. It reads a page only when the
+  user picks **Find the art on this page** from the window's menu, and then only the addresses and
+  sizes of its images (`PAGE_IMAGES`); it never clicks, scrolls or navigates for the user, and reads
+  nothing else. The only thing it adds to a page is its own toast in the corner (`finder::toast`),
+  set as text in a shadow root, to say what came of an image. Images reach the core from
+  `apps/desktop/src-tauri` (`manual::import`, `manual::fetch_page_images`), never from React: the
+  main window is shown a page's images to choose from, and answers with an index. One `verify`
+  doesn't accept is only saved if the user says so. Its pages get no capabilities: `capabilities/`
+  names only `main`.
 - **Art from anywhere but MTGPics and Scryfall goes through `verify`**, which checks it's Scryfall's
   art and larger. Tune its thresholds with `cargo run --release -p mtg-art-core --example verify`
   on real images kept outside the repo; the tests use generated ones.

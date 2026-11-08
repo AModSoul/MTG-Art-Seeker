@@ -75,8 +75,8 @@ when you go back to it. Later downloads of the card use the one you chose last.
 Some sites, Instagram among them, cover their images so they can't be saved. On those, open the post
 and choose **Find the art on this page** from the window's menu: the app downloads the images the
 page has and shows them in its main window, each with its size and whether it looks like the art,
-and saves the one you choose. It reads the page only when you ask, and only its images. You can sign in to a site in that window; **Sign out of sites** forgets it.
-Whatever you save or ask about, a note in the window's corner says what came of it: saved, too
+and saves the one you choose. It reads the page only when you ask, and only its images. You can
+sign in to a site in that window; **Sign out of sites** forgets it. Whatever you save or ask about, a note in the window's corner says what came of it: saved, too
 small, a card scan, or not the art.
 
 ### Settings
