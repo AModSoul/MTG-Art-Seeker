@@ -171,7 +171,13 @@ function applyEvents(events: RunEvent[]) {
             jobs = jobs.slice();
             copied = true;
           }
-          jobs[event.id - 1] = { ...job, status: event.status };
+          // The count of images it will save outlasts the status that says it,
+          // so a row keeps its height if the job then fails.
+          jobs[event.id - 1] = {
+            ...job,
+            status: event.status,
+            images: event.status.state === "downloading" ? event.status.images : job.images,
+          };
           break;
         }
         case "error":

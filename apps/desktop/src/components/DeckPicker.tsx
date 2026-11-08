@@ -7,7 +7,6 @@ import {
   Image,
   Input,
   SimpleGrid,
-  Spinner,
   Stack,
   Text,
 } from "@chakra-ui/react";
@@ -18,13 +17,22 @@ import { LuPackage, LuX } from "react-icons/lu";
 import { api } from "@/api";
 import type { DeckSearch } from "@/bindings/DeckSearch";
 import type { DeckSummary } from "@/bindings/DeckSummary";
+import { DataListItem, DataListRoot } from "@mtg-art/ui/data-list";
 import { RadioCardItem, RadioCardLabel, RadioCardRoot } from "@mtg-art/ui/radio-card";
+import { ScrollArea } from "@mtg-art/ui/scroll-area";
+import { Skeleton } from "@mtg-art/ui/skeleton";
 import { Tooltip } from "@mtg-art/ui/tooltip";
 import { errorText } from "@/notify";
 import { type PickedDeck, useInput } from "@/store";
 
 /** How many decks are shown at first, and how many more each "Show more" adds. */
 export const DECK_PAGE = 40;
+
+/** How many placeholder tiles stand in for the decks while MTGJSON's list is fetched. */
+const PLACEHOLDER_TILES = 6;
+
+/** The height of a deck's box picture. */
+const BOX_HEIGHT = "40";
 
 /** Every precon MTGJSON lists, two to a row with a picture of its box, and a
  * search above them in Scryfall's words. */
@@ -47,7 +55,9 @@ export function DeckPicker() {
         spellCheck={false}
       />
       <SearchSummary found={found} />
-      <Box flex="1" minH="0" overflowY="auto" mx="-1" px="1">
+      {/* Room at the end for the scrollbar, so it doesn't cover the tiles. */}
+      <ScrollArea flex="1" minH="0" mx="-1" contentProps={{ ps: "1", pe: "3" }}>
+        {!found.search && !found.error && <PlaceholderTiles />}
         {found.search && found.search.decks.length > 0 && (
           <Stack gap="3" pb="1">
             <RadioCardRoot
@@ -87,7 +97,7 @@ export function DeckPicker() {
             )}
           </Stack>
         )}
-      </Box>
+      </ScrollArea>
       {deck && <PickedDeckLine deck={deck} onClear={() => setInput({ deck: null })} />}
     </Stack>
   );
@@ -109,10 +119,9 @@ function SearchSummary({ found }: { found: Found }) {
   }
   if (!found.search) {
     return (
-      <HStack gap="2" color="fg.muted">
-        <Spinner size="xs" />
-        <Text fontSize="sm">Getting the list of decks from MTGJSON…</Text>
-      </HStack>
+      <Text fontSize="sm" color="fg.muted">
+        Getting the list of decks from MTGJSON…
+      </Text>
     );
   }
   const { total } = found.search;
@@ -122,6 +131,22 @@ function SearchSummary({ found }: { found: Found }) {
         ? "No decks match"
         : `${total.toLocaleString()} ${total === 1 ? "deck" : "decks"}`}
     </Text>
+  );
+}
+
+/** Tiles the shape of the decks', while MTGJSON's list is fetched: a box over
+ * two lines of text, in a card's border. */
+function PlaceholderTiles() {
+  return (
+    <SimpleGrid columns={2} gap="2" pb="1" aria-hidden>
+      {Array.from({ length: PLACEHOLDER_TILES }, (_, index) => (
+        <Stack key={index} gap="1.5" p="3" borderWidth="1px" rounded="l2">
+          <Skeleton h={BOX_HEIGHT} rounded="sm" />
+          <Skeleton h="4" w="80%" />
+          <Skeleton h="4" w="60%" />
+        </Stack>
+      ))}
+    </SimpleGrid>
   );
 }
 
@@ -158,11 +183,13 @@ function DeckTile({ deck }: { deck: DeckSummary }) {
  * across searches so a deck seen once isn't asked about again. */
 const boxes = new Map<string, string | null>();
 
-/** The picture of a deck's box, asked for once it scrolls into view. */
+/** The picture of a deck's box, asked for once it scrolls into view, and held
+ * by a placeholder its size until it has loaded. */
 function DeckBox({ deck }: { deck: DeckSummary }) {
   const ref = useRef<HTMLDivElement>(null);
   const known = boxes.get(deck.fileName);
   const [path, setPath] = useState<string | null | undefined>(deck.hasBox ? known : null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (path !== undefined || !ref.current) return;
@@ -186,42 +213,53 @@ function DeckBox({ deck }: { deck: DeckSummary }) {
   }, [deck.fileName, path]);
 
   return (
-    <Center ref={ref} h="40" w="full" rounded="sm" bg={path ? undefined : "bg.subtle"}>
-      {path ? (
-        <Image
-          src={convertFileSrc(path)}
-          alt={`The box of ${deck.name}`}
-          maxH="full"
-          maxW="full"
-          objectFit="contain"
-        />
-      ) : path === null ? (
-        <Box color="fg.subtle" fontSize="3xl" aria-hidden>
-          <LuPackage />
-        </Box>
-      ) : (
-        <Spinner size="sm" color="fg.subtle" />
-      )}
-    </Center>
+    <Skeleton
+      ref={ref}
+      loading={path === undefined || (path !== null && !loaded)}
+      h={BOX_HEIGHT}
+      w="full"
+      rounded="sm"
+    >
+      <Center h="full" rounded="sm" bg={path ? undefined : "bg.subtle"}>
+        {path ? (
+          <Image
+            src={convertFileSrc(path)}
+            alt={`The box of ${deck.name}`}
+            maxH="full"
+            maxW="full"
+            objectFit="contain"
+            onLoad={() => setLoaded(true)}
+            // A picture that won't load is no picture.
+            onError={() => setPath(null)}
+          />
+        ) : (
+          <Box color="fg.subtle" fontSize="3xl" aria-hidden>
+            <LuPackage />
+          </Box>
+        )}
+      </Center>
+    </Skeleton>
   );
 }
 
 function PickedDeckLine({ deck, onClear }: { deck: PickedDeck; onClear: () => void }) {
   return (
     <HStack gap="2" borderTopWidth="1px" pt="2">
-      <Stack gap="0" flex="1" minW="0">
-        <Text fontSize="xs" color="fg.muted">
-          Picked
-        </Text>
-        <Tooltip content={`${deck.name} · ${deck.setName}`}>
-          <Text fontSize="sm" fontWeight="medium" truncate>
-            {deck.name}{" "}
-            <Text as="span" color="fg.muted" fontWeight="normal">
-              ({deck.code})
-            </Text>
-          </Text>
-        </Tooltip>
-      </Stack>
+      <DataListRoot flex="1" minW="0">
+        <DataListItem
+          label="Picked"
+          value={
+            <Tooltip content={`${deck.name} · ${deck.setName}`}>
+              <Text fontWeight="medium" truncate>
+                {deck.name}{" "}
+                <Text as="span" color="fg.muted" fontWeight="normal">
+                  ({deck.code})
+                </Text>
+              </Text>
+            </Tooltip>
+          }
+        />
+      </DataListRoot>
       <IconButton size="xs" variant="ghost" aria-label="Unpick the deck" onClick={onClear}>
         <LuX />
       </IconButton>

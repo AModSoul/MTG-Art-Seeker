@@ -3,6 +3,7 @@ import { expect, mocked, screen, userEvent, waitFor } from "storybook/test";
 
 import {
   boltFile,
+  delverFile,
   finishedJobs,
   finishedSummary,
   foundBoltFile,
@@ -13,7 +14,7 @@ import {
 import { defaultSettings } from "@/__fixtures__/settings";
 import { api } from "@/api";
 import type { KnownSource } from "@/bindings/KnownSource";
-import { useRun, useSettings } from "@/store";
+import { type JobView, useRun, useSettings } from "@/store";
 
 import { RunView } from "./RunView";
 
@@ -38,13 +39,18 @@ export const Empty: Story = {
   },
 };
 
-/** A run has started but the Rust side hasn't planned its jobs yet. */
+/** A run has started but the Rust side hasn't planned its jobs yet: the table
+ * holds placeholder rows, so nothing moves when the jobs arrive. */
 export const Planning: Story = {
   beforeEach: () => {
     useRun.setState({ running: true, runId: 1 });
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByText("Getting the list ready…")).toBeVisible();
+    await expect(canvas.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
+    await expect(canvas.getByRole("table")).toHaveAttribute("aria-busy", "true");
+    await expect(canvas.getAllByRole("row")).toHaveLength(7);
+    await expect(canvas.getByRole("radio", { name: "All 0" })).toBeDisabled();
   },
 };
 
@@ -53,11 +59,18 @@ export const Running: Story = {
   beforeEach: () => {
     useRun.setState({ running: true, runId: 1, jobs: mixedJobs, skipped: skippedLines });
   },
-  play: async ({ canvas }) => {
+  play: async ({ canvas, canvasElement }) => {
     await expect(canvas.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "4");
     await expect(canvas.getByText("4 of 7 cards")).toBeVisible();
     await expect(canvas.getByText(/Skipped 2 lines that aren't cards/)).toBeVisible();
     await expect(canvas.queryByRole("button", { name: /retry failed/i })).not.toBeInTheDocument();
+    // Every status, the longest with its spinner, fits inside its column's padding.
+    const badges = canvasElement.querySelectorAll("td .chakra-badge");
+    await expect(badges).toHaveLength(mixedJobs.length);
+    for (const badge of badges) {
+      const cell = badge.closest("td")?.getBoundingClientRect();
+      await expect(badge.getBoundingClientRect().right).toBeLessThanOrEqual((cell?.right ?? 0) - 8);
+    }
   },
 };
 
@@ -87,13 +100,16 @@ export const Finished: Story = {
   },
 };
 
-/** Each saved image's size in pixels, or a dash when its header couldn't be read. */
-export const Resolution: Story = {
+/** Where each saved image came from, and its size in pixels, or a dash when
+ * its header couldn't be read. */
+export const ImageColumn: Story = {
   beforeEach: () => {
     useRun.setState({ jobs: finishedJobs, summary: finishedSummary });
   },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("columnheader", { name: "Resolution" })).toBeVisible();
+    await expect(canvas.getByRole("columnheader", { name: "Image" })).toBeVisible();
+    await expect(canvas.getAllByText("MTGPics")).toHaveLength(1);
+    await expect(canvas.getAllByText("Scryfall")).toHaveLength(5);
     await expect(canvas.getByText("1920 × 1408")).toBeVisible();
     await expect(canvas.getByText("626 × 457")).toBeVisible();
     // Sol Ring, Damnation and Counterspell finish with an image of unknown size.
@@ -346,7 +362,7 @@ export const ImagesOnThePage: Story = {
   },
 };
 
-/** Found art is badged as such, and links to the page it came from. */
+/** Found art is named as such, and links to the page it came from. */
 export const FoundArt: Story = {
   beforeEach: () => {
     useRun.setState({
@@ -486,12 +502,12 @@ export const SourcesForEachFace: Story = {
     ]);
   },
   play: async ({ canvas, canvasElement }) => {
-    // Each face has its own thumbnail and a line twice as tall as one card's.
+    // Each face has its own thumbnail, on a line as tall as it.
     await expect(canvasElement.querySelectorAll("img")).toHaveLength(2);
     // A size, or a dash for one unknown, on a line of its own per face.
     const sizes = canvas.getAllByText(/^(\d+ × \d+|—)$/);
     await expect(sizes).toHaveLength(2);
-    await expect(sizes[0]?.parentElement?.getBoundingClientRect().height).toBe(48);
+    await expect(sizes[0]?.parentElement?.parentElement?.getBoundingClientRect().height).toBe(48);
     await userEvent.pointer({ keys: "[MouseRight]", target: canvas.getByText("Done") });
     await waitFor(() =>
       expect(screen.getByText("Insectile Aberration: use the art from")).toBeVisible(),
@@ -514,5 +530,55 @@ export const FindLargerCopyFails: Story = {
       canvas.getByRole("button", { name: "Search Google Lens for this art, for Lightning Bolt" }),
     );
     await waitFor(() => expect(screen.getByText("Couldn't open the search")).toBeVisible());
+  },
+};
+
+/** Karn before its art is saved. */
+const karnJob: JobView = {
+  id: 1,
+  label: "Karn, Scion of Urza (DOM) 1",
+  line: "",
+  images: 1,
+  status: { state: "queued" },
+};
+
+/** Delver of Secrets, with its two faces, as its art is being saved. */
+const delverJob: JobView = {
+  id: 2,
+  label: "Delver of Secrets (ISD) 51",
+  line: "",
+  images: 2,
+  status: { state: "downloading", images: 2 },
+};
+
+/** A row is as tall as it will be once its art is saved: a line per image the
+ * job says it will save, held by placeholders until each arrives. */
+export const RowsKeepTheirHeight: Story = {
+  beforeEach: () => {
+    useRun.setState({ running: true, runId: 1, jobs: [karnJob, delverJob] });
+  },
+  play: async ({ canvas }) => {
+    const heights = () =>
+      [/Karn/, /Delver/].map(
+        (name) => canvas.getByRole("row", { name }).getBoundingClientRect().height,
+      );
+    const before = heights();
+    // Two faces make a row taller than one.
+    await expect(before[1]).toBeGreaterThan(before[0] ?? 0);
+
+    // Karn is saved, and Delver's back is missing.
+    useRun.setState({
+      jobs: [
+        { ...karnJob, status: { state: "done", files: [karnFile], missing: [] } },
+        {
+          ...delverJob,
+          status: { state: "done", files: [delverFile], missing: ["Insectile Aberration"] },
+        },
+      ],
+    });
+    await waitFor(() =>
+      expect(canvas.getByText("No art found for Insectile Aberration")).toBeVisible(),
+    );
+    await expect(heights()).toEqual(before);
   },
 };
