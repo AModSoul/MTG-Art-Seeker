@@ -19,6 +19,15 @@ export const Default: Story = {
   },
 };
 
+/** The smallest, for a bar of small buttons such as the desktop app's header: 24px square. */
+export const ExtraSmall: Story = {
+  args: { size: "2xs" },
+  play: async ({ canvas }) => {
+    const button = await canvas.findByRole("button", { name: "Toggle color mode" });
+    await expect(button.getBoundingClientRect().height).toBe(24);
+  },
+};
+
 export const Disabled: Story = {
   args: { disabled: true },
   play: async ({ canvas }) => {

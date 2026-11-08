@@ -4,9 +4,9 @@
 //
 // A run is recorded once by `crates/core/examples/record.rs` into target/screenshots, really
 // downloading the art; `--record` records again. Then the app's front end is served with
-// `api.ts` and `tauri.ts` in place of Tauri, fed the recording, and each scene is shot in
-// headless Chromium at the app window's default size, 1340 × 800, and 150%, as on a Windows
-// laptop. Name scenes to take only those.
+// `api.ts`, `appWindow.ts` and `tauri.ts` in place of Tauri, fed the recording, and each scene
+// is shot in headless Chromium at the app window's default size, 1340 × 800, and 150%, with
+// the app's own title bar, as on a Windows laptop. Name scenes to take only those.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -128,6 +128,7 @@ const recorded = new Map(
 // The app, with the stand-ins swapped in for the modules that reach Tauri.
 const swaps: Record<string, string> = {
   "@/api": path.join(here, "api.ts"),
+  "@/appWindow": path.join(here, "appWindow.ts"),
   "@tauri-apps/api/core": path.join(here, "tauri.ts"),
   "@tauri-apps/plugin-dialog": path.join(here, "tauri.ts"),
   "@tauri-apps/plugin-process": path.join(here, "tauri.ts"),
@@ -150,7 +151,9 @@ const server = await createServer({
   root: desktop,
   logLevel: "warn",
   plugins: [harness, react()],
-  resolve: { alias: [{ find: /^@\/(?!api$)/, replacement: `${path.join(desktop, "src")}/` }] },
+  resolve: {
+    alias: [{ find: /^@\/(?!(api|appWindow)$)/, replacement: `${path.join(desktop, "src")}/` }],
+  },
   server: { port: 1430, fs: { allow: [root, ...boxDirs] } },
 });
 await server.listen();

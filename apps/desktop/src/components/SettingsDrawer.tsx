@@ -24,6 +24,7 @@ import { SegmentedControl } from "@mtg-art/ui/segmented-control";
 import { SkeletonText } from "@mtg-art/ui/skeleton";
 import { SwitchField } from "@mtg-art/ui/switch-field";
 import { Tooltip } from "@mtg-art/ui/tooltip";
+import { HEADER_HEIGHT } from "@/layout";
 import { chooseOutputDir, useSettings } from "@/store";
 import { findOption, type Option } from "@/utils/options";
 
@@ -107,12 +108,20 @@ export function SettingsDrawer() {
     <DrawerRoot size="md">
       <Tooltip content="Settings">
         <DrawerTrigger asChild>
-          <IconButton variant="ghost" size="sm" aria-label="Settings" disabled={!settings}>
+          {/* As small as the header's other buttons. */}
+          <IconButton
+            variant="ghost"
+            size="2xs"
+            aria-label="Settings"
+            disabled={!settings}
+            _icon={{ boxSize: "4" }}
+          >
             <LuSettings />
           </IconButton>
         </DrawerTrigger>
       </Tooltip>
-      <DrawerContent>
+      {/* Below the header, which stays in reach above it. */}
+      <DrawerContent offset={`${HEADER_HEIGHT} 0 0 0`}>
         <DrawerHeader>
           <DrawerTitle>Settings</DrawerTitle>
         </DrawerHeader>
