@@ -1,14 +1,4 @@
-import {
-  Button,
-  Code,
-  Fieldset,
-  HStack,
-  IconButton,
-  Input,
-  Span,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { Button, Code, Fieldset, HStack, IconButton, Input, Stack, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { LuFolderOpen, LuSettings } from "react-icons/lu";
 
@@ -18,6 +8,7 @@ import type { Printing } from "@/bindings/Printing";
 import type { ScryfallImage } from "@/bindings/ScryfallImage";
 import type { Settings } from "@/bindings/Settings";
 import type { SourceMode } from "@/bindings/SourceMode";
+import { DataListItem, DataListRoot } from "@mtg-art/ui/data-list";
 import {
   DrawerBody,
   DrawerCloseTrigger,
@@ -30,7 +21,8 @@ import {
 import { Field } from "@mtg-art/ui/field";
 import { NativeSelectField, NativeSelectRoot } from "@mtg-art/ui/native-select";
 import { SegmentedControl } from "@mtg-art/ui/segmented-control";
-import { Switch } from "@mtg-art/ui/switch";
+import { SkeletonText } from "@mtg-art/ui/skeleton";
+import { SwitchField } from "@mtg-art/ui/switch-field";
 import { Tooltip } from "@mtg-art/ui/tooltip";
 import { chooseOutputDir, useSettings } from "@/store";
 import { findOption, type Option } from "@/utils/options";
@@ -135,22 +127,17 @@ function SettingsForm({ settings }: { settings: Settings }) {
   const update = useSettings((state) => state.update);
   const switches = (section: keyof typeof SWITCHES) =>
     SWITCHES[section].map(({ key, label, help }) => (
-      <Field
+      <SwitchField
         key={key}
-        // Lined up under the switch's label, not its track.
-        helperText={help && <Span ps="11">{help}</Span>}
-      >
-        <Switch
-          checked={settings[key]}
-          onCheckedChange={(event) => {
-            const patch: Partial<Settings> = {};
-            patch[key] = event.checked;
-            update(patch);
-          }}
-        >
-          {label}
-        </Switch>
-      </Field>
+        label={label}
+        helperText={help}
+        checked={settings[key]}
+        onCheckedChange={(event) => {
+          const patch: Partial<Settings> = {};
+          patch[key] = event.checked;
+          update(patch);
+        }}
+      />
     ));
 
   return (
@@ -264,19 +251,22 @@ function CardData() {
   }, []);
 
   return (
-    <Stack gap="1">
-      <Text fontSize="sm" fontWeight="medium">
-        Card data
-      </Text>
-      <Text fontSize="sm" color="fg.muted">
-        {status ? cardDataSummary(status) : "Checking…"}
-      </Text>
-      {status?.error && (
-        <Text fontSize="sm" color="fg.error">
-          The last update failed: {status.error}
-        </Text>
-      )}
-    </Stack>
+    // Bold, so its label reads like the fields' around it.
+    <DataListRoot variant="bold">
+      <DataListItem
+        label="Card data"
+        value={
+          status ? (
+            <Stack gap="1">
+              <Text>{cardDataSummary(status)}</Text>
+              {status.error && <Text color="fg.error">The last update failed: {status.error}</Text>}
+            </Stack>
+          ) : (
+            <SkeletonText noOfLines={2} />
+          )
+        }
+      />
+    </DataListRoot>
   );
 }
 

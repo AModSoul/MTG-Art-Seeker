@@ -1,9 +1,10 @@
-import { Badge, Box, Button, HStack, Image, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Image, SimpleGrid, Text } from "@chakra-ui/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useState } from "react";
 
 import type { Doubt } from "@/bindings/Doubt";
 import type { PageChoice } from "@/bindings/PageChoice";
+import { Card } from "@mtg-art/ui/card";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -87,16 +88,31 @@ function PageImageCard({ image, onSave }: { image: PageChoice; onSave: () => voi
   const { palette, label } = verdictLook(image.doubt);
   const size = `${image.size.width} × ${image.size.height}`;
   return (
-    <Stack gap="2" borderWidth="1px" rounded="md" p="2">
-      <Box bg="bg.subtle" rounded="sm">
-        <Image
-          src={convertFileSrc(image.path)}
-          alt={`${size} image from ${image.host}`}
-          w="full"
-          h="40"
-          objectFit="contain"
-        />
-      </Box>
+    <Card
+      size="sm"
+      media={
+        <Box bg="bg.subtle">
+          <Image
+            src={convertFileSrc(image.path)}
+            alt={`${size} image from ${image.host}`}
+            w="full"
+            h="40"
+            objectFit="contain"
+          />
+        </Box>
+      }
+      footer={
+        <Button
+          size="sm"
+          flex="1"
+          variant={image.doubt === null ? "solid" : "outline"}
+          aria-label={`Save this one: ${size}, from ${image.host}`}
+          onClick={onSave}
+        >
+          Save this one
+        </Button>
+      }
+    >
       <HStack justify="space-between">
         <Text fontWeight="medium" fontVariantNumeric="tabular-nums">
           {size}
@@ -110,14 +126,6 @@ function PageImageCard({ image, onSave }: { image: PageChoice; onSave: () => voi
           {image.host}
         </Text>
       </Tooltip>
-      <Button
-        size="sm"
-        variant={image.doubt === null ? "solid" : "outline"}
-        aria-label={`Save this one: ${size}, from ${image.host}`}
-        onClick={onSave}
-      >
-        Save this one
-      </Button>
-    </Stack>
+    </Card>
   );
 }

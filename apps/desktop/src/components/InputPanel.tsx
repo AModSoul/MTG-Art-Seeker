@@ -19,6 +19,7 @@ import type { ListFile } from "@/bindings/ListFile";
 import type { ParsedList } from "@/bindings/ParsedList";
 import type { PresetInfo } from "@/bindings/PresetInfo";
 import type { RunInput } from "@/bindings/RunInput";
+import { DataListItem, DataListRoot } from "@mtg-art/ui/data-list";
 import { Field } from "@mtg-art/ui/field";
 import { Radio, RadioGroup } from "@mtg-art/ui/radio";
 import { Tooltip } from "@mtg-art/ui/tooltip";
@@ -313,28 +314,28 @@ function OutputFolder() {
   if (!outputDir) return null;
 
   return (
-    <Stack gap="1">
-      <Text fontSize="xs" color="fg.muted" fontWeight="medium">
-        Saving to
-      </Text>
-      <HStack gap="2">
-        <Tooltip content={outputDir}>
-          <Text fontSize="sm" truncate flex="1">
-            {outputDir}
-          </Text>
-        </Tooltip>
-        <Tooltip content="Choose a folder">
-          <IconButton
-            size="xs"
-            variant="ghost"
-            aria-label="Choose the folder art is saved to"
-            onClick={() => void chooseOutputDir()}
-          >
-            <LuFolderOpen />
-          </IconButton>
-        </Tooltip>
-      </HStack>
-    </Stack>
+    <HStack gap="2" align="end">
+      <DataListRoot flex="1" minW="0">
+        <DataListItem
+          label="Saving to"
+          value={
+            <Tooltip content={outputDir}>
+              <Text truncate>{outputDir}</Text>
+            </Tooltip>
+          }
+        />
+      </DataListRoot>
+      <Tooltip content="Choose a folder">
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-label="Choose the folder art is saved to"
+          onClick={() => void chooseOutputDir()}
+        >
+          <LuFolderOpen />
+        </IconButton>
+      </Tooltip>
+    </HStack>
   );
 }
 

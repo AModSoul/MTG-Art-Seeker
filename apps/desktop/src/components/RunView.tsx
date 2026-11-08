@@ -2,10 +2,12 @@ import {
   Badge,
   Box,
   Button,
+  Center,
   Flex,
   HStack,
   IconButton,
   Image,
+  Spacer,
   Spinner,
   Stack,
   Table,
@@ -21,6 +23,7 @@ import {
   LuFolderOpen,
   LuGlobe,
   LuImageDown,
+  LuImageOff,
   LuRotateCcw,
 } from "react-icons/lu";
 import { SiArtstation, SiDeviantart, SiGooglelens, SiInstagram, SiPixiv } from "react-icons/si";
@@ -41,8 +44,10 @@ import {
   MenuRoot,
   MenuSeparator,
 } from "@mtg-art/ui/menu";
-import { ProgressBar, ProgressLabel, ProgressRoot } from "@mtg-art/ui/progress";
+import { ProgressBar, ProgressLabel, ProgressRoot, ProgressValueText } from "@mtg-art/ui/progress";
+import { ScrollArea } from "@mtg-art/ui/scroll-area";
 import { SegmentedControl } from "@mtg-art/ui/segmented-control";
+import { Skeleton } from "@mtg-art/ui/skeleton";
 import { Tooltip } from "@mtg-art/ui/tooltip";
 import { showError, showSuccess } from "@/notify";
 import {
@@ -59,37 +64,48 @@ import {
 } from "@/store";
 import { findOption } from "@/utils/options";
 
-type Filter = "all" | "failed" | "scryfall" | "mtgpics" | "web";
+/** Where a saved image came from, as the table names it. */
+const SOURCE_LABELS: Record<ArtSource, string> = {
+  mtgpics: "MTGPics",
+  scryfall: "Scryfall",
+  web: "Found",
+};
+
+type Filter = "all" | "failed" | ArtSource;
 
 /** The table's filters, each with the jobs it shows. */
 const FILTERS: { value: Filter; label: string; matches: (status: JobStatus) => boolean }[] = [
   { value: "all", label: "All", matches: () => true },
   { value: "failed", label: "Failed", matches: (status) => isFailed(status) },
-  { value: "scryfall", label: "Scryfall", matches: (status) => hasSource(status, "scryfall") },
-  { value: "mtgpics", label: "MTGPics", matches: (status) => hasSource(status, "mtgpics") },
-  { value: "web", label: "Found", matches: (status) => hasSource(status, "web") },
+  ...(["scryfall", "mtgpics", "web"] as const).map((source) => ({
+    value: source,
+    label: SOURCE_LABELS[source],
+    matches: (status: JobStatus) => hasSource(status, source),
+  })),
 ];
+
+/** How many placeholder rows the table shows while the run is planned. */
+const PLACEHOLDER_ROWS = 6;
 
 export function RunView() {
   const { jobs, skipped, error, summary, running, folder, listFolder } = useRun();
   const outputDir = useSettings((state) => state.settings?.outputDir);
   const [filter, setFilter] = useState<Filter>("all");
 
-  if (jobs.length === 0 && !error) {
+  if (jobs.length === 0 && !error && !running) {
     return (
       <EmptyState
         h="full"
-        icon={running ? <Spinner /> : <LuImageDown />}
-        title={running ? "Getting the list ready…" : "Nothing downloaded yet"}
-        description={
-          running
-            ? "Looking up the cards to download."
-            : "Paste a card list, search Scryfall, or pick a preset or a deck, then download its art."
-        }
+        icon={<LuImageDown />}
+        title="Nothing downloaded yet"
+        description="Paste a card list, search Scryfall, or pick a preset or a deck, then download its art."
       />
     );
   }
 
+  // Until the core has planned the run, the table holds placeholders the
+  // shape of the rows to come.
+  const starting = running && jobs.length === 0;
   const finished = jobs.filter((job) => isFinal(job.status)).length;
   const failed = jobs.filter((job) => isFailed(job.status));
   const active = FILTERS.find((option) => option.value === filter) ?? FILTERS[0];
@@ -122,17 +138,25 @@ export function RunView() {
         </Alert>
       )}
 
-      {jobs.length > 0 && (
+      {(jobs.length > 0 || starting) && (
         <Stack gap="3">
-          <ProgressRoot value={finished} max={jobs.length} size="sm">
+          <ProgressRoot value={starting ? null : finished} max={Math.max(jobs.length, 1)} size="sm">
             <HStack justify="space-between" mb="1">
               <ProgressLabel>
-                {running ? "Downloading" : summary?.cancelled ? "Cancelled" : "Finished"}
+                {starting
+                  ? "Getting the list ready…"
+                  : running
+                    ? "Downloading"
+                    : summary?.cancelled
+                      ? "Cancelled"
+                      : "Finished"}
               </ProgressLabel>
-              <Text fontSize="sm" color="fg.muted">
-                {finished} of {jobs.length} cards
-                {summary && !running && ` in ${formatSeconds(summary.seconds)}`}
-              </Text>
+              {!starting && (
+                <ProgressValueText fontVariantNumeric="tabular-nums">
+                  {finished} of {jobs.length} cards
+                  {summary && !running && ` in ${formatSeconds(summary.seconds)}`}
+                </ProgressValueText>
+              )}
             </HStack>
             <ProgressBar />
           </ProgressRoot>
@@ -140,6 +164,8 @@ export function RunView() {
           <HStack gap="3" wrap="wrap">
             <SegmentedControl
               size="sm"
+              fontVariantNumeric="tabular-nums"
+              disabled={starting}
               value={filter}
               items={filterItems}
               onValueChange={(event) => {
@@ -147,7 +173,7 @@ export function RunView() {
                 if (chosen) setFilter(chosen);
               }}
             />
-            <Box flex="1" />
+            <Spacer />
             {!running && failed.length > 0 && (
               <>
                 <Button size="sm" variant="outline" onClick={() => void copyFailed()}>
@@ -183,145 +209,127 @@ export function RunView() {
         </Stack>
       )}
 
-      <Box flex="1" minH="0" overflowY="auto" borderWidth="1px" rounded="md">
-        <Table.Root size="sm" stickyHeader interactive>
+      {/* Below its minimum width the table scrolls sideways rather than squeezing. */}
+      <ScrollArea flex="1" minH="0" orientation="both" borderWidth="1px" rounded="md">
+        <Table.Root
+          size="sm"
+          stickyHeader
+          interactive
+          tableLayout="fixed"
+          minW="2xl"
+          aria-busy={starting}
+        >
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader w="20">
                 <VisuallyHidden>Art</VisuallyHidden>
               </Table.ColumnHeader>
-              <Table.ColumnHeader>Card</Table.ColumnHeader>
+              <Table.ColumnHeader w="20%">Card</Table.ColumnHeader>
               <Table.ColumnHeader w="32">Status</Table.ColumnHeader>
-              <Table.ColumnHeader w="28">Resolution</Table.ColumnHeader>
+              <Table.ColumnHeader w="28">Image</Table.ColumnHeader>
               {/* Saved takes the width left over, and its names are cut short to fit it. */}
-              <Table.ColumnHeader w="full" maxW="0">
-                Saved
-              </Table.ColumnHeader>
+              <Table.ColumnHeader>Saved</Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {shown.map((job) => (
-              <JobRow key={job.id} job={job} />
-            ))}
+            {starting
+              ? Array.from({ length: PLACEHOLDER_ROWS }, (_, index) => (
+                  <PlaceholderRow key={index} />
+                ))
+              : shown.map((job) => <JobRow key={job.id} job={job} />)}
           </Table.Body>
         </Table.Root>
-      </Box>
+      </ScrollArea>
     </Flex>
   );
 }
 
-/** The height of a saved image's line, the same under Resolution and Saved. */
-const FILE_LINE = "6";
+/** The height of each of a row's lines, its thumbnail's: one line per image,
+ * level across the columns. */
+const LINE = "12";
 
-/** A face's line on a card with more than one image: twice as tall, with room
- * for the face's own thumbnail beside it. */
-const FACE_LINE = "12";
+/** What one of a row's lines shows. */
+type Line =
+  /** An image still to come; `active` once its job is under way. */
+  | { kind: "waiting"; active: boolean }
+  | { kind: "saved"; file: SavedFile }
+  /** A face no art was found for. */
+  | { kind: "missing"; face: string }
+  /** No image: the job failed or was cancelled. */
+  | { kind: "none" };
+
+/** A row's lines: one per image it saved, or will save once it's done, so the
+ * row is its final height before its art arrives. */
+function rowLines(job: JobView): Line[] {
+  const { status } = job;
+  if (status.state === "done") {
+    return [
+      ...status.files.map((file): Line => ({ kind: "saved", file })),
+      ...status.missing.map((face): Line => ({ kind: "missing", face })),
+    ];
+  }
+  const line: Line =
+    status.state === "failed" || status.state === "cancelled"
+      ? { kind: "none" }
+      : { kind: "waiting", active: status.state !== "queued" };
+  return Array.from({ length: Math.max(job.images ?? 1, 1) }, () => line);
+}
+
+/** A cell's lines, each as tall as a thumbnail. */
+function Lines({
+  lines,
+  children,
+}: {
+  lines: Line[];
+  children: (line: Line, index: number) => React.ReactNode;
+}) {
+  return (
+    <Stack gap="1">
+      {lines.map((line, index) => (
+        <Flex key={line.kind === "saved" ? line.file.path : index} h={LINE} align="center" minW="0">
+          {children(line, index)}
+        </Flex>
+      ))}
+    </Stack>
+  );
+}
 
 const JobRow = memo(function JobRow({ job }: { job: JobView }) {
   const { status } = job;
+  const lines = rowLines(job);
   const files = status.state === "done" ? status.files : [];
-  const line = files.length > 1 ? FACE_LINE : FILE_LINE;
 
   const row = (
     <Table.Row>
       <Table.Cell>
-        {/* A thumbnail per face, level with its lines; one card shows its only one. */}
-        <Stack gap="1">
-          {files.map((file) => (
-            <Box key={file.path} asChild w="16" h="12" rounded="sm" focusRing="outside">
-              <button
-                type="button"
-                aria-label={`Show ${file.face}'s art in its folder`}
-                onClick={() => void api.revealFile(file.path)}
-              >
-                <Image
-                  src={convertFileSrc(file.path)}
-                  alt=""
-                  w="full"
-                  maxW="none"
-                  h="full"
-                  objectFit="cover"
-                  rounded="sm"
-                  loading="lazy"
-                  cursor="pointer"
-                />
-              </button>
-            </Box>
-          ))}
-        </Stack>
+        <Lines lines={lines}>{(line) => <Thumbnail line={line} />}</Lines>
       </Table.Cell>
       <Table.Cell>
-        <Text fontWeight="medium">{job.label}</Text>
-        {status.state === "failed" && (
-          <Text fontSize="xs" color="fg.error">
-            {status.error}
-          </Text>
-        )}
-        {status.state === "done" && status.missing.length > 0 && (
-          <Text fontSize="xs" color="fg.warning">
-            No art found for {status.missing.join(", ")}
-          </Text>
-        )}
+        <Text fontWeight="medium" lineClamp={2}>
+          {job.label}
+        </Text>
       </Table.Cell>
       <Table.Cell>
         <StatusBadge status={status} />
       </Table.Cell>
       <Table.Cell>
-        {/* One line per saved image, level with its line under Saved. */}
-        <Stack gap="1">
-          {files.map((file) => (
-            <Flex key={file.path} h={line} align="center">
-              <Tooltip content="Width × height, in pixels" disabled={!file.size}>
-                <Text
-                  fontSize="sm"
-                  color="fg.muted"
-                  fontVariantNumeric="tabular-nums"
-                  whiteSpace="nowrap"
-                >
-                  {file.size ? `${file.size.width} × ${file.size.height}` : "—"}
+        <Lines lines={lines}>{(line) => <ImageInfo line={line} />}</Lines>
+      </Table.Cell>
+      <Table.Cell>
+        <Lines lines={lines}>
+          {(line, index) =>
+            // A failed job's reason, where its art would be.
+            status.state === "failed" && index === 0 ? (
+              <Tooltip content={status.error}>
+                <Text fontSize="sm" color="fg.error" truncate>
+                  {status.error}
                 </Text>
               </Tooltip>
-            </Flex>
-          ))}
-        </Stack>
-      </Table.Cell>
-      <Table.Cell w="full" maxW="0">
-        <Stack gap="1">
-          {files.map((file) => (
-            <HStack key={file.path} h={line} gap="1">
-              <Tooltip
-                content={
-                  <>
-                    <Text wordBreak="break-all">{file.path}</Text>
-                    <Text mt="1">
-                      Click to show it in its folder, or right-click the row for its other sources
-                    </Text>
-                  </>
-                }
-                contentProps={{ maxW: "md" }}
-              >
-                <HStack
-                  asChild
-                  flex="1"
-                  minW="0"
-                  gap="2"
-                  cursor="pointer"
-                  textAlign="start"
-                  rounded="sm"
-                  focusRing="outside"
-                >
-                  <button type="button" onClick={() => void api.revealFile(file.path)}>
-                    <SourceBadge source={file.source} />
-                    <Text fontSize="sm" truncate>
-                      {file.face} · {file.artist}
-                    </Text>
-                  </button>
-                </HStack>
-              </Tooltip>
-              <FileAction job={job.id} file={file} />
-            </HStack>
-          ))}
-        </Stack>
+            ) : (
+              <SavedLine job={job.id} line={line} />
+            )
+          }
+        </Lines>
       </Table.Cell>
     </Table.Row>
   );
@@ -334,6 +342,152 @@ const JobRow = memo(function JobRow({ job }: { job: JobView }) {
     row
   );
 });
+
+/** A row the shape of a job's, while the run is planned. */
+function PlaceholderRow() {
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <Skeleton w="16" h={LINE} rounded="sm" />
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton h="4" w="80%" />
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton h="5" w="16" />
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton h="4" w="20" />
+      </Table.Cell>
+      <Table.Cell>
+        <Skeleton h="4" w="60%" />
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+/** Stands in for text still to come: pulsing once its job is under way, still before. */
+function TextPlaceholder({ active, w }: { active: boolean; w: string }) {
+  return active ? <Skeleton h="4" w={w} /> : <Skeleton h="4" w={w} variant="none" bg="bg.muted" />;
+}
+
+/** A line's thumbnail, or what stands in for it. */
+function Thumbnail({ line }: { line: Line }) {
+  switch (line.kind) {
+    case "waiting":
+      return line.active ? (
+        <Skeleton w="16" h={LINE} rounded="sm" />
+      ) : (
+        <Skeleton w="16" h={LINE} rounded="sm" variant="none" bg="bg.muted" />
+      );
+    case "saved":
+      return (
+        <Box asChild w="16" h={LINE} rounded="sm" focusRing="outside">
+          <button
+            type="button"
+            aria-label={`Show ${line.file.face}'s art in its folder`}
+            onClick={() => void api.revealFile(line.file.path)}
+          >
+            <Image
+              src={convertFileSrc(line.file.path)}
+              alt=""
+              w="full"
+              maxW="none"
+              h="full"
+              objectFit="cover"
+              rounded="sm"
+              loading="lazy"
+              cursor="pointer"
+            />
+          </button>
+        </Box>
+      );
+    case "missing":
+    case "none":
+      return (
+        <Center w="16" h={LINE} rounded="sm" bg="bg.subtle" color="fg.subtle" aria-hidden>
+          <LuImageOff />
+        </Center>
+      );
+  }
+}
+
+/** Where a line's image came from, over its size in pixels. */
+function ImageInfo({ line }: { line: Line }) {
+  switch (line.kind) {
+    case "waiting":
+      return <TextPlaceholder active={line.active} w="20" />;
+    case "saved": {
+      const { source, size } = line.file;
+      return (
+        <Stack gap="0" minW="0">
+          <Text fontSize="xs" color="fg.muted" truncate>
+            {SOURCE_LABELS[source]}
+          </Text>
+          <Tooltip content="Width × height, in pixels" disabled={!size}>
+            <Text fontSize="sm" fontVariantNumeric="tabular-nums" whiteSpace="nowrap">
+              {size ? `${size.width} × ${size.height}` : "—"}
+            </Text>
+          </Tooltip>
+        </Stack>
+      );
+    }
+    case "missing":
+    case "none":
+      return null;
+  }
+}
+
+/** A line's saved file, to show in its folder, with what else can be done with it. */
+function SavedLine({ job, line }: { job: number; line: Line }) {
+  switch (line.kind) {
+    case "waiting":
+      return <TextPlaceholder active={line.active} w="60%" />;
+    case "saved": {
+      const { file } = line;
+      return (
+        <HStack flex="1" minW="0" gap="1">
+          <Tooltip
+            content={
+              <>
+                <Text wordBreak="break-all">{file.path}</Text>
+                <Text mt="1">
+                  Click to show it in its folder, or right-click the row for its other sources
+                </Text>
+              </>
+            }
+            contentProps={{ maxW: "md" }}
+          >
+            <Box
+              asChild
+              flex="1"
+              minW="0"
+              fontSize="sm"
+              truncate
+              cursor="pointer"
+              textAlign="start"
+              rounded="sm"
+              focusRing="outside"
+            >
+              <button type="button" onClick={() => void api.revealFile(file.path)}>
+                {file.face} · {file.artist}
+              </button>
+            </Box>
+          </Tooltip>
+          <FileAction job={job} file={file} />
+        </HStack>
+      );
+    }
+    case "missing":
+      return (
+        <Text fontSize="sm" color="fg.warning" truncate>
+          No art found for {line.face}
+        </Text>
+      );
+    case "none":
+      return null;
+  }
+}
 
 /** What a choice in a row's menu does. */
 type RowAction =
@@ -504,21 +658,6 @@ function StatusBadge({ status }: { status: JobStatus }) {
   return (
     <Badge colorPalette={palette}>
       {busy && <Spinner size="xs" />} {label}
-    </Badge>
-  );
-}
-
-const SOURCE_LOOK: Record<ArtSource, { palette: string; label: string }> = {
-  mtgpics: { palette: "purple", label: "MTGPics" },
-  scryfall: { palette: "teal", label: "Scryfall" },
-  web: { palette: "blue", label: "Found" },
-};
-
-function SourceBadge({ source }: { source: ArtSource }) {
-  const { palette, label } = SOURCE_LOOK[source];
-  return (
-    <Badge colorPalette={palette} variant="subtle">
-      {label}
     </Badge>
   );
 }

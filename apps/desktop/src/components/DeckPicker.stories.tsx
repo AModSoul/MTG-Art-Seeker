@@ -37,7 +37,8 @@ export const AllDecks: Story = {
     await expect(api.searchDecks).toHaveBeenCalledWith("", DECK_PAGE);
     await expect(canvas.getByText("Abzan Armor")).toBeVisible();
     await expect(canvas.getByText("Tarkir: Dragonstorm Commander")).toBeVisible();
-    await expect(await canvas.findByAltText("The box of Abzan Armor")).toBeVisible();
+    // A box picture shows once it has loaded.
+    await waitFor(() => expect(canvas.getByAltText("The box of Abzan Armor")).toBeVisible());
     await expect(canvas.queryByAltText("The box of Arzakon's Minions")).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
   },
@@ -151,13 +152,45 @@ export const ShowMore: Story = {
   },
 };
 
-/** While MTGJSON's list is fetched the first time. */
+/** While MTGJSON's list is fetched the first time, tiles the decks' shape hold
+ * their place. */
 export const Loading: Story = {
   beforeEach: () => {
     mocked(api.searchDecks).mockReturnValue(new Promise(() => {}));
   },
-  play: async ({ canvas }) => {
+  play: async ({ canvas, canvasElement }) => {
     await expect(canvas.getByText("Getting the list of decks from MTGJSON…")).toBeVisible();
+    // Six tiles, each a box and two lines.
+    await expect(canvasElement.querySelectorAll(".chakra-skeleton")).toHaveLength(18);
+  },
+};
+
+/** Box pictures the core hasn't answered for yet. */
+const pendingBoxes: ((path: string | null) => void)[] = [];
+
+/** A deck's box picture arrives in a placeholder its size: the tile doesn't
+ * change height when it does. */
+export const BoxesLoadInPlace: Story = {
+  beforeEach: () => {
+    // A deck no other story has seen, so its picture isn't remembered from one.
+    mocked(api.searchDecks).mockResolvedValue({
+      decks: [{ ...abzanArmor, fileName: "AbzanArmor_Pending" }],
+      total: 1,
+    });
+    pendingBoxes.length = 0;
+    mocked(api.deckBox).mockImplementation(
+      () => new Promise((resolve) => pendingBoxes.push(resolve)),
+    );
+  },
+  play: async ({ canvas }) => {
+    const tile = (await canvas.findByRole("radio", { name: /Abzan Armor/ })).closest("label");
+    await waitFor(() => expect(pendingBoxes.length).toBeGreaterThan(0));
+    const before = tile?.getBoundingClientRect().height;
+    await expect(canvas.queryByAltText("The box of Abzan Armor")).not.toBeInTheDocument();
+
+    for (const resolve of pendingBoxes) resolve("/boxes/box.png");
+    await waitFor(() => expect(canvas.getByAltText("The box of Abzan Armor")).toBeVisible());
+    await expect(tile?.getBoundingClientRect().height).toBe(before);
   },
 };
 

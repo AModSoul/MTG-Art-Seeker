@@ -48,7 +48,6 @@ export function UpdateOffer({ update }: { update: AvailableUpdate }) {
   return (
     <Button
       size="sm"
-      colorPalette="green"
       variant="subtle"
       loading={installing}
       loadingText="Updating…"
