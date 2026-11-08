@@ -21,10 +21,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** While GitHub is asked: placeholders the shape of the downloads, and a link
+ * to GitHub's releases that works without scripts. */
 export const Loading: Story = {
   args: { state: { status: "loading" } },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: /Finding the latest release/ })).toBeDisabled();
+  play: async ({ canvas, canvasElement }) => {
+    await expect(canvas.getByText(/Finding the latest release/)).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "All releases on GitHub" })).toBeVisible();
+    await expect(canvasElement.querySelectorAll(".chakra-skeleton")).toHaveLength(3);
   },
 };
 
