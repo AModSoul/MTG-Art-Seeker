@@ -1,8 +1,9 @@
 import { Button, Code, Fieldset, HStack, IconButton, Input, Stack, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { LuFolderOpen, LuSettings } from "react-icons/lu";
+import { LuExternalLink, LuFolderOpen, LuSettings } from "react-icons/lu";
 
 import { api } from "@/api";
+import type { CardAnvilStatus } from "@/bindings/CardAnvilStatus";
 import type { CardDataStatus } from "@/bindings/CardDataStatus";
 import type { Printing } from "@/bindings/Printing";
 import type { ScryfallImage } from "@/bindings/ScryfallImage";
@@ -25,7 +26,7 @@ import { SkeletonText } from "@mtg-art/ui/skeleton";
 import { SwitchField } from "@mtg-art/ui/switch-field";
 import { Tooltip } from "@mtg-art/ui/tooltip";
 import { HEADER_BUTTON } from "@/layout";
-import { chooseOutputDir, useSettings } from "@/store";
+import { chooseCardAnvil, chooseOutputDir, openCardAnvilSite, useSettings } from "@/store";
 import { findOption, type Option } from "@/utils/options";
 
 const SOURCES: Option<SourceMode>[] = [
@@ -46,7 +47,7 @@ const PRINTINGS: Option<Printing>[] = [
 
 /** The on/off settings, in the order they're shown, by section. */
 const SWITCHES: Record<
-  "sources" | "files" | "printings" | "searching",
+  "sources" | "files" | "printings" | "searching" | "cardAnvil",
   { key: BooleanSetting; label: string; help?: string }[]
 > = {
   sources: [
@@ -93,6 +94,13 @@ const SWITCHES: Record<
       key: "includeExtras",
       label: "Include extras",
       help: "Un-cards, oversized cards, championship cards and the like",
+    },
+  ],
+  cardAnvil: [
+    {
+      key: "autoSendToCardAnvil",
+      label: "Send each download to Card Anvil",
+      help: "When a download finishes with art saved, Card Anvil opens and asks where to put it.",
     },
   ],
 };
@@ -226,6 +234,68 @@ function SettingsForm({ settings }: { settings: Settings }) {
         <Fieldset.Legend>Searching</Fieldset.Legend>
         <Fieldset.Content>{switches("searching")}</Fieldset.Content>
       </Fieldset.Root>
+
+      <Fieldset.Root>
+        <Fieldset.Legend>Card Anvil</Fieldset.Legend>
+        <Fieldset.Content>
+          <CardAnvilApp chosen={settings.cardAnvilPath} />
+          {switches("cardAnvil")}
+        </Fieldset.Content>
+      </Fieldset.Root>
+    </Stack>
+  );
+}
+
+/** The Card Anvil art is sent to: the installed one, found again whenever the user
+ * chooses another copy or goes back to it, or the one they chose. */
+function CardAnvilApp({ chosen }: { chosen: string | undefined }) {
+  const update = useSettings((state) => state.update);
+  const [status, setStatus] = useState<CardAnvilStatus | null>(null);
+  useEffect(() => {
+    let current = true;
+    api.cardAnvilStatus(chosen ?? null).then(
+      (result) => current && setStatus(result),
+      () => current && setStatus(null),
+    );
+    return () => {
+      current = false;
+    };
+  }, [chosen]);
+
+  return (
+    <Stack gap="3">
+      <Field
+        label="Card Anvil app"
+        helperText="Found automatically. Choose a different copy if you have more than one, such as a development build."
+      >
+        <HStack w="full">
+          <Input
+            value={status?.path ?? ""}
+            placeholder={status ? "Not found" : undefined}
+            readOnly
+            flex="1"
+          />
+          <Button variant="outline" onClick={() => void chooseCardAnvil()}>
+            <LuFolderOpen /> Choose…
+          </Button>
+        </HStack>
+      </Field>
+      {status?.chosenMissing && (
+        <Text fontSize="sm" color="fg.warning">
+          The copy you chose isn't there any more, so{" "}
+          {status.path ? "the installed one is used." : "art can't be sent."}
+        </Text>
+      )}
+      <HStack gap="2" wrap="wrap">
+        {chosen !== undefined && (
+          <Button size="sm" variant="outline" onClick={() => update({ cardAnvilPath: undefined })}>
+            Use the installed one
+          </Button>
+        )}
+        <Button size="sm" variant="outline" onClick={() => void openCardAnvilSite()}>
+          <LuExternalLink /> Get Card Anvil
+        </Button>
+      </HStack>
     </Stack>
   );
 }

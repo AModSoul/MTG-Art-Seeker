@@ -104,21 +104,23 @@ it: saved, too small, a card scan, or not the art.
 
 <img alt="The settings drawer" src="docs/screenshots/settings-dark.png" width="700" />
 
-| Setting                   | Default                        |                                                    |
-| ------------------------- | ------------------------------ | -------------------------------------------------- |
-| Save art to               | `Pictures/MTG Art`             |                                                    |
-| File names                | `NAME (ARTIST) [SET] {NUMBER}` |                                                    |
-| Where art comes from      | MTGPics, then Scryfall         | or MTGPics only, or Scryfall only                  |
-| Scryfall image            | Art crop                       | or the full card scan, as a PNG                    |
-| Search MTGPics' art too   | Off                            | the Find a larger copy buttons beside MTGPics' art |
-| Printing                  | Newest                         | for lines with only a name                         |
-| Every printing's art      | Off                            | for lines with only a name                         |
-| One printing per artwork  | On                             | skip reprints that reuse an art                    |
-| Skip full-art printings   | Off                            |                                                    |
-| Include extras            | On                             | Un-cards, oversized and championship cards         |
-| A folder for each list    | Off                            | named in a field under the card list               |
-| Folders                   | Source and layout              | a folder per card type can be added                |
-| Replace files of one name | On                             | otherwise the new file is numbered: `Name (1).jpg` |
+| Setting                          | Default                        |                                                               |
+| -------------------------------- | ------------------------------ | ------------------------------------------------------------- |
+| Save art to                      | `Pictures/MTG Art`             |                                                               |
+| File names                       | `NAME (ARTIST) [SET] {NUMBER}` |                                                               |
+| Where art comes from             | MTGPics, then Scryfall         | or MTGPics only, or Scryfall only                             |
+| Scryfall image                   | Art crop                       | or the full card scan, as a PNG                               |
+| Search MTGPics' art too          | Off                            | the Find a larger copy buttons beside MTGPics' art            |
+| Printing                         | Newest                         | for lines with only a name                                    |
+| Every printing's art             | Off                            | for lines with only a name                                    |
+| One printing per artwork         | On                             | skip reprints that reuse an art                               |
+| Skip full-art printings          | Off                            |                                                               |
+| Include extras                   | On                             | Un-cards, oversized and championship cards                    |
+| A folder for each list           | Off                            | named in a field under the card list                          |
+| Folders                          | Source and layout              | a folder per card type can be added                           |
+| Replace files of one name        | On                             | otherwise the new file is numbered: `Name (1).jpg`            |
+| Card Anvil app                   | Found automatically            | or a copy you choose, such as a development build             |
+| Send each download to Card Anvil | Off                            | when a download finishes with art saved, and wasn't cancelled |
 
 The settings live in `settings.json` in the app's config folder
 (`%APPDATA%\io.github.amodsoul.mtg-art-downloader` on Windows,

@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { open } from "@tauri-apps/plugin-dialog";
-import { expect, mocked, screen, userEvent, waitFor } from "storybook/test";
+import { expect, mocked, screen, userEvent, waitFor, within } from "storybook/test";
 
 import { cardData } from "@/__fixtures__/run";
-import { defaultSettings } from "@/__fixtures__/settings";
+import { chosenCardAnvil, defaultSettings, installedCardAnvil } from "@/__fixtures__/settings";
 import { api } from "@/api";
 import { useSettings } from "@/store";
 
@@ -23,6 +23,11 @@ async function openDrawer(canvas: { getByRole: typeof screen.getByRole }) {
   // It slides in; wait for it to finish.
   await waitFor(() => expect(drawer).toBeVisible());
   return drawer;
+}
+
+/** One of the drawer's sections, by its legend, to query inside. */
+function section(legend: string) {
+  return within(screen.getByRole("group", { name: legend }));
 }
 
 /** The drawer shows the current settings. */
@@ -138,7 +143,7 @@ export const ChooseOutputFolder: Story = {
   },
   play: async ({ canvas }) => {
     await openDrawer(canvas);
-    await userEvent.click(screen.getByRole("button", { name: /choose/i }));
+    await userEvent.click(section("Files").getByRole("button", { name: /choose/i }));
     await waitFor(() => expect(screen.getByLabelText("Save art to")).toHaveValue("/home/user/Art"));
     await waitFor(() =>
       expect(api.saveSettings).toHaveBeenCalledWith({
@@ -158,5 +163,122 @@ export const SaveFails: Story = {
     await openDrawer(canvas);
     await userEvent.click(screen.getByRole("checkbox", { name: "Skip full-art printings" }));
     await waitFor(() => expect(screen.getByText("Couldn't save settings")).toBeVisible());
+  },
+};
+
+/** Card Anvil, found where its installer put it. */
+export const CardAnvilFound: Story = {
+  play: async ({ canvas }) => {
+    await openDrawer(canvas);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Card Anvil app")).toHaveValue(installedCardAnvil.path),
+    );
+    await expect(api.cardAnvilStatus).toHaveBeenCalledWith(null);
+    await expect(screen.getByText(/Found automatically/)).toBeVisible();
+    // Nothing chosen, so nothing to go back from.
+    await expect(
+      screen.queryByRole("button", { name: "Use the installed one" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      screen.getByRole("checkbox", { name: "Send each download to Card Anvil" }),
+    ).not.toBeChecked();
+  },
+};
+
+/** Card Anvil isn't installed: the field says so, and links to its download page. */
+export const CardAnvilNotFound: Story = {
+  beforeEach: () => {
+    mocked(api.cardAnvilStatus).mockResolvedValue({ chosen: false, chosenMissing: false });
+  },
+  play: async ({ canvas }) => {
+    await openDrawer(canvas);
+    const app = screen.getByLabelText("Card Anvil app");
+    await waitFor(() => expect(app).toHaveAttribute("placeholder", "Not found"));
+    await expect(app).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "Get Card Anvil" }));
+    await expect(api.openCardAnvilSite).toHaveBeenCalled();
+  },
+};
+
+/** "Choose…" picks another copy of Card Anvil, such as a development build, and saves it. */
+export const ChooseCardAnvil: Story = {
+  beforeEach: () => {
+    mocked(open).mockResolvedValue(chosenCardAnvil.path ?? null);
+    mocked(api.cardAnvilStatus).mockImplementation(async (path) =>
+      path === null ? installedCardAnvil : chosenCardAnvil,
+    );
+  },
+  play: async ({ canvas }) => {
+    await openDrawer(canvas);
+    await userEvent.click(section("Card Anvil").getByRole("button", { name: /choose/i }));
+    await expect(open).toHaveBeenCalledWith(expect.objectContaining({ directory: false }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Card Anvil app")).toHaveValue(chosenCardAnvil.path),
+    );
+    await expect(api.cardAnvilStatus).toHaveBeenLastCalledWith(chosenCardAnvil.path);
+    await expect(screen.getByRole("button", { name: "Use the installed one" })).toBeVisible();
+    await waitFor(() =>
+      expect(api.saveSettings).toHaveBeenCalledWith({
+        ...defaultSettings,
+        cardAnvilPath: chosenCardAnvil.path,
+      }),
+    );
+  },
+};
+
+/** "Use the installed one" forgets the copy chosen, and finds the installed one again. */
+export const ResetCardAnvil: Story = {
+  beforeEach: () => {
+    useSettings.setState({
+      settings: { ...defaultSettings, cardAnvilPath: chosenCardAnvil.path },
+    });
+    mocked(api.cardAnvilStatus).mockImplementation(async (path) =>
+      path === null ? installedCardAnvil : chosenCardAnvil,
+    );
+  },
+  play: async ({ canvas }) => {
+    await openDrawer(canvas);
+    const app = screen.getByLabelText("Card Anvil app");
+    await waitFor(() => expect(app).toHaveValue(chosenCardAnvil.path));
+    await userEvent.click(screen.getByRole("button", { name: "Use the installed one" }));
+    await waitFor(() => expect(app).toHaveValue(installedCardAnvil.path));
+    await expect(
+      screen.queryByRole("button", { name: "Use the installed one" }),
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(api.saveSettings).toHaveBeenLastCalledWith(defaultSettings));
+  },
+};
+
+/** The copy chosen is gone: the installed one is used, and the drawer says why. */
+export const ChosenCardAnvilGone: Story = {
+  beforeEach: () => {
+    useSettings.setState({
+      settings: { ...defaultSettings, cardAnvilPath: "/home/user/old/card-anvil" },
+    });
+    mocked(api.cardAnvilStatus).mockResolvedValue({ ...installedCardAnvil, chosenMissing: true });
+  },
+  play: async ({ canvas }) => {
+    await openDrawer(canvas);
+    await waitFor(() =>
+      expect(screen.getByText(/The copy you chose isn't there any more/)).toBeVisible(),
+    );
+    await expect(screen.getByLabelText("Card Anvil app")).toHaveValue(installedCardAnvil.path);
+    await expect(screen.getByRole("button", { name: "Use the installed one" })).toBeVisible();
+  },
+};
+
+/** Each download can be sent to Card Anvil as it finishes. */
+export const ToggleAutoSend: Story = {
+  play: async ({ canvas }) => {
+    await openDrawer(canvas);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Send each download to Card Anvil" }),
+    );
+    await waitFor(() =>
+      expect(api.saveSettings).toHaveBeenLastCalledWith({
+        ...defaultSettings,
+        autoSendToCardAnvil: true,
+      }),
+    );
   },
 };
