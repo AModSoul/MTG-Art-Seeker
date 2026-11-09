@@ -18,7 +18,9 @@
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,
-        "decorations": false
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "create": false
       }
     ],
     "security": {
@@ -41,7 +43,25 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "wix": {
+        "upgradeCode": "9457c8b8-978e-58dc-aa47-1aeb98fb75bd"
+      },
+      "nsis": {
+        "installerHooks": "windows/installer-hooks.nsh"
+      }
+    },
+    "linux": {
+      "deb": {
+        "conflicts": ["mtg-art-downloader"],
+        "replaces": ["mtg-art-downloader"]
+      },
+      "rpm": {
+        "conflicts": ["mtg-art-downloader"],
+        "obsoletes": ["mtg-art-downloader"]
+      }
+    }
   },
   "plugins": {
     "updater": {

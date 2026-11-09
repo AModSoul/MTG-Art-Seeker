@@ -2,6 +2,7 @@
 // it, and the calls the title bar's buttons make. Storybook and the screenshots stand in for
 // this module, as they do for `api.ts`.
 
+import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /** What frames the window: the app's own title bar on Windows and Linux, where the native one
@@ -10,9 +11,11 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 export type WindowFrame = "custom" | "mac" | "browser";
 
 export function windowFrame(): WindowFrame {
-  if (!("__TAURI_INTERNALS__" in window)) return "browser";
-  // WKWebView, on macOS, says "Macintosh"; WebView2 and WebKitGTK don't.
-  return /mac/i.test(navigator.userAgent) ? "mac" : "custom";
+  if (!isTauri()) return "browser";
+  // Set by the Rust side as it opens the window (`open_main_window`), which knows the system
+  // it was built for. Without it, the app's own buttons: a window with no way to close it is
+  // worse than one with two.
+  return Reflect.get(window, "__MTG_ART_WINDOW_FRAME__") === "mac" ? "mac" : "custom";
 }
 
 export const minimizeWindow = () => getCurrentWindow().minimize();
