@@ -90,7 +90,7 @@ place it's known to be: MTGPics (if an earlier download found it there), Scryfal
 found, listed with its site and size. The app keeps only where each one is, and downloads it again
 when you go back to it. Later downloads of the card use the one you chose last.
 
-<img alt="Karn's row right-clicked: use the art from MTGPics, 1024 × 768 and saved now, or from Scryfall, 633 × 468, or show it in its folder" src="docs/screenshots/sources-dark.png" />
+<img alt="Karn's row right-clicked: use the art from MTGPics, 1024 × 768 and saved now, or from Scryfall, 633 × 468, show it in its folder, or send it to Card Anvil" src="docs/screenshots/sources-dark.png" />
 
 Some sites, Instagram among them, cover their images so they can't be saved. On those, open the post
 and choose **Find the art on this page** from the window's menu (on macOS, the **Find Art** menu in
@@ -99,6 +99,14 @@ with its size and whether it looks like the art, and saves the one you choose. I
 only when you ask, and only its images. You can sign in to a site in that window; **Sign out of
 sites** forgets it. Whatever you save or ask about, a note in the window's corner says what came of
 it: saved, too small, a card scan, or not the art.
+
+**Send to Card Anvil.** [Card Anvil](https://cardanvil.com) makes cards from art. When a run ends,
+**Send to Card Anvil** hands it the art the run saved, or right-click a card to send just that
+card's. Card Anvil opens, or comes to the front, and asks which group of cards to put the art in,
+suggesting one named after the list or deck. Each image becomes a card matched to its printing: a
+double-faced card's faces are a card each, and a split card's two halves are one card with both
+paintings. The app finds Card Anvil where its installer put it; choose another copy in the settings.
+With **Send each download to Card Anvil** on, every run that saves art is sent when it finishes.
 
 ### Settings
 
