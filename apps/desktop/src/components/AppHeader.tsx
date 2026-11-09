@@ -31,9 +31,6 @@ export function AppHeader() {
       bg="bg.emphasized"
       shadow="sm"
       h={HEADER_HEIGHT}
-      // Dialogs and drawers open below it (`theme.ts`). It still takes clicks while one is
-      // open, which turns them off for the rest of the page (`keepHeader`), so the window can
-      // always be dragged, minimized or closed.
       pointerEvents="auto"
       {...drag}
     >

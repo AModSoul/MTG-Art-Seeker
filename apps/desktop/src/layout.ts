@@ -12,8 +12,9 @@ export const headerProps = { id: HEADER_ID };
 /** Keeps the app's header working while a dialog or drawer is open, for that overlay's
  * `persistentElements`: a press on it, to drag, minimize or close the window or to use one of
  * its buttons, is then not one outside the overlay, which would close it, and the overlay
- * doesn't turn off its clicks as it does the rest of the page's. Every dialog and drawer in
- * the app passes it, as a native title bar is never part of the page.
+ * doesn't turn off its clicks as it does the rest of the page's. The app's own `DialogRoot` and
+ * `DrawerRoot` (`components/ui`) pass it to every overlay, as a native title bar is never part
+ * of the page.
  *
  * The overlay waits a second for each such element to appear, and then fails with an error
  * nothing catches. Where there's no header, as in a dialog's own story, a detached element

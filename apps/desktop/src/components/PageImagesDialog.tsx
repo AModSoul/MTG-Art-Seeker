@@ -13,9 +13,8 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from "@mtg-art/ui/dialog";
+} from "@/components/ui/dialog";
 import { Tooltip } from "@mtg-art/ui/tooltip";
-import { keepHeader } from "@/layout";
 import { choosePageImage, useRun } from "@/store";
 
 /** What the check said of each image, as a badge. */
@@ -45,7 +44,6 @@ export function PageImagesDialog() {
     <DialogRoot
       size="xl"
       scrollBehavior="inside"
-      persistentElements={keepHeader}
       open={pageImages !== null}
       onOpenChange={(event) => {
         // Escape, the close button or a click outside: save none.
