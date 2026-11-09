@@ -1,5 +1,6 @@
-import { Box, Heading, HStack, Icon, VisuallyHidden } from "@chakra-ui/react";
-import { RiImageDownloadFill } from "react-icons/ri";
+import { Box, Heading, HStack, Image, VisuallyHidden } from "@chakra-ui/react";
+
+import appIcon from "../../src-tauri/icons/128x128.png";
 
 import { windowFrame } from "@/appWindow";
 import { DiscordButton } from "@/components/DiscordButton";
@@ -48,9 +49,8 @@ export function AppHeader() {
           <VisuallyHidden>{APP_NAME}</VisuallyHidden>
         ) : (
           <HStack gap="2">
-            <Icon size="lg" color="emerald.solid" aria-hidden>
-              <RiImageDownloadFill />
-            </Icon>
+            {/* The app's own icon, as the taskbar shows it. */}
+            <Image src={appIcon} alt="" boxSize="6" draggable={false} />
             <Box as="span">{APP_NAME}</Box>
           </HStack>
         )}
