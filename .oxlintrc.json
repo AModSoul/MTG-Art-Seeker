@@ -74,6 +74,14 @@
               "Tooltip"
             ],
             "message": "Use the snippet from @mtg-art/ui instead (e.g. @mtg-art/ui/tooltip for Tooltip). If it is missing, add it with `npx @chakra-ui/cli snippet add <name> --tsx --outdir packages/ui/src/components/ui`."
+          },
+          {
+            "name": "@mtg-art/ui/dialog",
+            "message": "In the desktop app, import from @/components/ui/dialog, which keeps the app's header usable while a dialog is open."
+          },
+          {
+            "name": "@mtg-art/ui/drawer",
+            "message": "In the desktop app, import from @/components/ui/drawer, which keeps the app's header usable while a drawer is open."
           }
         ]
       }
@@ -89,6 +97,12 @@
         "react/immutability": "off",
         "react/set-state-in-effect": "off",
         "react-hooks/exhaustive-deps": "off",
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["apps/desktop/src/components/ui/**"],
+      "rules": {
         "no-restricted-imports": "off"
       }
     },
