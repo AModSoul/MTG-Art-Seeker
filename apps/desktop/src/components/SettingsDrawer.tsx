@@ -17,14 +17,14 @@ import {
   DrawerRoot,
   DrawerTitle,
   DrawerTrigger,
-} from "@mtg-art/ui/drawer";
+} from "@/components/ui/drawer";
 import { Field } from "@mtg-art/ui/field";
 import { NativeSelectField, NativeSelectRoot } from "@mtg-art/ui/native-select";
 import { SegmentedControl } from "@mtg-art/ui/segmented-control";
 import { SkeletonText } from "@mtg-art/ui/skeleton";
 import { SwitchField } from "@mtg-art/ui/switch-field";
 import { Tooltip } from "@mtg-art/ui/tooltip";
-import { HEADER_BUTTON, keepHeader } from "@/layout";
+import { HEADER_BUTTON } from "@/layout";
 import { chooseOutputDir, useSettings } from "@/store";
 import { findOption, type Option } from "@/utils/options";
 
@@ -105,10 +105,7 @@ export function SettingsDrawer() {
   const settings = useSettings((state) => state.settings);
 
   return (
-    // The drawer opens below the header (`theme.ts`), which stays in reach. The button that
-    // opens it is there, so a click on it isn't one outside the drawer, which would start it
-    // closing only for the button to open it again: it closes the drawer, as it opened it.
-    <DrawerRoot size="md" persistentElements={keepHeader}>
+    <DrawerRoot size="md">
       <Tooltip content="Settings">
         <DrawerTrigger asChild>
           <IconButton {...HEADER_BUTTON} aria-label="Settings" disabled={!settings}>

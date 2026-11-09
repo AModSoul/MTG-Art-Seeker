@@ -101,7 +101,9 @@ The Tauri crate embeds `apps/desktop/dist`, so `pnpm --filter desktop build` onc
   semantic tokens (`fg.muted`, `bg.subtle`…) over raw colours so both colour modes work.
 - **In the desktop app, errors go through `showError`** (`apps/desktop/src/notify.ts`), and a
   select, segmented control or tab list over a string union narrows its value with `findOption`
-  (`apps/desktop/src/utils/options.ts`).
+  (`apps/desktop/src/utils/options.ts`). Its dialogs and drawers come from
+  `@/components/ui/dialog` and `@/components/ui/drawer`, which keep the header usable while one
+  is open; oxlint bans the shared ones there.
 - **Screenshots follow the UI.** `docs/screenshots`, which the README and the site show, are
   taken from real runs by `pnpm --filter desktop screenshots`. A change that alters what one
   shows (theme, colours, fonts, the panels, the run table, the settings drawer, wording) retakes
