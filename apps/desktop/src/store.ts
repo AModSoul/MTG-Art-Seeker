@@ -1,8 +1,9 @@
-import { open } from "@tauri-apps/plugin-dialog";
+import { type DialogFilter, open } from "@tauri-apps/plugin-dialog";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { api } from "@/api";
+import { windowFrame } from "@/appWindow";
 import { toaster } from "@mtg-art/ui/toaster";
 import type { ArtSource } from "@/bindings/ArtSource";
 import type { DeckSummary } from "@/bindings/DeckSummary";
@@ -115,6 +116,28 @@ export async function chooseOutputDir() {
   if (typeof dir === "string") update({ outputDir: dir });
 }
 
+/** Asks which Card Anvil to send art to, starting from the one chosen before. */
+export async function chooseCardAnvil() {
+  const { settings, update } = useSettings.getState();
+  const path = await open({
+    title: "Choose Card Anvil",
+    directory: false,
+    multiple: false,
+    defaultPath: settings?.cardAnvilPath,
+    filters: cardAnvilFilters(),
+  });
+  if (typeof path === "string") update({ cardAnvilPath: path });
+}
+
+/** What Card Anvil is on this system, for the picker to show: an app bundle on macOS, a
+ * program on Windows. Linux's programs have no extension to filter by. */
+function cardAnvilFilters(): DialogFilter[] {
+  if (windowFrame() === "mac") return [{ name: "Card Anvil", extensions: ["app"] }];
+  return navigator.userAgent.includes("Windows")
+    ? [{ name: "Card Anvil", extensions: ["exe"] }]
+    : [];
+}
+
 // --- The current run, fed by its event channel -----------------------------
 
 export type JobView = JobInfo & { status: JobStatus };
@@ -224,15 +247,33 @@ export async function startRun(input: RunInput) {
     queue = [];
     applyEvents(events);
   };
+  // Kept, so a send when the run finishes goes to this run, whenever its id arrives.
+  const runIdPromise = api.startRun(input, settings, (event) => {
+    queue.push(event);
+    timer ??= setTimeout(flush, BATCH_MS);
+    if (event.event === "finished" && sendsWhenFinished(settings, event.summary)) {
+      // Asked for a moment later: an event can arrive before `runIdPromise` is set.
+      void Promise.resolve()
+        .then(() => runIdPromise)
+        .then(
+          (id) => sendToCardAnvil(undefined, id),
+          () => {},
+        );
+    }
+  });
   try {
-    const runId = await api.startRun(input, settings, (event) => {
-      queue.push(event);
-      timer ??= setTimeout(flush, BATCH_MS);
-    });
+    const runId = await runIdPromise;
     useRun.setState({ runId });
   } catch (error) {
     useRun.setState({ running: false, error: errorText(error) });
   }
+}
+
+/** Whether a run that finished as `summary` says is sent to Card Anvil on its own: when
+ * the setting is on, it saved art, and nothing was cancelled. */
+function sendsWhenFinished(settings: Settings, summary: RunSummary): boolean {
+  const saved = summary.mtgpicsFiles + summary.scryfallFiles + summary.webFiles;
+  return settings.autoSendToCardAnvil && summary.cancelled === 0 && saved > 0;
 }
 
 export function cancelRun() {
