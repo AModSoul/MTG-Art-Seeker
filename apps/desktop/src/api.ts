@@ -4,6 +4,8 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 
 import type { ArtSource } from "@/bindings/ArtSource";
+import type { CardAnvilSend } from "@/bindings/CardAnvilSend";
+import type { CardAnvilStatus } from "@/bindings/CardAnvilStatus";
 import type { CardDataStatus } from "@/bindings/CardDataStatus";
 import type { DeckSearch } from "@/bindings/DeckSearch";
 import type { KnownSource } from "@/bindings/KnownSource";
@@ -35,6 +37,15 @@ export const api = {
   openFolder: (path: string) => invoke<void>("open_folder", { path }),
   cardDataStatus: () => invoke<CardDataStatus>("card_data_status"),
   openDiscord: () => invoke<void>("open_discord"),
+
+  /** Sends the art run `run` saved to Card Anvil: job `jobs`' art, or with `null`, all of
+   * it. Resolves once Card Anvil has taken it, or once it's clear it won't. */
+  sendToCardAnvil: (run: number, jobs: number[] | null, settings: Settings) =>
+    invoke<CardAnvilSend>("send_to_card_anvil", { run, jobs, settings }),
+  /** The Card Anvil art is sent to: `path`, the one the user chose, while it's there,
+   * otherwise the installed one. */
+  cardAnvilStatus: (path: string | null) => invoke<CardAnvilStatus>("card_anvil_status", { path }),
+  openCardAnvilSite: () => invoke<void>("open_card_anvil_site"),
 
   confirmFoundArt: (token: number, save: boolean) =>
     invoke<void>("confirm_found_art", { token, save }),

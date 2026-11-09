@@ -10,10 +10,11 @@ use std::{
         atomic::{AtomicU32, Ordering},
         Arc, Mutex,
     },
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use mtg_art_core::{
+    card_anvil::{self, CardAnvilSend, CardAnvilStatus},
     carddb::{default_card_data_dir, CardData, CardDataStatus},
     decks::{default_decks_dir, DeckSearch, Decks},
     engine::{self, ArtSource, JobStatus, Local, RunEvent, RunInput, SavedFile},
@@ -58,15 +59,37 @@ struct AppState {
     next_token: AtomicU32,
     /// MTGPics' list of artists, for their websites, read once a session.
     artists: Artists,
+    /// Where manifests are written for Card Anvil to take.
+    card_anvil_inbox: PathBuf,
+    /// Held while art is sent to Card Anvil, so one send waits for the last
+    /// to be taken.
+    card_anvil_sending: tokio::sync::Mutex<()>,
 }
 
 /// What's kept of a run, so an image the user finds later is saved where the
-/// run saved the face's art.
+/// run saved the face's art, and its art can be sent to Card Anvil.
 struct RunRecord {
     settings: Settings,
     list_folder: Option<String>,
+    /// What the run was of, for Card Anvil to name a group of cards after.
+    title: Option<String>,
     /// Each finished job's saved files, by job id.
     files: HashMap<u32, Vec<SavedFile>>,
+}
+
+/// What a run was of, in a few words: a list's or deck's folder name, a
+/// search's query, or a preset's name. `None` for a list given no name.
+fn run_title(input: &RunInput) -> Option<String> {
+    let title = match input {
+        RunInput::List { .. } | RunInput::Deck { .. } => input.folder().map(str::to_owned),
+        RunInput::Search { query } => Some(query.clone()),
+        RunInput::Preset { id } => presets()
+            .into_iter()
+            .find(|preset| &preset.id == id)
+            .map(|preset| preset.label),
+    }?;
+    let title = title.trim();
+    (!title.is_empty()).then(|| title.to_owned())
 }
 
 /// A face the finder window is looking for a larger copy of, and where to tell
@@ -240,6 +263,7 @@ fn start_run(
             RunRecord {
                 settings: settings.clone(),
                 list_folder,
+                title: run_title(&input),
                 files: HashMap::new(),
             },
         );
@@ -666,6 +690,97 @@ fn open_discord(app: AppHandle) -> CommandResult<()> {
         .map_err(|e| e.to_string())
 }
 
+/// Sends the art run `run` saved to Card Anvil: job `jobs`' art, or all of it.
+/// `settings` say which Card Anvil, if the user chose one. Card Anvil asks the
+/// user where to put the art; this returns once it has taken the request, or
+/// once it's clear it won't.
+#[tauri::command]
+async fn send_to_card_anvil(
+    state: State<'_, AppState>,
+    run: u32,
+    jobs: Option<Vec<u32>>,
+    settings: Settings,
+) -> CommandResult<CardAnvilSend> {
+    // One at a time: each waits to hear whether Card Anvil took it.
+    let _sending = state.card_anvil_sending.lock().await;
+    let (files, scryfall_image, title) = {
+        let records = lock(&state.records);
+        let record = records
+            .get(&run)
+            .ok_or("That run is too long ago. Run the cards again.")?;
+        let mut ids: Vec<u32> = jobs.unwrap_or_else(|| record.files.keys().copied().collect());
+        ids.sort_unstable();
+        ids.dedup();
+        let files: Vec<Vec<SavedFile>> = ids
+            .iter()
+            .filter_map(|id| record.files.get(id))
+            .filter(|files| !files.is_empty())
+            .cloned()
+            .collect();
+        (files, record.settings.scryfall_image, record.title.clone())
+    };
+    if files.is_empty() {
+        return Err("That run saved no art.".into());
+    }
+    let manifest = card_anvil::manifest(
+        &files,
+        title.as_deref(),
+        scryfall_image,
+        card_anvil::new_id(),
+        SystemTime::now(),
+        env!("CARGO_PKG_VERSION"),
+    );
+    let images = manifest.images();
+    if manifest.items.len() > card_anvil::MAX_ITEMS {
+        return Ok(CardAnvilSend::TooMany {
+            images,
+            max: card_anvil::MAX_ITEMS as u32,
+        });
+    }
+
+    let chosen = settings.card_anvil_path;
+    let found = tauri::async_runtime::spawn_blocking(move || card_anvil::locate(chosen.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(app) = found else {
+        return Ok(CardAnvilSend::NotFound);
+    };
+    let path = {
+        let dir = state.card_anvil_inbox.clone();
+        tauri::async_runtime::spawn_blocking(move || card_anvil::write_manifest(&dir, &manifest))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| format!("Couldn't write the list of art for Card Anvil: {e}"))?
+    };
+    if let Err(error) = card_anvil::launch(&app, &path) {
+        let _ = std::fs::remove_file(&path);
+        return Err(format!("Couldn't start Card Anvil ({}): {error}", app.display()));
+    }
+    if card_anvil::wait_until_taken(&path, card_anvil::TAKE_WITHIN).await {
+        Ok(CardAnvilSend::Delivered { images })
+    } else {
+        let _ = std::fs::remove_file(&path);
+        Ok(CardAnvilSend::NotTaken { images })
+    }
+}
+
+/// The Card Anvil art is sent to: `path`, the one the user chose, while it's
+/// there, otherwise the installed one.
+#[tauri::command]
+async fn card_anvil_status(path: Option<String>) -> CommandResult<CardAnvilStatus> {
+    tauri::async_runtime::spawn_blocking(move || card_anvil::status(path.as_deref()))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Opens Card Anvil's download page in the system's browser.
+#[tauri::command]
+fn open_card_anvil_site(app: AppHandle) -> CommandResult<()> {
+    app.opener()
+        .open_url(card_anvil::DOWNLOAD_PAGE, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 /// How current the local copy of Scryfall's card data is.
 #[tauri::command]
 fn card_data_status(state: State<AppState>) -> CardDataStatus {
@@ -749,6 +864,13 @@ pub fn run() {
                 .or_else(|| app.path().app_local_data_dir().ok().map(|dir| dir.join("decks")))
                 .ok_or("no data folder to keep decks in")?;
             let decks = Decks::open(decks_dir);
+            let card_anvil_inbox = card_anvil::default_inbox_dir()
+                .or_else(|| app.path().app_local_data_dir().ok().map(|dir| dir.join("card-anvil")))
+                .ok_or("no data folder to write Card Anvil's lists of art in")?;
+            // A list of art left from the last session was never taken.
+            if let Err(error) = card_anvil::clear_inbox_dir(&card_anvil_inbox) {
+                eprintln!("can't clear the art left for Card Anvil: {error}");
+            }
             // The main window shows the pictures of the decks' boxes.
             std::fs::create_dir_all(decks.images_dir())?;
             app.asset_protocol_scope().allow_directory(decks.images_dir(), false)?;
@@ -766,6 +888,8 @@ pub fn run() {
                 choices: Mutex::new(None),
                 next_token: AtomicU32::new(1),
                 artists: Artists::default(),
+                card_anvil_inbox,
+                card_anvil_sending: tokio::sync::Mutex::new(()),
             });
             finder::clear_downloads(app.handle());
             // The main window shows a page's images for the user to choose from.
@@ -799,6 +923,9 @@ pub fn run() {
             open_folder,
             card_data_status,
             open_discord,
+            send_to_card_anvil,
+            card_anvil_status,
+            open_card_anvil_site,
             find_larger_copy,
             confirm_found_art,
             choose_page_image,
