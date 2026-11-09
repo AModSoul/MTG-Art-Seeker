@@ -125,6 +125,7 @@ pub struct Item {
 
 /// An image, and what's known of it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Art {
     /// Absolute.
     pub path: String,
@@ -133,6 +134,14 @@ pub struct Art {
     pub artist: Option<String>,
     pub image: ImageKind,
     pub origin: Origin,
+    /// Where the image was downloaded from. With [`Origin::Mtgpics`], Card
+    /// Anvil files it as MTGPics' art at this address, not as an upload.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Scryfall's illustration id for the artwork, whatever the origin. With
+    /// [`Origin::Scryfall`], Card Anvil files the image as Scryfall's art.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub illustration_id: Option<String>,
     /// The page an image the user found came from.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<String>,
@@ -285,6 +294,8 @@ fn art_of(file: &SavedFile, scryfall_image: ScryfallImage) -> Art {
             .map(str::to_owned),
         image: if whole_card { ImageKind::Card } else { ImageKind::Art },
         origin: file.source.into(),
+        url: file.url.clone(),
+        illustration_id: file.illustration.clone(),
         page: file.page.clone(),
         width: file.size.map(|size| size.width),
         height: file.size.map(|size| size.height),
@@ -666,6 +677,18 @@ mod tests {
             }),
             page: None,
             split_half: false,
+            url: None,
+            illustration: None,
+        }
+    }
+
+    /// Downloaded from `url`, of the fixture's artwork `art`: its illustration
+    /// ids differ only in their last digit.
+    fn from(file: SavedFile, url: &str, art: u32) -> SavedFile {
+        SavedFile {
+            url: Some(url.into()),
+            illustration: Some(format!("6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e0{art}")),
+            ..file
         }
     }
 
@@ -692,90 +715,118 @@ mod tests {
         let path = |rest: &str| format!(r"{DIR}\{rest}");
         let mtgpics = ArtSource::Mtgpics;
         vec![
-            vec![sized(
-                file(
-                    &path(r"mtgpics\Basic\Karn, Scion of Urza (Chase Stone) [DOM] {1}.jpg"),
-                    "Karn, Scion of Urza",
-                    0,
-                    mtgpics,
-                    ("DOM", "1"),
-                ),
-                "Chase Stone",
-                1024,
-                768,
-            )],
-            vec![
+            vec![from(
                 sized(
                     file(
-                        &path(r"mtgpics\MDFC Front\Agadeem's Awakening (Dmitry Burmak) [ZNR] {90}.jpg"),
-                        "Agadeem's Awakening",
+                        &path(r"mtgpics\Basic\Karn, Scion of Urza (Chase Stone) [DOM] {1}.jpg"),
+                        "Karn, Scion of Urza",
                         0,
                         mtgpics,
-                        ("ZNR", "90"),
+                        ("DOM", "1"),
                     ),
-                    "Dmitry Burmak",
-                    1500,
-                    1126,
+                    "Chase Stone",
+                    1024,
+                    768,
                 ),
-                sized(
-                    file(
-                        &path(r"mtgpics\MDFC Back\Agadeem, the Undercrypt (Dmitry Burmak) [ZNR] {90}.jpg"),
-                        "Agadeem, the Undercrypt",
-                        1,
-                        mtgpics,
-                        ("ZNR", "90"),
-                    ),
-                    "Dmitry Burmak",
-                    1500,
-                    1126,
-                ),
-            ],
-            vec![sized(
-                file(
-                    &path(r"scryfall\Basic\Sol Ring (Hector Ortiz) [TRC] {499}.jpg"),
-                    "Sol Ring",
-                    0,
-                    ArtSource::Scryfall,
-                    ("TRC", "499"),
-                ),
-                "Hector Ortiz",
-                626,
-                457,
+                "https://www.mtgpics.com/pics/art/dom/001.jpg",
+                1,
             )],
             vec![
-                half(file(
-                    &path(r"mtgpics\Split\Fire (Dan Murayama Scott) [MH2] {290}.jpg"),
-                    "Fire",
-                    0,
-                    mtgpics,
-                    ("MH2", "290"),
-                )),
-                half(sized(
+                from(
+                    sized(
+                        file(
+                            &path(r"mtgpics\MDFC Front\Agadeem's Awakening (Dmitry Burmak) [ZNR] {90}.jpg"),
+                            "Agadeem's Awakening",
+                            0,
+                            mtgpics,
+                            ("ZNR", "90"),
+                        ),
+                        "Dmitry Burmak",
+                        1500,
+                        1126,
+                    ),
+                    "https://www.mtgpics.com/pics/art/znr/090.jpg",
+                    2,
+                ),
+                from(
+                    sized(
+                        file(
+                            &path(r"mtgpics\MDFC Back\Agadeem, the Undercrypt (Dmitry Burmak) [ZNR] {90}.jpg"),
+                            "Agadeem, the Undercrypt",
+                            1,
+                            mtgpics,
+                            ("ZNR", "90"),
+                        ),
+                        "Dmitry Burmak",
+                        1500,
+                        1126,
+                    ),
+                    "https://www.mtgpics.com/pics/art/znr/090b.jpg",
+                    3,
+                ),
+            ],
+            vec![from(
+                sized(
                     file(
-                        &path(r"mtgpics\Split\Ice (Dan Murayama Scott) [MH2] {290}.jpg"),
-                        "Ice",
-                        1,
+                        &path(r"scryfall\Basic\Sol Ring (Hector Ortiz) [TRC] {499}.jpg"),
+                        "Sol Ring",
+                        0,
+                        ArtSource::Scryfall,
+                        ("TRC", "499"),
+                    ),
+                    "Hector Ortiz",
+                    626,
+                    457,
+                ),
+                "https://cards.scryfall.io/art_crop/front/1/b/1b59533a-3e43-4c6c-8a4e-1a2b3c4d5e04.jpg?1700000000",
+                4,
+            )],
+            vec![
+                half(from(
+                    file(
+                        &path(r"mtgpics\Split\Fire (Dan Murayama Scott) [MH2] {290}.jpg"),
+                        "Fire",
+                        0,
                         mtgpics,
                         ("MH2", "290"),
                     ),
-                    "Dan Murayama Scott",
-                    960,
-                    652,
+                    "https://www.mtgpics.com/pics/art/mh2/290.jpg",
+                    5,
+                )),
+                half(from(
+                    sized(
+                        file(
+                            &path(r"mtgpics\Split\Ice (Dan Murayama Scott) [MH2] {290}.jpg"),
+                            "Ice",
+                            1,
+                            mtgpics,
+                            ("MH2", "290"),
+                        ),
+                        "Dan Murayama Scott",
+                        960,
+                        652,
+                    ),
+                    "https://www.mtgpics.com/pics/art/mh2/290b.jpg",
+                    5,
                 )),
             ],
             vec![SavedFile {
                 page: Some("https://example.com/gallery/birds-of-paradise".into()),
-                ..sized(
-                    file(
-                        &path(r"web\Basic\Birds of Paradise (Marcelo Vignali) [M12] {165}.webp"),
-                        "Birds of Paradise",
-                        0,
-                        ArtSource::Web,
-                        ("M12", "165"),
+                ..from(
+                    sized(
+                        file(
+                            &path(r"web\Basic\Birds of Paradise (Marcelo Vignali) [M12] {165}.webp"),
+                            "Birds of Paradise",
+                            0,
+                            ArtSource::Web,
+                            ("M12", "165"),
+                        ),
+                        "Marcelo Vignali",
+                        2400,
+                        1760,
                     ),
-                    "Marcelo Vignali",
-                    2400,
-                    1760,
+                    "https://example.com/images/birds-of-paradise-full.webp",
+                    6,
                 )
             }],
         ]
@@ -871,6 +922,40 @@ mod tests {
         assert_eq!(items[0].art.artist, None);
         let json = serde_json::to_value(&items[0]).unwrap();
         assert!(json.get("artist").is_none());
+    }
+
+    #[test]
+    fn says_where_each_image_came_from_and_which_artwork_it_is() {
+        let items = fixture_manifest(&fixture_jobs(), ScryfallImage::ArtCrop).items;
+        let sol_ring = &items[3].art;
+        assert_eq!(sol_ring.origin, Origin::Scryfall);
+        assert_eq!(
+            sol_ring.illustration_id.as_deref(),
+            Some("6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e04")
+        );
+        // Each half its own painting's address, and the one artwork Scryfall gives both.
+        let fire_ice = &items[4];
+        let ice = fire_ice.second_art.as_ref().unwrap();
+        assert_eq!(
+            (fire_ice.art.url.as_deref(), ice.url.as_deref()),
+            (
+                Some("https://www.mtgpics.com/pics/art/mh2/290.jpg"),
+                Some("https://www.mtgpics.com/pics/art/mh2/290b.jpg")
+            )
+        );
+        assert_eq!(fire_ice.art.illustration_id, ice.illustration_id);
+    }
+
+    #[test]
+    fn leaves_out_an_address_and_an_artwork_not_known() {
+        let mut jobs = fixture_jobs();
+        // An image saved from a page's `data:` address, of a card Scryfall gives no illustration id.
+        jobs[4][0].url = None;
+        jobs[4][0].illustration = None;
+        let items = fixture_manifest(&jobs, ScryfallImage::ArtCrop).items;
+        let json = serde_json::to_value(&items[5]).unwrap();
+        assert!(json.get("url").is_none() && json.get("illustrationId").is_none());
+        assert_eq!(json["page"], "https://example.com/gallery/birds-of-paradise");
     }
 
     #[test]

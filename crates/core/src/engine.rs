@@ -182,6 +182,16 @@ pub struct SavedFile {
     /// [`FacePlan::is_split_half`]. Left out when it isn't.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub split_half: bool,
+    /// The address the image was downloaded from, when it can be downloaded
+    /// from there again: not a page's `blob:` or `data:` image.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub url: Option<String>,
+    /// Scryfall's illustration id for the face's artwork, whatever the image's
+    /// source; see [`FacePlan::illustration_id`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub illustration: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, TS)]
@@ -641,7 +651,7 @@ async fn download_card(
         if use_mtgpics {
             match mtgpics_art(card, (index, face), faces.len(), &mut arts, context, errors).await {
                 FromMtgpics::Saved(file, url) => {
-                    files.push(file);
+                    files.push(*file);
                     log.push(Some(url));
                     continue;
                 }
@@ -789,7 +799,8 @@ async fn split_halves(card: &Card, first: &SavedFile, second: &SavedFile, contex
 }
 
 /// Swaps two saved images' pictures, so each face's name holds its own: each
-/// keeps its type's extension, and its size, source and page go with it.
+/// keeps its type's extension, and its size, source, page and address go with
+/// it, while each face keeps its own artwork's id.
 /// If a rename fails, the ones done are undone, so both are as they were.
 async fn swap_pictures(first: &SavedFile, second: &SavedFile) -> Result<(SavedFile, SavedFile)> {
     let (first_path, second_path) = (PathBuf::from(&first.path), PathBuf::from(&second.path));
@@ -815,6 +826,7 @@ async fn swap_pictures(first: &SavedFile, second: &SavedFile) -> Result<(SavedFi
             face: first.face.clone(),
             face_index: first.face_index,
             artist: first.artist.clone(),
+            illustration: first.illustration.clone(),
             ..second.clone()
         },
         SavedFile {
@@ -822,6 +834,7 @@ async fn swap_pictures(first: &SavedFile, second: &SavedFile) -> Result<(SavedFi
             face: second.face.clone(),
             face_index: second.face_index,
             artist: second.artist.clone(),
+            illustration: second.illustration.clone(),
             ..first.clone()
         },
     ))
@@ -857,6 +870,7 @@ async fn rename_to_face(file: SavedFile, card: &Card, face: &FacePlan, context: 
         artist: face.artist.clone(),
         // A half's picture that turned out to be the whole card's is a half no more.
         split_half: face.is_split_half(),
+        illustration: face.illustration_id().map(str::to_owned),
         ..file
     })
 }
@@ -909,7 +923,9 @@ async fn found_by_hand(
         let path = context
             .paths
             .reserve(&dir, &stem, kind.extension(), context.settings.overwrite);
-        place(temp, kind, &path, card, face, ArtSource::Web).await.map(Ok)
+        place(temp, kind, &path, card, face, ArtSource::Web, Some(&found.url))
+            .await
+            .map(Ok)
     };
     match saved.await {
         Ok(Ok(file)) => Some(SavedFile {
@@ -942,7 +958,8 @@ struct MtgpicsArts<'r> {
 }
 
 enum FromMtgpics {
-    Saved(SavedFile, String),
+    /// Saved, from this address. Boxed: a saved file is far larger than the rest.
+    Saved(Box<SavedFile>, String),
     /// MTGPics has no art for the face.
     None,
     /// MTGPics couldn't be asked, or its image couldn't be saved.
@@ -963,7 +980,7 @@ async fn mtgpics_art(
     let remembered = arts.remembered.and_then(|r| r.mtgpics.get(index).cloned().flatten());
     if let Some(url) = &remembered {
         match save(card, face, ArtSource::Mtgpics, url, context).await {
-            Ok(Some(file)) => return FromMtgpics::Saved(file, url.clone()),
+            Ok(Some(file)) => return FromMtgpics::Saved(Box::new(file), url.clone()),
             // Gone from there: look for it again.
             Ok(None) => {}
             Err(error) => {
@@ -988,7 +1005,7 @@ async fn mtgpics_art(
         return if failed { FromMtgpics::Failed } else { FromMtgpics::None };
     };
     match save(card, face, ArtSource::Mtgpics, &art.url, context).await {
-        Ok(Some(file)) => FromMtgpics::Saved(file, art.url),
+        Ok(Some(file)) => FromMtgpics::Saved(Box::new(file), art.url),
         Ok(None) => FromMtgpics::None,
         Err(error) => {
             errors.push(format!("MTGPics: {error}"));
@@ -1017,7 +1034,7 @@ async fn save(
     };
     let stem = face_stem(settings, card, face);
     let path = context.paths.reserve(&dir, &stem, kind.extension(), settings.overwrite);
-    let file = place(temp, kind, &path, card, face, source).await?;
+    let file = place(temp, kind, &path, card, face, source, Some(url)).await?;
     // Noted, so the image's size can be shown without downloading it again.
     if let (Some(history), Some(size)) = (context.history, file.size) {
         let _ = history.remember_image_size(url, size);
@@ -1048,7 +1065,8 @@ pub(crate) fn face_stem(settings: &Settings, card: &Card, face: &FacePlan) -> St
     )
 }
 
-/// Moves a downloaded image to `path`, in the same folder, and says what it is.
+/// Moves a downloaded image to `path`, in the same folder, and says what it
+/// is, and that it was downloaded from `url`.
 pub(crate) async fn place(
     temp: TempFile,
     kind: ImageKind,
@@ -1056,6 +1074,7 @@ pub(crate) async fn place(
     card: &Card,
     face: &FacePlan,
     source: ArtSource,
+    url: Option<&str>,
 ) -> Result<SavedFile> {
     let size = image_size(temp.path(), kind);
     tokio::fs::rename(temp.path(), path).await?;
@@ -1071,6 +1090,8 @@ pub(crate) async fn place(
         size,
         page: None,
         split_half: face.is_split_half(),
+        url: url.map(str::to_owned),
+        illustration: face.illustration_id().map(str::to_owned),
     })
 }
 

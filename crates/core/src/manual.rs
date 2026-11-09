@@ -327,7 +327,8 @@ impl From<&PageCandidate> for PageChoice {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Imported {
     Saved {
-        file: SavedFile,
+        /// Boxed: a saved file is far larger than a doubt.
+        file: Box<SavedFile>,
         /// Scryfall's file it replaced, if there was one.
         replaced: Option<String>,
     },
@@ -390,7 +391,9 @@ pub async fn import(
     tokio::fs::create_dir_all(&dir).await?;
     let temp = TempFile::beside(&dir);
     tokio::fs::copy(downloaded, temp.path()).await?;
-    let (file, replaced) = put_in_place(target, destination, ArtSource::Web, &dir, temp, kind).await?;
+    // Only an address it can be downloaded from again: not a page's `blob:` or `data:` image.
+    let url = Some(found.image_url).filter(|url| is_web_url(url));
+    let (file, replaced) = put_in_place(target, destination, ArtSource::Web, &dir, temp, kind, url).await?;
     let file = SavedFile {
         page: found.page.map(str::to_owned),
         ..file
@@ -419,7 +422,10 @@ pub async fn import(
             },
         );
     }
-    Ok(Imported::Saved { file, replaced })
+    Ok(Imported::Saved {
+        file: Box::new(file),
+        replaced,
+    })
 }
 
 /// The folder the face's art from `source` goes in, as the run saved it.
@@ -434,8 +440,9 @@ pub(crate) fn source_dir(target: &Target, destination: Destination<'_>, source: 
 }
 
 /// Moves `temp`, an image of kind `kind` in `dir` (see [`source_dir`]), into
-/// place as the face's art from `source`, in place of the file the run saved,
-/// which is deleted. Says which file that was, if there was one.
+/// place as the face's art from `source`, downloaded from `url`, in place of
+/// the file the run saved, which is deleted. Says which file that was, if there
+/// was one.
 pub(crate) async fn put_in_place(
     target: &Target,
     destination: Destination<'_>,
@@ -443,6 +450,7 @@ pub(crate) async fn put_in_place(
     dir: &Path,
     temp: TempFile,
     kind: ImageKind,
+    url: Option<&str>,
 ) -> Result<(SavedFile, Option<String>)> {
     let Destination { settings, replace, .. } = destination;
     let (card, face) = (&target.card, &target.face);
@@ -451,7 +459,7 @@ pub(crate) async fn put_in_place(
     // Taking the place of the file it replaces is no clash; any other is.
     let overwrite = settings.overwrite || replace == Some(named.as_path());
     let path = PathReserver::default().reserve(dir, &stem, kind.extension(), overwrite);
-    let file = place(temp, kind, &path, card, face, source).await?;
+    let file = place(temp, kind, &path, card, face, source, url).await?;
 
     let replaced = match replace {
         Some(old) if old != path => match tokio::fs::remove_file(old).await {
