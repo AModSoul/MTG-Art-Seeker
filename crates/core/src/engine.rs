@@ -25,7 +25,7 @@ use crate::{
     http::{Http, ImageKind},
     imagesize::{image_size, ImageSize},
     list::{parse_list, CardLine, SkippedLine},
-    manual::{refetch_found_copy, FoundCopyAt, Refetched},
+    manual::{refetch_found_copy, FoundCopyAt, Refetched, Site},
     mtgpics::{self, MtgpicsArt},
     naming::{file_stem, sanitize, NameParts},
     presets::preset_names,
@@ -178,6 +178,11 @@ pub struct SavedFile {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub page: Option<String>,
+    /// Where the user started looking for a [`ArtSource::Web`] image, when
+    /// it's known: Google Lens, the artist on ArtStation, and so on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub site: Option<Site>,
     /// Whether this is one half of a split card, with its own painting; see
     /// [`FacePlan::is_split_half`]. Left out when it isn't.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -898,13 +903,15 @@ async fn found_by_hand(
     let history = context.history?;
     let art = face.illustration.as_deref()?;
     let found = history.found_by_hand(art).ok().flatten()?;
-    // The size the copy had when the user saved it.
-    let accepted = history
+    // The size the copy had when the user saved it, and where they started looking for it.
+    let copy = history
         .found_copies(art)
         .unwrap_or_default()
         .into_iter()
         .find(|(_, copy)| copy.url == found.url)
-        .and_then(|(_, copy)| copy.size);
+        .map(|(_, copy)| copy);
+    let accepted = copy.as_ref().and_then(|copy| copy.size);
+    let site = copy.and_then(|copy| copy.site).as_deref().and_then(Site::from_key);
 
     let saved = async {
         let dir = face_dir(&context.output_dir, context.settings, ArtSource::Web, face);
@@ -930,6 +937,7 @@ async fn found_by_hand(
     match saved.await {
         Ok(Ok(file)) => Some(SavedFile {
             page: found.page,
+            site,
             ..file
         }),
         Ok(Err(not_saved)) => {
@@ -1089,6 +1097,7 @@ pub(crate) async fn place(
         artist: face.artist.clone(),
         size,
         page: None,
+        site: None,
         split_half: face.is_split_half(),
         url: url.map(str::to_owned),
         illustration: face.illustration_id().map(str::to_owned),

@@ -396,6 +396,7 @@ pub async fn import(
     let (file, replaced) = put_in_place(target, destination, ArtSource::Web, &dir, temp, kind, url).await?;
     let file = SavedFile {
         page: found.page.map(str::to_owned),
+        site: found.site,
         ..file
     };
 

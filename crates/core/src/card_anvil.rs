@@ -20,12 +20,14 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use reqwest::Url;
 use serde::Serialize;
 use ts_rs::TS;
 
 use crate::{
     engine::{ArtSource, SavedFile},
     faces::UNKNOWN_ARTIST,
+    manual::Site,
     settings::ScryfallImage,
     Error, Result, APP_ID,
 };
@@ -142,6 +144,10 @@ pub struct Art {
     /// [`Origin::Scryfall`], Card Anvil files the image as Scryfall's art.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub illustration_id: Option<String>,
+    /// For an image the user found, the site it's from, or else the one they
+    /// found it through: `artstation`, `lens`… ([`Site::key`]); see [`found_on`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub site: Option<&'static str>,
     /// The page an image the user found came from.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<String>,
@@ -296,10 +302,51 @@ fn art_of(file: &SavedFile, scryfall_image: ScryfallImage) -> Art {
         origin: file.source.into(),
         url: file.url.clone(),
         illustration_id: file.illustration.clone(),
+        site: (file.source == ArtSource::Web)
+            .then(|| found_on(file))
+            .flatten()
+            .map(Site::key),
         page: file.page.clone(),
         width: file.size.map(|size| size.width),
         height: file.size.map(|size| size.height),
     }
+}
+
+/// The site an image the user found is from: the one its page is on, or
+/// else the image itself, however they got there. Otherwise, where they
+/// started looking for it: Google Lens, say, or the artist's own website.
+fn found_on(file: &SavedFile) -> Option<Site> {
+    [file.page.as_deref(), file.url.as_deref()]
+        .into_iter()
+        .flatten()
+        .find_map(site_at)
+        .or(file.site)
+}
+
+/// The sites found art is on, by the domains their pages and images are at.
+const SITE_DOMAINS: [(&str, Site); 6] = [
+    ("artstation.com", Site::Artstation),
+    ("deviantart.com", Site::Deviantart),
+    ("pixiv.net", Site::Pixiv),
+    // Where Pixiv keeps its images.
+    ("pximg.net", Site::Pixiv),
+    ("instagram.com", Site::Instagram),
+    // Where Instagram keeps its images.
+    ("cdninstagram.com", Site::Instagram),
+];
+
+/// The site `address` is on, if it's one of [`SITE_DOMAINS`] or a subdomain
+/// of one: `cdna.artstation.com` is ArtStation, `artstation.com.example` isn't.
+fn site_at(address: &str) -> Option<Site> {
+    let url = Url::parse(address).ok()?;
+    let host = url.host_str()?.trim_end_matches('.').to_ascii_lowercase();
+    SITE_DOMAINS
+        .iter()
+        .find(|(domain, _)| {
+            host.strip_suffix(domain)
+                .is_some_and(|rest| rest.is_empty() || rest.ends_with('.'))
+        })
+        .map(|(_, site)| *site)
 }
 
 /// `time` in RFC 3339, in UTC, to the second: `2026-11-09T14:03:12Z`.
@@ -676,6 +723,7 @@ mod tests {
                 height: 680,
             }),
             page: None,
+            site: None,
             split_half: false,
             url: None,
             illustration: None,
@@ -810,8 +858,10 @@ mod tests {
                     5,
                 )),
             ],
+            // Found through Google Lens, on ArtStation.
             vec![SavedFile {
-                page: Some("https://example.com/gallery/birds-of-paradise".into()),
+                page: Some("https://www.artstation.com/artwork/birdsofparadise".into()),
+                site: Some(Site::Lens),
                 ..from(
                     sized(
                         file(
@@ -825,7 +875,7 @@ mod tests {
                         2400,
                         1760,
                     ),
-                    "https://example.com/images/birds-of-paradise-full.webp",
+                    "https://cdna.artstation.com/p/assets/images/images/000/000/001/large/birds-of-paradise.webp",
                     6,
                 )
             }],
@@ -955,7 +1005,85 @@ mod tests {
         let items = fixture_manifest(&jobs, ScryfallImage::ArtCrop).items;
         let json = serde_json::to_value(&items[5]).unwrap();
         assert!(json.get("url").is_none() && json.get("illustrationId").is_none());
-        assert_eq!(json["page"], "https://example.com/gallery/birds-of-paradise");
+        assert_eq!(json["page"], "https://www.artstation.com/artwork/birdsofparadise");
+    }
+
+    #[test]
+    fn knows_the_sites_found_art_is_on_by_their_domains() {
+        let cases = [
+            (
+                "https://www.artstation.com/artwork/birdsofparadise",
+                Some(Site::Artstation),
+            ),
+            (
+                "https://cdna.artstation.com/p/assets/images/birds.jpg",
+                Some(Site::Artstation),
+            ),
+            ("https://ARTSTATION.com./artwork/x", Some(Site::Artstation)),
+            ("https://www.deviantart.com/someone/art/birds-1", Some(Site::Deviantart)),
+            ("https://www.pixiv.net/en/artworks/1", Some(Site::Pixiv)),
+            ("https://i.pximg.net/img-original/img/1_p0.png", Some(Site::Pixiv)),
+            ("https://www.instagram.com/p/birds/", Some(Site::Instagram)),
+            ("https://scontent.cdninstagram.com/v/birds.jpg", Some(Site::Instagram)),
+            // Look-alikes.
+            ("https://artstation.com.evil.example/artwork/x", None),
+            ("https://evilartstation.com/artwork/x", None),
+            ("https://example.com/?from=https://www.artstation.com/", None),
+            ("https://example.com/artstation.com/birds.jpg", None),
+            // Not a site's address at all.
+            ("data:image/png;base64,AAAA", None),
+            ("not an address", None),
+        ];
+        for (address, site) in cases {
+            assert_eq!(site_at(address), site, "{address}");
+        }
+    }
+
+    /// The fixture's Birds of Paradise, as a found image with `page`, `url`
+    /// and `site`, and the site the manifest names it with.
+    fn site_sent(page: Option<&str>, url: Option<&str>, site: Option<Site>) -> Option<&'static str> {
+        let mut jobs = fixture_jobs();
+        let birds = &mut jobs[4][0];
+        birds.page = page.map(str::to_owned);
+        birds.url = url.map(str::to_owned);
+        birds.site = site;
+        let items = fixture_manifest(&jobs, ScryfallImage::ArtCrop).items;
+        items[5].art.site
+    }
+
+    #[test]
+    fn names_the_site_a_found_image_is_from_or_was_found_through() {
+        let artstation = Some("https://www.artstation.com/artwork/birdsofparadise");
+        let blog = Some("https://birds.example/gallery");
+        let pixiv_image = Some("https://i.pximg.net/img-original/img/1_p0.png");
+        // The image's own site, however the user got there.
+        assert_eq!(site_sent(artstation, None, Some(Site::Lens)), Some("artstation"));
+        assert_eq!(site_sent(blog, pixiv_image, Some(Site::Lens)), Some("pixiv"));
+        assert_eq!(site_sent(None, pixiv_image, None), Some("pixiv"));
+        // Elsewhere: where they started looking.
+        assert_eq!(
+            site_sent(blog, Some("https://birds.example/1.jpg"), Some(Site::Lens)),
+            Some("lens")
+        );
+        assert_eq!(site_sent(blog, None, Some(Site::Website)), Some("website"));
+        // Neither known: left out.
+        assert_eq!(site_sent(blog, None, None), None);
+        let mut jobs = fixture_jobs();
+        jobs[4][0].page = None;
+        jobs[4][0].url = None;
+        jobs[4][0].site = None;
+        let items = fixture_manifest(&jobs, ScryfallImage::ArtCrop).items;
+        assert!(serde_json::to_value(&items[5]).unwrap().get("site").is_none());
+    }
+
+    #[test]
+    fn only_found_images_name_a_site() {
+        let mut jobs = fixture_jobs();
+        // Scryfall's Sol Ring, as if a site were noted for it.
+        jobs[2][0].site = Some(Site::Lens);
+        let items = fixture_manifest(&jobs, ScryfallImage::ArtCrop).items;
+        assert!(items[..5].iter().all(|item| item.art.site.is_none()));
+        assert_eq!(items[5].art.site, Some("artstation"));
     }
 
     #[test]
