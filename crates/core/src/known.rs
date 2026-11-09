@@ -136,15 +136,15 @@ pub async fn save_from(
 ) -> Result<(SavedFile, Option<String>)> {
     let name = &target.face.name;
     let art = target.face.illustration.as_deref();
-    let (url, page, accepted) = match source {
+    let (url, page, accepted, site) = match source {
         ArtSource::Mtgpics => mtgpics_url(history, target, destination.settings)
-            .map(|url| (url, None, None))
+            .map(|url| (url, None, None, None))
             .ok_or_else(|| Error::Other(format!("MTGPics' art for {name} isn't known. Download the card again.")))?,
         ArtSource::Scryfall => target
             .face
             .scryfall_url
             .clone()
-            .map(|url| (url, None, None))
+            .map(|url| (url, None, None, None))
             .ok_or_else(|| Error::Other(format!("Scryfall has no image of {name}.")))?,
         ArtSource::Web => {
             let (_, found) = history
@@ -153,7 +153,8 @@ pub async fn save_from(
                 // Only a copy of this face's art.
                 .filter(|(of, _)| Some(of.as_str()) == art)
                 .ok_or_else(|| Error::Other(format!("That copy of {name}'s art is no longer known.")))?;
-            (found.url, found.page, found.size)
+            let site = found.site.as_deref().and_then(Site::from_key);
+            (found.url, found.page, found.size, site)
         }
     };
 
@@ -208,5 +209,5 @@ pub async fn save_from(
             _ => history.forget_found_by_hand(art),
         };
     }
-    Ok((SavedFile { page, ..file }, replaced))
+    Ok((SavedFile { page, site, ..file }, replaced))
 }

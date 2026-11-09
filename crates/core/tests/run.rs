@@ -865,9 +865,10 @@ async fn saves_a_larger_copy_the_user_found_in_place_of_scryfalls() {
     );
     assert_eq!(file.source, ArtSource::Web);
     assert_eq!(file.page.as_deref(), found.page);
-    // Where the image itself is, and the artwork it's a copy of.
+    // Where the image itself is, the artwork it's a copy of, and where the user looked.
     assert_eq!(file.url.as_deref(), Some(found.image_url));
     assert_eq!(file.illustration.as_deref(), Some(KARN_ART));
+    assert_eq!(file.site, Some(manual::Site::Artstation));
     assert_eq!(file.size.map(|s| (s.width, s.height)), Some((1200, 900)));
     assert_eq!(replaced.as_deref(), Some(scryfall_file.to_string_lossy().as_ref()));
     assert!(!scryfall_file.exists(), "Scryfall's file is replaced");
@@ -946,6 +947,14 @@ async fn later_runs_save_the_users_copy_from_where_they_found_it() {
         page: Some("https://example.com/karn".into()),
     };
     history.remember_found_by_hand(KARN_ART, &found).unwrap();
+    // Found through Google Lens.
+    let copy = mtg_art_core::history::FoundCopy {
+        url: found.url.clone(),
+        page: found.page.clone(),
+        site: Some(manual::Site::Lens.key().into()),
+        size: None,
+    };
+    history.remember_found_copy(KARN_ART, &copy).unwrap();
 
     let out = tempfile::tempdir().unwrap();
     let events = Mutex::new(Vec::new());
@@ -984,6 +993,7 @@ async fn later_runs_save_the_users_copy_from_where_they_found_it() {
         "web/Karn, Scion of Urza [DOM] {1}.jpg"
     );
     assert_eq!(files[0].page, found.page);
+    assert_eq!(files[0].site, Some(manual::Site::Lens));
 }
 
 #[tokio::test]
@@ -1110,6 +1120,7 @@ async fn keeps_only_a_copy_that_can_be_downloaded_again() {
     // A page's own address for an image is no address to send on.
     assert_eq!(file.url, None);
     assert_eq!(file.illustration.as_deref(), Some(KARN_ART));
+    assert_eq!(file.site, Some(manual::Site::Instagram));
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
     assert!(history.found_copies(KARN_ART).unwrap().is_empty());
 }
@@ -1384,6 +1395,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
             height: 900,
         }),
         page: None,
+        site: Some(manual::Site::Artstation),
         split_half: false,
         url: Some(artstation.clone()),
         illustration: Some(KARN_ART.into()),
@@ -1450,6 +1462,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
     // Where MTGPics has it, and still the same artwork.
     assert_eq!(file.url.as_deref(), Some(mtgpics.as_str()));
     assert_eq!(file.illustration.as_deref(), Some(KARN_ART));
+    assert_eq!(file.site, None);
     assert_eq!(replaced.as_deref(), Some(web_file.to_string_lossy().as_ref()));
     assert!(!web_file.exists());
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
@@ -1476,6 +1489,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
     );
     assert_eq!(file.page.as_deref(), Some("https://www.artstation.com/artwork/karn"));
     assert_eq!(file.url.as_deref(), Some(artstation.as_str()));
+    assert_eq!(file.site, Some(manual::Site::Artstation));
     assert_eq!(file.size.map(|s| s.width), Some(1200));
     assert!(!mtgpics_file.exists());
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), Some(in_use));
