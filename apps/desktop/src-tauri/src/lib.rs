@@ -18,7 +18,7 @@ use mtg_art_core::{
     decks::{default_decks_dir, DeckSearch, Decks},
     engine::{self, ArtSource, JobStatus, Local, RunEvent, RunInput, SavedFile},
     history::{default_history_path, History},
-    http::{Http, HttpConfig},
+    http::{Http, HttpConfig, USER_AGENT},
     known::{self, KnownSource},
     list::{parse_list, ListFile, ParsedList},
     manual::{self, Destination, Doubt, Found, FoundEvent, Imported, PageCandidate, PageImage, Site, Target},
@@ -679,6 +679,32 @@ fn open_folder(app: AppHandle, path: String) -> CommandResult<()> {
     app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// What frames the main window, as `appWindow.ts` reads it: the app's own title bar on Windows
+/// and Linux, or macOS's traffic lights over the app's header.
+const WINDOW_FRAME: &str = if cfg!(target_os = "macos") { "mac" } else { "custom" };
+
+/// Opens the main window from its entry in `tauri.conf.json`, which leaves that to this
+/// (`create: false`) so one entry serves every system. On Windows and Linux the native title
+/// bar is turned off, the app's header drawing its own; on macOS it stays, under the header,
+/// as the entry's `titleBarStyle` and `hiddenTitle` say, which only macOS reads. The page
+/// learns which before it loads, rather than guessing from the user agent.
+fn open_main_window(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .ok_or("tauri.conf.json has no main window")?;
+    tauri::WebviewWindowBuilder::from_config(app.handle(), config)?
+        .decorations(cfg!(target_os = "macos"))
+        .initialization_script(format!(
+            "Object.defineProperty(window, \"__MTG_ART_WINDOW_FRAME__\", {{ value: \"{WINDOW_FRAME}\" }});"
+        ))
+        .build()?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -687,7 +713,13 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
-                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                // Its requests to GitHub name this app and its version, as the core's do,
+                // rather than the plugin's own.
+                app.handle().plugin(
+                    tauri_plugin_updater::Builder::new()
+                        .header("User-Agent", USER_AGENT)?
+                        .build(),
+                )?;
                 app.handle().plugin(tauri_plugin_process::init())?;
             }
             let settings_path = default_settings_path()
@@ -749,6 +781,7 @@ pub fn run() {
                     tokio::time::sleep(CARD_DATA_CHECK).await;
                 }
             });
+            open_main_window(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
