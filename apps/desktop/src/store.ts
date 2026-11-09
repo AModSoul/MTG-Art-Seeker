@@ -17,7 +17,15 @@ import type { SavedFile } from "@/bindings/SavedFile";
 import type { Site } from "@/bindings/Site";
 import type { Settings } from "@/bindings/Settings";
 import type { SkippedLine } from "@/bindings/SkippedLine";
-import { errorText, showError, showInfo, showLoading, showSuccess } from "@/notify";
+import {
+  errorText,
+  showError,
+  showInfo,
+  showLoading,
+  showSuccess,
+  showWarning,
+  type ToastAction,
+} from "@/notify";
 
 // --- What the user is about to download, remembered between launches -------
 
@@ -230,6 +238,88 @@ export async function startRun(input: RunInput) {
 export function cancelRun() {
   const { runId } = useRun.getState();
   if (runId !== null) void api.cancelRun(runId);
+}
+
+// --- Sending art to Card Anvil ------------------------------------------------
+
+interface CardAnvilState {
+  /** Whether art is on its way to Card Anvil, until it's taken or it's clear it won't be. */
+  sending: boolean;
+}
+
+export const useCardAnvil = create<CardAnvilState>()(() => ({ sending: false }));
+
+/** Numbers each send's toast, so a second doesn't take over the first's. */
+let sendToasts = 0;
+
+/** The button on a toast that says Card Anvil needs installing or updating. */
+const GET_CARD_ANVIL: ToastAction = {
+  label: "Get Card Anvil",
+  onClick: () => void openCardAnvilSite(),
+};
+
+/** Sends the art run `run` (the one shown, by default) saved to Card Anvil: jobs `jobs`'
+ * art, or all of it. Card Anvil opens and asks where to put it. */
+export async function sendToCardAnvil(jobs?: number[], run?: number) {
+  const runId = run ?? useRun.getState().runId;
+  const { settings } = useSettings.getState();
+  if (runId === null || !settings) return;
+  const toast = `card-anvil-${++sendToasts}`;
+  useCardAnvil.setState({ sending: true });
+  showLoading("Sending the art to Card Anvil…", toast);
+  try {
+    const sent = await api.sendToCardAnvil(runId, jobs ?? null, settings);
+    switch (sent.outcome) {
+      case "delivered":
+        showSuccess(
+          `Sent ${count(sent.images, "image")} to Card Anvil`,
+          toast,
+          `Card Anvil will ask where to put ${sent.images === 1 ? "it" : "them"}.`,
+        );
+        break;
+      case "notFound":
+        showWarning(
+          "Card Anvil isn't installed",
+          "Install it, or choose where it is in Settings.",
+          toast,
+          GET_CARD_ANVIL,
+        );
+        break;
+      case "notTaken":
+        showWarning(
+          "Card Anvil didn't take the art",
+          "This version is too old. Update it, then send again.",
+          toast,
+          GET_CARD_ANVIL,
+        );
+        break;
+      case "tooMany":
+        showError(
+          "Too many images for Card Anvil",
+          `Card Anvil takes up to ${count(sent.max, "card")} at a time, and that's ${count(sent.images, "image")}. Send cards one at a time instead: right-click a card.`,
+          toast,
+        );
+        break;
+    }
+  } catch (error) {
+    showError("Couldn't send the art to Card Anvil", error, toast);
+  } finally {
+    useCardAnvil.setState({ sending: false });
+  }
+}
+
+/** Opens Card Anvil's download page. */
+export async function openCardAnvilSite() {
+  try {
+    await api.openCardAnvilSite();
+  } catch (error) {
+    showError("Couldn't open Card Anvil's website", error);
+  }
+}
+
+/** `n` of `noun`, counted: "1 image", "1,200 images". */
+function count(n: number, noun: string): string {
+  return `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
 }
 
 // --- Larger copies the user finds in the finder window ----------------------

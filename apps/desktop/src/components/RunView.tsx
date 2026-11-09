@@ -19,6 +19,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { IconType } from "react-icons";
 import {
+  LuAnvil,
   LuClipboardCopy,
   LuExternalLink,
   LuFolderOpen,
@@ -58,8 +59,10 @@ import {
   openFoundPage,
   knownSourceName,
   saveArtFrom,
+  sendToCardAnvil,
   SITE_NAMES,
   startRun,
+  useCardAnvil,
   useRun,
   useSettings,
 } from "@/store";
@@ -302,6 +305,7 @@ const PLACEHOLDER_ROWS = 6;
 export function RunView() {
   const { jobs, skipped, error, summary, running, folder, listFolder } = useRun();
   const outputDir = useSettings((state) => state.settings?.outputDir);
+  const sending = useCardAnvil((state) => state.sending);
   const [filter, setFilter] = useState<Filter>("all");
   const [nameWidth, measureNames] = useWidth();
   const [savedHeader, lineSizer] = useStacked();
@@ -415,6 +419,14 @@ export function RunView() {
             )}
             <Button size="sm" variant="outline" onClick={() => void openFolder()}>
               <LuFolderOpen /> Open folder
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={running || files.length === 0 || sending}
+              onClick={() => void sendToCardAnvil()}
+            >
+              <LuAnvil /> Send to Card Anvil
             </Button>
           </HStack>
           {skipped.length > 0 && (
@@ -765,8 +777,12 @@ type RowAction =
   | { kind: "reveal"; file: SavedFile }
   | { kind: "use"; file: SavedFile; known: KnownSource };
 
+/** The value of a row's menu item that sends its art to Card Anvil. */
+const SEND_TO_CARD_ANVIL = "send-to-card-anvil";
+
 /** A row's right-click menu: for each saved image, the places its art is known
- * to be, to save it again from one, and a way to show it in its folder. */
+ * to be, to save it again from one, and a way to show it in its folder; and a way
+ * to send the row's art to Card Anvil. */
 function RowMenu({
   job,
   files,
@@ -778,6 +794,7 @@ function RowMenu({
 }) {
   // Per file, where its art is known to be; `null` while they're asked for.
   const [known, setKnown] = useState<KnownSource[][] | null>(null);
+  const sending = useCardAnvil((state) => state.sending);
   const actions = new Map<string, RowAction>();
 
   async function load() {
@@ -831,6 +848,7 @@ function RowMenu({
         if (event.open) void load();
       }}
       onSelect={(event) => {
+        if (event.value === SEND_TO_CARD_ANVIL) void sendToCardAnvil([job]);
         const action = actions.get(event.value);
         if (action?.kind === "reveal") void api.revealFile(action.file.path);
         if (action?.kind === "use") void saveArtFrom(job, action.file.faceIndex, action.known);
@@ -841,6 +859,10 @@ function RowMenu({
         {groups.flatMap((group, index) =>
           index === 0 ? [group] : [<MenuSeparator key={`separator-${index}`} />, group],
         )}
+        <MenuSeparator />
+        <MenuItem value={SEND_TO_CARD_ANVIL} disabled={sending}>
+          <LuAnvil /> Send to Card Anvil
+        </MenuItem>
       </MenuContent>
     </MenuRoot>
   );

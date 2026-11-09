@@ -668,3 +668,127 @@ export const RowsKeepTheirHeight: Story = {
     await expect(heights()).toEqual(before);
   },
 };
+
+/** The button that sends the run's art to Card Anvil. */
+const sendButton = (canvas: { getByRole: typeof screen.getByRole }) =>
+  canvas.getByRole("button", { name: "Send to Card Anvil" });
+
+/** "Send to Card Anvil" hands the run's art over, and waits while Card Anvil takes it. */
+export const SendToCardAnvil: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+  },
+  play: async ({ canvas }) => {
+    let deliver: (() => void) | undefined;
+    mocked(api.sendToCardAnvil).mockReturnValue(
+      new Promise((resolve) => {
+        deliver = () => resolve({ outcome: "delivered", images: 6 });
+      }),
+    );
+    await userEvent.click(sendButton(canvas));
+    await expect(api.sendToCardAnvil).toHaveBeenCalledWith(3, null, defaultSettings);
+    // One send at a time.
+    await waitFor(() => expect(screen.getByText("Sending the art to Card Anvil…")).toBeVisible());
+    await expect(sendButton(canvas)).toBeDisabled();
+
+    deliver?.();
+    await waitFor(() => expect(screen.getByText("Sent 6 images to Card Anvil")).toBeVisible());
+    await expect(screen.getByText("Card Anvil will ask where to put them.")).toBeVisible();
+    await waitFor(() => expect(sendButton(canvas)).toBeEnabled());
+  },
+};
+
+/** Card Anvil isn't installed: the toast says so, and offers its download page. */
+export const CardAnvilNotFound: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "notFound" });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(sendButton(canvas));
+    await waitFor(() => expect(screen.getByText("Card Anvil isn't installed")).toBeVisible());
+    await expect(screen.getByText("Install it, or choose where it is in Settings.")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Get Card Anvil" }));
+    await expect(api.openCardAnvilSite).toHaveBeenCalled();
+  },
+};
+
+/** Card Anvil started but didn't take the art: it's too old to know how. */
+export const CardAnvilNotTaken: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "notTaken", images: 6 });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(sendButton(canvas));
+    await waitFor(() => expect(screen.getByText("Card Anvil didn't take the art")).toBeVisible());
+    await expect(
+      screen.getByText("This version is too old. Update it, then send again."),
+    ).toBeVisible();
+    await expect(screen.getByRole("button", { name: "Get Card Anvil" })).toBeVisible();
+  },
+};
+
+/** More cards than Card Anvil takes at once: the toast says to send a few at a time. */
+export const TooManyForCardAnvil: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "tooMany", images: 1204, max: 1000 });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(sendButton(canvas));
+    await waitFor(() => expect(screen.getByText("Too many images for Card Anvil")).toBeVisible());
+    await expect(screen.getByText(/that's 1,204 images/)).toBeVisible();
+    await expect(screen.getByText(/right-click a card/)).toBeVisible();
+  },
+};
+
+/** Card Anvil couldn't be started: the error shows as a toast. */
+export const SendToCardAnvilFails: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.sendToCardAnvil).mockRejectedValue("Couldn't start Card Anvil: access denied");
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(sendButton(canvas));
+    await waitFor(() =>
+      expect(screen.getByText("Couldn't send the art to Card Anvil")).toBeVisible(),
+    );
+    await expect(screen.getByText("Couldn't start Card Anvil: access denied")).toBeVisible();
+    await waitFor(() => expect(sendButton(canvas)).toBeEnabled());
+  },
+};
+
+/** A row's right-click menu sends that card's art alone. */
+export const SendARowToCardAnvil: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "delivered", images: 1 });
+  },
+  play: async ({ canvas }) => {
+    await userEvent.pointer({ keys: "[MouseRight]", target: canvas.getByText("626 × 457") });
+    const send = await screen.findByRole("menuitem", { name: "Send to Card Anvil" });
+    await waitFor(() => expect(send).toBeVisible());
+    await userEvent.click(send);
+    await expect(api.sendToCardAnvil).toHaveBeenCalledWith(3, [2], defaultSettings);
+    await waitFor(() => expect(screen.getByText("Sent 1 image to Card Anvil")).toBeVisible());
+    await expect(screen.getByText("Card Anvil will ask where to put it.")).toBeVisible();
+  },
+};
+
+/** Nothing is sent while the run is still going, or before it has saved any art. */
+export const SendToCardAnvilAfterTheRun: Story = {
+  beforeEach: () => {
+    useRun.setState({ running: true, runId: 1, jobs: mixedJobs });
+  },
+  play: async ({ canvas }) => {
+    await expect(sendButton(canvas)).toBeDisabled();
+
+    useRun.setState({
+      running: false,
+      jobs: mixedJobs.map((job) => ({ ...job, status: { state: "cancelled" } })),
+    });
+    await waitFor(() => expect(canvas.getAllByText("Cancelled").length).toBeGreaterThan(1));
+    await expect(sendButton(canvas)).toBeDisabled();
+  },
+};

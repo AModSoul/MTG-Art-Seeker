@@ -8,7 +8,7 @@ import { mocked, sb } from "storybook/test";
 
 import { allDecks } from "../src/__fixtures__/decks.ts";
 import { cardData, presets } from "../src/__fixtures__/run.ts";
-import { defaultSettings } from "../src/__fixtures__/settings.ts";
+import { defaultSettings, installedCardAnvil } from "../src/__fixtures__/settings.ts";
 import { api } from "../src/api.ts";
 import {
   closeWindow,
@@ -18,7 +18,7 @@ import {
   toggleMaximizeWindow,
   windowFrame,
 } from "../src/appWindow.ts";
-import { useInput, useRun, useSettings } from "../src/store.ts";
+import { useCardAnvil, useInput, useRun, useSettings } from "../src/store.ts";
 import { system } from "../src/theme.ts";
 
 // Storybook has no Tauri backend, so every module that reaches it is mocked.
@@ -52,6 +52,9 @@ const preview: Preview = {
     mocked(api.deckBox).mockResolvedValue(null);
     mocked(api.cardDataStatus).mockResolvedValue(cardData);
     mocked(api.openDiscord).mockResolvedValue();
+    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "delivered", images: 1 });
+    mocked(api.cardAnvilStatus).mockResolvedValue(installedCardAnvil);
+    mocked(api.openCardAnvilSite).mockResolvedValue();
     mocked(api.cancelRun).mockResolvedValue();
     mocked(api.revealFile).mockResolvedValue();
     mocked(api.openFolder).mockResolvedValue();
@@ -83,6 +86,7 @@ const preview: Preview = {
     useInput.persist.clearStorage();
     useInput.setState(useInput.getInitialState(), true);
     useRun.setState(useRun.getInitialState(), true);
+    useCardAnvil.setState(useCardAnvil.getInitialState(), true);
     useSettings.setState({ ...useSettings.getInitialState(), settings: defaultSettings }, true);
   },
 };

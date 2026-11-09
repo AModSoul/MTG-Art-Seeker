@@ -35,6 +35,8 @@ declare global {
 
 /** The folder the screenshots say art is saved to, wherever the recording saved it. */
 const SHOWN_OUTPUT_DIR = "C:\\MTG Art";
+/** Where the screenshots say Card Anvil is installed: where its installer puts it. */
+const SHOWN_CARD_ANVIL = "C:\\Users\\You\\AppData\\Local\\Card Anvil\\Card-Anvil.exe";
 
 const recording = () => window.screenshotRecording;
 const done = async () => {};
@@ -54,6 +56,9 @@ export const api: typeof realApi = {
   cardDataStatus: async () =>
     recording().cardData ?? { updatedAt: null, cards: 0, updating: false, error: null },
   openDiscord: done,
+  sendToCardAnvil: () => Promise.reject(new Error("Not while taking screenshots")),
+  cardAnvilStatus: async () => ({ path: SHOWN_CARD_ANVIL, chosen: false, chosenMissing: false }),
+  openCardAnvilSite: done,
   confirmFoundArt: done,
   choosePageImage: done,
   artSources: async (_run, job, face) => recording().sources?.[`${job}:${face}`] ?? [],
