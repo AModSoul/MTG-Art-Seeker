@@ -21,6 +21,8 @@
       "artist": "Chase Stone",
       "image": "art",
       "origin": "mtgpics",
+      "url": "https://www.mtgpics.com/pics/art/dom/001.jpg",
+      "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e01",
       "width": 1024,
       "height": 768
     },
@@ -35,6 +37,8 @@
       "artist": "Dmitry Burmak",
       "image": "art",
       "origin": "mtgpics",
+      "url": "https://www.mtgpics.com/pics/art/znr/090.jpg",
+      "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e02",
       "width": 1500,
       "height": 1126
     },
@@ -49,6 +53,8 @@
       "artist": "Dmitry Burmak",
       "image": "art",
       "origin": "mtgpics",
+      "url": "https://www.mtgpics.com/pics/art/znr/090b.jpg",
+      "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e03",
       "width": 1500,
       "height": 1126
     },
@@ -63,6 +69,8 @@
       "artist": "Hector Ortiz",
       "image": "art",
       "origin": "scryfall",
+      "url": "https://cards.scryfall.io/art_crop/front/1/b/1b59533a-3e43-4c6c-8a4e-1a2b3c4d5e04.jpg?1700000000",
+      "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e04",
       "width": 626,
       "height": 457
     },
@@ -77,6 +85,8 @@
       "artist": "Dan Murayama Scott",
       "image": "art",
       "origin": "mtgpics",
+      "url": "https://www.mtgpics.com/pics/art/mh2/290.jpg",
+      "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e05",
       "width": 1000,
       "height": 680,
       "secondArt": {
@@ -84,6 +94,8 @@
         "artist": "Dan Murayama Scott",
         "image": "art",
         "origin": "mtgpics",
+        "url": "https://www.mtgpics.com/pics/art/mh2/290b.jpg",
+        "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e05",
         "width": 960,
         "height": 652
       }
@@ -99,6 +111,8 @@
       "artist": "Marcelo Vignali",
       "image": "art",
       "origin": "web",
+      "url": "https://example.com/images/birds-of-paradise-full.webp",
+      "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e06",
       "page": "https://example.com/gallery/birds-of-paradise",
       "width": 2400,
       "height": 1760
