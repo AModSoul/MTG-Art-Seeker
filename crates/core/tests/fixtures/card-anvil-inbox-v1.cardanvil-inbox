@@ -111,9 +111,10 @@
       "artist": "Marcelo Vignali",
       "image": "art",
       "origin": "web",
-      "url": "https://example.com/images/birds-of-paradise-full.webp",
+      "url": "https://cdna.artstation.com/p/assets/images/images/000/000/001/large/birds-of-paradise.webp",
       "illustrationId": "6f0f6b11-7f6e-4c1b-9d4e-1a2b3c4d5e06",
-      "page": "https://example.com/gallery/birds-of-paradise",
+      "site": "artstation",
+      "page": "https://www.artstation.com/artwork/birdsofparadise",
       "width": 2400,
       "height": 1760
     }
