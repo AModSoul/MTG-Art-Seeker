@@ -1,0 +1,107 @@
+{
+  "kind": "cardanvil.inbox",
+  "version": 1,
+  "id": "18c3f7a9e2b-1f4",
+  "createdAt": "2026-11-09T14:03:12Z",
+  "source": {
+    "app": "MTG Art Seeker",
+    "version": "0.3.0",
+    "url": "https://getmtg.art"
+  },
+  "title": "Karn's Workshop",
+  "items": [
+    {
+      "path": "C:\\MTG Art\\Karn's Workshop\\mtgpics\\Basic\\Karn, Scion of Urza (Chase Stone) [DOM] {1}.jpg",
+      "card": {
+        "name": "Karn, Scion of Urza",
+        "set": "dom",
+        "collectorNumber": "1",
+        "faceIndex": 0
+      },
+      "artist": "Chase Stone",
+      "image": "art",
+      "origin": "mtgpics",
+      "width": 1024,
+      "height": 768
+    },
+    {
+      "path": "C:\\MTG Art\\Karn's Workshop\\mtgpics\\MDFC Front\\Agadeem's Awakening (Dmitry Burmak) [ZNR] {90}.jpg",
+      "card": {
+        "name": "Agadeem's Awakening",
+        "set": "znr",
+        "collectorNumber": "90",
+        "faceIndex": 0
+      },
+      "artist": "Dmitry Burmak",
+      "image": "art",
+      "origin": "mtgpics",
+      "width": 1500,
+      "height": 1126
+    },
+    {
+      "path": "C:\\MTG Art\\Karn's Workshop\\mtgpics\\MDFC Back\\Agadeem, the Undercrypt (Dmitry Burmak) [ZNR] {90}.jpg",
+      "card": {
+        "name": "Agadeem, the Undercrypt",
+        "set": "znr",
+        "collectorNumber": "90",
+        "faceIndex": 1
+      },
+      "artist": "Dmitry Burmak",
+      "image": "art",
+      "origin": "mtgpics",
+      "width": 1500,
+      "height": 1126
+    },
+    {
+      "path": "C:\\MTG Art\\Karn's Workshop\\scryfall\\Basic\\Sol Ring (Hector Ortiz) [TRC] {499}.jpg",
+      "card": {
+        "name": "Sol Ring",
+        "set": "trc",
+        "collectorNumber": "499",
+        "faceIndex": 0
+      },
+      "artist": "Hector Ortiz",
+      "image": "art",
+      "origin": "scryfall",
+      "width": 626,
+      "height": 457
+    },
+    {
+      "path": "C:\\MTG Art\\Karn's Workshop\\mtgpics\\Split\\Fire (Dan Murayama Scott) [MH2] {290}.jpg",
+      "card": {
+        "name": "Fire // Ice",
+        "set": "mh2",
+        "collectorNumber": "290",
+        "faceIndex": 0
+      },
+      "artist": "Dan Murayama Scott",
+      "image": "art",
+      "origin": "mtgpics",
+      "width": 1000,
+      "height": 680,
+      "secondArt": {
+        "path": "C:\\MTG Art\\Karn's Workshop\\mtgpics\\Split\\Ice (Dan Murayama Scott) [MH2] {290}.jpg",
+        "artist": "Dan Murayama Scott",
+        "image": "art",
+        "origin": "mtgpics",
+        "width": 960,
+        "height": 652
+      }
+    },
+    {
+      "path": "C:\\MTG Art\\Karn's Workshop\\web\\Basic\\Birds of Paradise (Marcelo Vignali) [M12] {165}.webp",
+      "card": {
+        "name": "Birds of Paradise",
+        "set": "m12",
+        "collectorNumber": "165",
+        "faceIndex": 0
+      },
+      "artist": "Marcelo Vignali",
+      "image": "art",
+      "origin": "web",
+      "page": "https://example.com/gallery/birds-of-paradise",
+      "width": 2400,
+      "height": 1760
+    }
+  ]
+}
