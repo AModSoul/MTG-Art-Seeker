@@ -25,7 +25,8 @@ export function Header() {
         <HStack justify="space-between" gap={4}>
           <Link asChild fontWeight="semibold" color="fg" textDecoration="none" gap={2}>
             <RouterLink to="/">
-              <Image src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" boxSize={7} />
+              {/* The app's icon at 256px, sharp at this size on any screen. */}
+              <Image src={`${import.meta.env.BASE_URL}apple-touch-icon.png`} alt="" boxSize={7} />
               <Box as="span" display={{ base: "none", sm: "inline" }}>
                 {APP_NAME}
               </Box>
