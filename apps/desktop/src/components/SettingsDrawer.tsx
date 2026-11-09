@@ -98,7 +98,7 @@ const SWITCHES: Record<
 };
 
 type BooleanSetting = {
-  [K in keyof Settings]: Settings[K] extends boolean ? K : never;
+  [K in keyof Settings]-?: Settings[K] extends boolean ? K : never;
 }[keyof Settings];
 
 export function SettingsDrawer() {

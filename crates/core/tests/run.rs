@@ -1376,6 +1376,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
             height: 900,
         }),
         page: None,
+        split_half: false,
     };
 
     let known = known::known_sources(&http, Some(&history), &target, &settings, &saved_now).await;
@@ -1516,8 +1517,11 @@ async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall
     let JobStatus::Done { files, missing } = &jobs[0].1 else {
         panic!("{jobs:?}");
     };
-    let faces: Vec<_> = files.iter().map(|f| (f.face_index, f.face.as_str())).collect();
-    assert_eq!(faces, [(0, "Fire"), (1, "Ice")]);
+    let faces: Vec<_> = files
+        .iter()
+        .map(|f| (f.face_index, f.face.as_str(), f.split_half))
+        .collect();
+    assert_eq!(faces, [(0, "Fire", true), (1, "Ice", true)]);
     assert!(missing.is_empty());
 }
 
@@ -1593,9 +1597,10 @@ async fn saves_a_split_card_whole_when_mtgpics_files_one_image_under_both_halves
     let JobStatus::Done { files, missing } = &jobs[0].1 else {
         panic!("{jobs:?}");
     };
+    // One picture of the whole card: not a half.
     assert_eq!(
-        (files[0].face.as_str(), files[0].face_index),
-        ("Bottomless Pool // Locker Room", 0)
+        (files[0].face.as_str(), files[0].face_index, files[0].split_half),
+        ("Bottomless Pool // Locker Room", 0, false)
     );
     assert!(missing.is_empty());
 }

@@ -17,4 +17,5 @@ export const defaultSettings: Settings = {
   layoutFolders: true,
   typeFolders: false,
   overwrite: true,
+  autoSendToCardAnvil: false,
 };

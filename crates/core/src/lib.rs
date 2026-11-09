@@ -6,6 +6,7 @@
 //! through a callback.
 
 pub mod card;
+pub mod card_anvil;
 pub mod carddb;
 pub mod decks;
 pub mod engine;
