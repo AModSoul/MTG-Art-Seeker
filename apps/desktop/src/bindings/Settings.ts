@@ -56,4 +56,14 @@ export type Settings = {
    * Replace a file of the same name; otherwise the new one is numbered.
    */
   overwrite: boolean;
+  /**
+   * The Card Anvil app art is sent to, when the user chose one: a
+   * development build, say. Otherwise the installed one is found.
+   */
+  cardAnvilPath?: string;
+  /**
+   * Send a download's art to Card Anvil when it finishes with art saved,
+   * unless it was cancelled.
+   */
+  autoSendToCardAnvil: boolean;
 };

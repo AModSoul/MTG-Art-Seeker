@@ -178,6 +178,10 @@ pub struct SavedFile {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub page: Option<String>,
+    /// Whether this is one half of a split card, with its own painting; see
+    /// [`FacePlan::is_split_half`]. Left out when it isn't.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub split_half: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, TS)]
@@ -851,6 +855,8 @@ async fn rename_to_face(file: SavedFile, card: &Card, face: &FacePlan, context: 
         face: face.name.clone(),
         face_index: face.index as u32,
         artist: face.artist.clone(),
+        // A half's picture that turned out to be the whole card's is a half no more.
+        split_half: face.is_split_half(),
         ..file
     })
 }
@@ -1064,6 +1070,7 @@ pub(crate) async fn place(
         artist: face.artist.clone(),
         size,
         page: None,
+        split_half: face.is_split_half(),
     })
 }
 

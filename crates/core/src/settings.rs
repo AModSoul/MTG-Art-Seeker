@@ -40,6 +40,14 @@ pub struct Settings {
     pub type_folders: bool,
     /// Replace a file of the same name; otherwise the new one is numbered.
     pub overwrite: bool,
+    /// The Card Anvil app art is sent to, when the user chose one: a
+    /// development build, say. Otherwise the installed one is found.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub card_anvil_path: Option<String>,
+    /// Send a download's art to Card Anvil when it finishes with art saved,
+    /// unless it was cancelled.
+    pub auto_send_to_card_anvil: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -87,6 +95,8 @@ impl Default for Settings {
             layout_folders: true,
             type_folders: false,
             overwrite: true,
+            card_anvil_path: None,
+            auto_send_to_card_anvil: false,
         }
     }
 }
@@ -144,6 +154,8 @@ mod tests {
         let settings = Settings {
             naming: "NAME".into(),
             sources: SourceMode::ScryfallOnly,
+            card_anvil_path: Some(r"C:\Card Anvil\Card-Anvil.exe".into()),
+            auto_send_to_card_anvil: true,
             ..Settings::default()
         };
         settings.save(&path).unwrap();
@@ -153,5 +165,14 @@ mod tests {
         let loaded = Settings::load(&path).unwrap();
         assert!(!loaded.overwrite);
         assert_eq!(loaded.naming, Settings::default().naming);
+        assert_eq!(loaded.card_anvil_path, None);
+        assert!(!loaded.auto_send_to_card_anvil);
+    }
+
+    #[test]
+    fn leaves_out_a_card_anvil_path_never_chosen() {
+        let json = serde_json::to_value(Settings::default()).unwrap();
+        assert!(json.get("cardAnvilPath").is_none());
+        assert_eq!(json["autoSendToCardAnvil"], false);
     }
 }

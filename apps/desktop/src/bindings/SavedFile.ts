@@ -24,4 +24,9 @@ export type SavedFile = {
    * The page a [`ArtSource::Web`] image was saved from.
    */
   page?: string;
+  /**
+   * Whether this is one half of a split card, with its own painting; see
+   * [`FacePlan::is_split_half`]. Left out when it isn't.
+   */
+  splitHalf?: boolean;
 };

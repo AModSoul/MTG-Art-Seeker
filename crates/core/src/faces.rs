@@ -155,8 +155,11 @@ fn image_url(uris: &crate::card::ImageUris, settings: &Settings) -> Option<Strin
     }
 }
 
+/// The artist a face is saved under when Scryfall doesn't name one.
+pub const UNKNOWN_ARTIST: &str = "Unknown Artist";
+
 fn artist(name: Option<&str>) -> String {
-    name.map_or_else(|| "Unknown Artist".into(), deunicode::deunicode)
+    name.map_or_else(|| UNKNOWN_ARTIST.into(), deunicode::deunicode)
 }
 
 fn folders(type_folder: &Option<String>, layout_folder: Option<String>) -> Vec<String> {
