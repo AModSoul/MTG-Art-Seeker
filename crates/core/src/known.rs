@@ -191,7 +191,7 @@ pub async fn save_from(
             None => return Err(Error::Other(format!("{name}'s art is gone from {url}"))),
         }
     };
-    let (file, replaced) = put_in_place(target, destination, source, &dir, temp, kind).await?;
+    let (file, replaced) = put_in_place(target, destination, source, &dir, temp, kind, Some(&url)).await?;
 
     if let (Some(history), Some(size)) = (history, file.size) {
         let _ = history.remember_image_size(&url, size);

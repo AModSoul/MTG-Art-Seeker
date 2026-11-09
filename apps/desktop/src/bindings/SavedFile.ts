@@ -29,4 +29,14 @@ export type SavedFile = {
    * [`FacePlan::is_split_half`]. Left out when it isn't.
    */
   splitHalf?: boolean;
+  /**
+   * The address the image was downloaded from, when it can be downloaded
+   * from there again: not a page's `blob:` or `data:` image.
+   */
+  url?: string;
+  /**
+   * Scryfall's illustration id for the face's artwork, whatever the image's
+   * source; see [`FacePlan::illustration_id`].
+   */
+  illustration?: string;
 };

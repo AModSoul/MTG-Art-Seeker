@@ -865,6 +865,9 @@ async fn saves_a_larger_copy_the_user_found_in_place_of_scryfalls() {
     );
     assert_eq!(file.source, ArtSource::Web);
     assert_eq!(file.page.as_deref(), found.page);
+    // Where the image itself is, and the artwork it's a copy of.
+    assert_eq!(file.url.as_deref(), Some(found.image_url));
+    assert_eq!(file.illustration.as_deref(), Some(KARN_ART));
     assert_eq!(file.size.map(|s| (s.width, s.height)), Some((1200, 900)));
     assert_eq!(replaced.as_deref(), Some(scryfall_file.to_string_lossy().as_ref()));
     assert!(!scryfall_file.exists(), "Scryfall's file is replaced");
@@ -1101,7 +1104,12 @@ async fn keeps_only_a_copy_that_can_be_downloaded_again() {
     let imported = manual::import(&http, Some(&history), &target, destination, &downloaded, found, false)
         .await
         .unwrap();
-    assert!(matches!(imported, manual::Imported::Saved { .. }), "saved this once");
+    let manual::Imported::Saved { file, .. } = imported else {
+        panic!("not saved this once: {imported:?}");
+    };
+    // A page's own address for an image is no address to send on.
+    assert_eq!(file.url, None);
+    assert_eq!(file.illustration.as_deref(), Some(KARN_ART));
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
     assert!(history.found_copies(KARN_ART).unwrap().is_empty());
 }
@@ -1333,7 +1341,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
     // ArtStation one saved last.
     let mtgpics = format!("{}/pics/art/dom/001_1.jpg", servers.mtgpics.uri());
     history
-        .remember(&target.card, &[Some(mtgpics)], std::time::SystemTime::now())
+        .remember(&target.card, &[Some(mtgpics.clone())], std::time::SystemTime::now())
         .unwrap();
     let artstation = format!("{}/found/karn.jpg", servers.cdn.uri());
     let copies = [
@@ -1377,6 +1385,8 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
         }),
         page: None,
         split_half: false,
+        url: Some(artstation.clone()),
+        illustration: Some(KARN_ART.into()),
     };
 
     let known = known::known_sources(&http, Some(&history), &target, &settings, &saved_now).await;
@@ -1437,6 +1447,9 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
         "mtgpics/Karn, Scion of Urza [DOM] {1}.jpg"
     );
     assert_eq!((file.source, file.page.as_deref()), (ArtSource::Mtgpics, None));
+    // Where MTGPics has it, and still the same artwork.
+    assert_eq!(file.url.as_deref(), Some(mtgpics.as_str()));
+    assert_eq!(file.illustration.as_deref(), Some(KARN_ART));
     assert_eq!(replaced.as_deref(), Some(web_file.to_string_lossy().as_ref()));
     assert!(!web_file.exists());
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), None);
@@ -1462,6 +1475,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
         "web/Karn, Scion of Urza [DOM] {1}.jpg"
     );
     assert_eq!(file.page.as_deref(), Some("https://www.artstation.com/artwork/karn"));
+    assert_eq!(file.url.as_deref(), Some(artstation.as_str()));
     assert_eq!(file.size.map(|s| s.width), Some(1200));
     assert!(!mtgpics_file.exists());
     assert_eq!(history.found_by_hand(KARN_ART).unwrap(), Some(in_use));
@@ -1493,11 +1507,22 @@ async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall
     };
     let saved_in = |out: &Path| -> Vec<String> { walk(out).iter().map(|file| relative(file, out)).collect() };
 
+    // Scryfall gives the halves one artwork, which each half's image is of.
+    const FIRE_ICE_ART: &str = "511174a2-18dc-4582-9de1-c04871eb77de";
+
     // MTGPics has neither half: the whole card, as Scryfall has it.
     let out = tempfile::tempdir().unwrap();
-    let (summary, _) = run_to_end(&servers.http(), input(), &settings(out.path())).await;
+    let (summary, jobs) = run_to_end(&servers.http(), input(), &settings(out.path())).await;
     assert_eq!((summary.done, summary.scryfall_files), (1, 1));
     assert_eq!(saved_in(out.path()), ["scryfall/Split/Fire - Ice [MH2] {290}.jpg"]);
+    let JobStatus::Done { files, .. } = &jobs[0].1 else {
+        panic!("{jobs:?}");
+    };
+    assert_eq!(files[0].illustration.as_deref(), Some(FIRE_ICE_ART));
+    assert!(files[0]
+        .url
+        .as_deref()
+        .is_some_and(|url| url.starts_with(&servers.cdn.uri()) && url.contains("/art_crop/")));
 
     // MTGPics has a painting for each half, Fire's first: one image each, as
     // a two-faced card has.
@@ -1523,6 +1548,19 @@ async fn saves_a_split_cards_halves_from_mtgpics_or_the_whole_card_from_scryfall
         .collect();
     assert_eq!(faces, [(0, "Fire", true), (1, "Ice", true)]);
     assert!(missing.is_empty());
+    // Each half's own picture's address, and the artwork without the half's number.
+    let mtgpics = servers.mtgpics.uri();
+    let sources: Vec<_> = files
+        .iter()
+        .map(|f| (f.url.clone(), f.illustration.as_deref()))
+        .collect();
+    assert_eq!(
+        sources,
+        [
+            (Some(format!("{mtgpics}/pics/art/ivg/032.jpg")), Some(FIRE_ICE_ART)),
+            (Some(format!("{mtgpics}/pics/art/ivg/091.jpg")), Some(FIRE_ICE_ART)),
+        ]
+    );
 }
 
 #[tokio::test]
@@ -1664,6 +1702,16 @@ async fn puts_a_split_cards_paintings_under_the_halves_they_belong_to() {
                 960,
                 "mtgpics/Split/Ice [DMR] {215}.jpg".to_owned()
             ),
+        ]
+    );
+    // Each picture's address went with it.
+    let urls: Vec<_> = files.iter().map(|f| f.url.clone()).collect();
+    let mtgpics = servers.mtgpics.uri();
+    assert_eq!(
+        urls,
+        [
+            Some(format!("{mtgpics}/pics/art/apo/128.jpg")),
+            Some(format!("{mtgpics}/pics/art/apo/129.jpg")),
         ]
     );
 }

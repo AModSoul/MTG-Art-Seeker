@@ -38,6 +38,14 @@ impl FacePlan {
     pub fn is_split_half(&self) -> bool {
         self.illustration.as_deref().is_some_and(|art| art.contains('#'))
     }
+
+    /// Scryfall's illustration id for this image's artwork: [`Self::illustration`]
+    /// without a split card's half's number, which Scryfall doesn't give.
+    pub fn illustration_id(&self) -> Option<&str> {
+        self.illustration
+            .as_deref()
+            .map(|art| art.split_once('#').map_or(art, |(id, _)| id))
+    }
 }
 
 /// Card types a type folder can be, in the order a type line is checked:
@@ -321,6 +329,8 @@ mod tests {
             ]
         );
         assert!(faces.iter().all(|f| f.folders == ["Split"] && f.is_split_half()));
+        // Scryfall's id for the halves' artwork, without the half's number.
+        assert!(faces.iter().all(|f| f.illustration_id() == Some("fire-ice-art")));
     }
 
     #[test]
@@ -334,6 +344,7 @@ mod tests {
         assert_eq!(faces[0].name, "Fire // Ice");
         assert_eq!(faces[0].folders, ["Split"]);
         assert_eq!(faces[0].illustration.as_deref(), Some("fire-ice-art"));
+        assert_eq!(faces[0].illustration_id(), Some("fire-ice-art"));
         assert!(faces[0].scryfall_url.is_some() && !faces[0].is_split_half());
     }
 }

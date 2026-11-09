@@ -634,7 +634,7 @@ async fn import_found(state: &AppState, search: &Search, found: &finder::Saved, 
     match imported {
         Ok(Imported::Saved { file, replaced }) => {
             let _ = std::fs::remove_file(&found.path);
-            saved(state, search, file, replaced)
+            saved(state, search, *file, replaced)
         }
         Ok(Imported::Doubtful(doubt)) => {
             let token = state.next_token.fetch_add(1, Ordering::Relaxed);
