@@ -23,7 +23,7 @@ export const Default: Story = {
     );
     await expect(canvas.getByRole("link", { name: "Source code on GitHub" })).toHaveAttribute(
       "href",
-      "https://github.com/AModSoul/mtg-art-downloader-rust",
+      "https://github.com/AModSoul/MTG-Art-Seeker",
     );
   },
 };

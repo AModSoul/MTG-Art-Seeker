@@ -20,7 +20,7 @@ use crate::{
 pub const USER_AGENT: &str = concat!(
     "MTGArtSeeker/",
     env!("CARGO_PKG_VERSION"),
-    " (+https://github.com/AModSoul/mtg-art-downloader-rust)"
+    " (+https://github.com/AModSoul/MTG-Art-Seeker)"
 );
 
 /// Where each service lives. Tests point these at a local mock server.

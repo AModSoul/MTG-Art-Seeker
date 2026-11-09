@@ -17,7 +17,7 @@ by way of [Alex Taxiera's fork](https://github.com/alex-taxiera/mtg-art-download
 ## Install
 
 Download the installer for your system from the
-[latest release](https://github.com/AModSoul/mtg-art-downloader-rust/releases/latest). The app
+[latest release](https://github.com/AModSoul/MTG-Art-Seeker/releases/latest). The app
 checks for new versions when it starts and offers to update itself.
 
 ## Using it

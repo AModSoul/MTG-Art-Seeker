@@ -116,7 +116,7 @@ export const LoadFailed: Story = {
     await expect(canvas.getByText("Couldn't load the latest release from GitHub")).toBeVisible();
     await expect(canvas.getByRole("link", { name: "Go to the latest release" })).toHaveAttribute(
       "href",
-      "https://github.com/AModSoul/mtg-art-downloader-rust/releases/latest",
+      "https://github.com/AModSoul/MTG-Art-Seeker/releases/latest",
     );
   },
 };
