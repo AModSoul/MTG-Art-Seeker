@@ -16,8 +16,12 @@ const FALLBACK_FONTS = `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica
  * The app's Chakra system. Tokens and semantic tokens go in this config; recipes and slot recipes
  * live in `./recipes`, one file each, and only add to Chakra's own. Run
  * `pnpm --filter @mtg-art/ui typegen` after changing any of them so their props are typed.
+ *
+ * Both apps use it. An app that needs more of its own, as the desktop app's dialogs open below
+ * its header, builds its system from this config and a layer of its own (`createSystem`), and
+ * hands that to the provider and its Storybook (`previewFor`).
  */
-const config = defineConfig({
+export const config = defineConfig({
   theme: {
     tokens: {
       // Chakra's stack names Inter but doesn't ship it, so it only showed where it was installed.

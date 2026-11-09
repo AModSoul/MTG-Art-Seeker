@@ -10,6 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@mtg-art/ui/dialog";
+import { keepHeader } from "@/layout";
 import { answerDoubt, useRun } from "@/store";
 
 /** What the check found, for each reason an image wasn't saved. */
@@ -43,6 +44,7 @@ export function FoundArtDialog() {
       role="alertdialog"
       open={doubt !== undefined}
       closeOnInteractOutside={false}
+      persistentElements={keepHeader}
       onOpenChange={(event) => {
         // Escape, or the window closing it: don't save.
         if (!event.open) void answerDoubt(false);

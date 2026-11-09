@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "@/App";
 import { useInput } from "@/store";
+import { system } from "@/theme";
 import { Provider } from "@mtg-art/ui/provider";
 import { Toaster } from "@mtg-art/ui/toaster";
 
@@ -26,7 +27,7 @@ if (!root) throw new Error("index.html has no #root");
 
 createRoot(root).render(
   <StrictMode>
-    <Provider>
+    <Provider system={system}>
       <App />
       <Toaster />
     </Provider>

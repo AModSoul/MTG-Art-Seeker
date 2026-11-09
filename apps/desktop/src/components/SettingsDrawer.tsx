@@ -1,5 +1,5 @@
 import { Button, Code, Fieldset, HStack, IconButton, Input, Stack, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { LuFolderOpen, LuSettings } from "react-icons/lu";
 
 import { api } from "@/api";
@@ -24,7 +24,7 @@ import { SegmentedControl } from "@mtg-art/ui/segmented-control";
 import { SkeletonText } from "@mtg-art/ui/skeleton";
 import { SwitchField } from "@mtg-art/ui/switch-field";
 import { Tooltip } from "@mtg-art/ui/tooltip";
-import { HEADER_HEIGHT } from "@/layout";
+import { HEADER_BUTTON, keepHeader } from "@/layout";
 import { chooseOutputDir, useSettings } from "@/store";
 import { findOption, type Option } from "@/utils/options";
 
@@ -103,30 +103,20 @@ type BooleanSetting = {
 
 export function SettingsDrawer() {
   const settings = useSettings((state) => state.settings);
-  const trigger = useRef<HTMLButtonElement>(null);
 
   return (
-    // The button that opens the drawer stays in reach above it, in the header. A click on it
-    // isn't one outside the drawer, which would start it closing only for the button to open
-    // it again: it closes the drawer, as it opened it.
-    <DrawerRoot size="md" persistentElements={[() => trigger.current]}>
+    // The drawer opens below the header (`theme.ts`), which stays in reach. The button that
+    // opens it is there, so a click on it isn't one outside the drawer, which would start it
+    // closing only for the button to open it again: it closes the drawer, as it opened it.
+    <DrawerRoot size="md" persistentElements={keepHeader}>
       <Tooltip content="Settings">
         <DrawerTrigger asChild>
-          {/* As small as the header's other buttons. */}
-          <IconButton
-            ref={trigger}
-            variant="ghost"
-            size="2xs"
-            aria-label="Settings"
-            disabled={!settings}
-            _icon={{ boxSize: "4" }}
-          >
+          <IconButton {...HEADER_BUTTON} aria-label="Settings" disabled={!settings}>
             <LuSettings />
           </IconButton>
         </DrawerTrigger>
       </Tooltip>
-      {/* Below the header, which stays in reach above it. */}
-      <DrawerContent offset={`${HEADER_HEIGHT} 0 0 0`}>
+      <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>Settings</DrawerTitle>
         </DrawerHeader>
