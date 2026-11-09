@@ -2,6 +2,7 @@ import { IconButton } from "@chakra-ui/react";
 import { RiDiscordFill } from "react-icons/ri";
 
 import { api } from "@/api";
+import { HEADER_BUTTON } from "@/layout";
 import { Tooltip } from "@mtg-art/ui/tooltip";
 import { showError } from "@/notify";
 
@@ -17,12 +18,9 @@ async function openDiscord() {
 export function DiscordButton() {
   return (
     <Tooltip content="Join the Proxy Community Discord">
-      {/* As small as the header's other buttons. */}
       <IconButton
-        variant="ghost"
-        size="2xs"
+        {...HEADER_BUTTON}
         aria-label="Join the Proxy Community Discord"
-        _icon={{ boxSize: "4" }}
         onClick={() => void openDiscord()}
       >
         <RiDiscordFill />

@@ -21,7 +21,8 @@ export const Windows: Story = {
     await expect(canvas.getByRole("button", { name: "Minimize" })).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Maximize" })).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Close" })).toBeVisible();
-    await expect(canvas.getByRole("banner")).toHaveAttribute("data-tauri-drag-region");
+    // Anywhere on it but its buttons.
+    await expect(canvas.getByRole("banner")).toHaveAttribute("data-tauri-drag-region", "deep");
   },
 };
 
@@ -42,9 +43,9 @@ export const MacOS: Story = {
 };
 
 /** With the settings drawer open, which opens below the bar, the window's buttons still take a
- * click. The drawer is modal, so it hides the rest of the page, the bar too, from screen readers,
- * and keeps the keyboard to itself: these buttons are for the pointer then, as a native title
- * bar's are. */
+ * click, and using the bar leaves the drawer open. The drawer is modal, so it hides the rest of
+ * the page, the bar too, from screen readers, and keeps the keyboard to itself: these buttons
+ * are for the pointer then, as a native title bar's are. */
 export const WithSettingsOpen: Story = {
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByRole("button", { name: "Settings" }));
@@ -52,6 +53,10 @@ export const WithSettingsOpen: Story = {
     // A click on anything the drawer blocks (`pointer-events: none`) would fail here.
     await userEvent.click(canvas.getByRole("button", { name: "Minimize", hidden: true }));
     await expect(minimizeWindow).toHaveBeenCalledTimes(1);
+    // Pressing the bar, as to drag the window, isn't a click outside the drawer either.
+    await userEvent.click(canvas.getByRole("heading", { level: 1, hidden: true }));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await expect(screen.getByRole("dialog", { name: "Settings" })).toBeVisible();
 
     // The drawer starts where the bar ends.
     const bar = canvas.getByRole("banner", { hidden: true }).getBoundingClientRect();

@@ -11,6 +11,9 @@ import {
 } from "@/appWindow";
 import { showError } from "@/notify";
 
+/** How long the window's size must hold still before the controls ask if it's maximized. */
+const RESIZE_SETTLES_MS = 100;
+
 /** A click handler that does `action` to the window, and says so if it can't. */
 function run(what: string, action: () => Promise<void>) {
   return () => {
@@ -32,14 +35,21 @@ export function WindowControls() {
   useEffect(() => {
     let current = true;
     let stop: (() => void) | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const sync = () => {
       isWindowMaximized().then(
         (value) => current && setMaximized(value),
         () => {},
       );
     };
+    // Dragging the window's edge sends a stream of resizes; ask once it stops for a moment,
+    // not at each.
+    const settled = () => {
+      clearTimeout(timer);
+      timer = setTimeout(sync, RESIZE_SETTLES_MS);
+    };
     sync();
-    onWindowResized(sync).then(
+    onWindowResized(settled).then(
       (unlisten) => {
         if (current) stop = unlisten;
         else unlisten();
@@ -48,6 +58,7 @@ export function WindowControls() {
     );
     return () => {
       current = false;
+      clearTimeout(timer);
       stop?.();
     };
   }, []);

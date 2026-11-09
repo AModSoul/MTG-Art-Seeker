@@ -5,7 +5,7 @@ import { windowFrame } from "@/appWindow";
 import { DiscordButton } from "@/components/DiscordButton";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { UpdateButton } from "@/components/UpdateButton";
-import { HEADER_HEIGHT } from "@/layout";
+import { HEADER_BUTTON, HEADER_HEIGHT, headerProps } from "@/layout";
 import { WindowControls } from "@/components/WindowControls";
 import { ColorModeButton } from "@mtg-art/ui/color-mode";
 
@@ -17,24 +17,22 @@ const APP_NAME = "MTG Art Seeker";
  * but for screen readers. */
 export function AppHeader() {
   const frame = windowFrame();
-  // This bar is all there is to drag the window by. Tauri starts a drag only from an element
-  // that carries the attribute itself, so it goes on the bar's empty parts and the name, not
-  // on the buttons.
-  const drag = frame === "browser" ? {} : { "data-tauri-drag-region": true };
+  // This bar is all there is to drag the window by: anywhere on it but its buttons, which
+  // Tauri leaves to their clicks.
+  const drag = frame === "browser" ? {} : { "data-tauri-drag-region": "deep" };
 
   return (
     <HStack
       as="header"
+      {...headerProps}
       gap="0"
       align="stretch"
       bg="bg.emphasized"
       shadow="sm"
       h={HEADER_HEIGHT}
-      // Above drawers and dialogs and their backdrops, and still taking clicks while one is
-      // open (a modal turns them off for the rest of the page), so the window can always be
-      // dragged, minimized or closed. Drawers open below it.
-      position="relative"
-      zIndex="popover"
+      // Dialogs and drawers open below it (`theme.ts`). It still takes clicks while one is
+      // open, which turns them off for the rest of the page (`keepHeader`), so the window can
+      // always be dragged, minimized or closed.
       pointerEvents="auto"
       {...drag}
     >
@@ -48,18 +46,15 @@ export function AppHeader() {
         // Card Anvil's: the default heading's line height, with a smaller font, sets the
         // bar's height.
         fontSize="md"
-        {...drag}
       >
         {frame === "mac" ? (
           <VisuallyHidden>{APP_NAME}</VisuallyHidden>
         ) : (
-          <HStack gap="2" {...drag}>
-            <Icon size="lg" color="emerald.solid" pointerEvents="none" aria-hidden>
+          <HStack gap="2">
+            <Icon size="lg" color="emerald.solid" aria-hidden>
               <RiImageDownloadFill />
             </Icon>
-            <Box as="span" {...drag}>
-              {APP_NAME}
-            </Box>
+            <Box as="span">{APP_NAME}</Box>
           </HStack>
         )}
       </Heading>
@@ -68,7 +63,7 @@ export function AppHeader() {
       <HStack gap="2" pe="4">
         <UpdateButton />
         <DiscordButton />
-        <ColorModeButton size="2xs" />
+        <ColorModeButton {...HEADER_BUTTON} />
         <SettingsDrawer />
       </HStack>
       {frame === "custom" && <WindowControls />}

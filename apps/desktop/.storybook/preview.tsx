@@ -1,4 +1,4 @@
-import { basePreview, resetUi } from "@mtg-art/ui/storybook";
+import { previewFor, resetUi } from "@mtg-art/ui/storybook";
 import type { Preview } from "@storybook/react-vite";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -19,6 +19,7 @@ import {
   windowFrame,
 } from "../src/appWindow.ts";
 import { useInput, useRun, useSettings } from "../src/store.ts";
+import { system } from "../src/theme.ts";
 
 // Storybook has no Tauri backend, so every module that reaches it is mocked.
 // Each export becomes a spy; the defaults below make the app behave as if the
@@ -38,7 +39,8 @@ const PLACEHOLDER_ART = `data:image/svg+xml,${encodeURIComponent(
 )}`;
 
 const preview: Preview = {
-  ...basePreview,
+  // The app's own system, whose dialogs and drawers open below its header.
+  ...previewFor(system),
   beforeEach: () => {
     mocked(api.getSettings).mockResolvedValue(defaultSettings);
     mocked(api.saveSettings).mockResolvedValue();
