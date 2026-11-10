@@ -11,9 +11,20 @@ export interface ToastAction {
   onClick: () => void;
 }
 
-/** A toast can be given an `id`: another with the same one replaces it, so a
- * loading toast can turn into its result. */
-export function showError(title: string, error: unknown, id?: string, action?: ToastAction) {
+/** What else a toast says and does, besides its title. */
+export interface ToastOptions {
+  /** Another toast with the same `id` replaces it, so a loading toast can turn into its result. */
+  id?: string;
+  description?: string;
+  action?: ToastAction;
+}
+
+/** An error's toast, which says the error itself. */
+export function showError(
+  title: string,
+  error: unknown,
+  { id, action }: Omit<ToastOptions, "description"> = {},
+) {
   toaster.create({
     ...withId(id),
     ...withAction(action),
@@ -23,32 +34,30 @@ export function showError(title: string, error: unknown, id?: string, action?: T
   });
 }
 
-export function showSuccess(
-  title: string,
-  id?: string,
-  description?: string,
-  action?: ToastAction,
-) {
-  toaster.create({ ...withId(id), ...withAction(action), type: "success", title, description });
+export function showSuccess(title: string, options: ToastOptions = {}) {
+  show("success", title, options);
 }
 
-export function showInfo(title: string, description?: string, id?: string, action?: ToastAction) {
-  toaster.create({ ...withId(id), ...withAction(action), type: "info", title, description });
+export function showInfo(title: string, options: ToastOptions = {}) {
+  show("info", title, options);
 }
 
 /** Something didn't happen, but nothing went wrong: the user has something to do. */
-export function showWarning(
-  title: string,
-  description?: string,
-  id?: string,
-  action?: ToastAction,
-) {
-  toaster.create({ ...withId(id), ...withAction(action), type: "warning", title, description });
+export function showWarning(title: string, options: ToastOptions = {}) {
+  show("warning", title, options);
 }
 
 /** A toast with a spinner, until another with the same `id` replaces it. */
 export function showLoading(title: string, id: string) {
   toaster.create({ id, type: "loading", title });
+}
+
+function show(
+  type: "success" | "info" | "warning",
+  title: string,
+  { id, description, action }: ToastOptions,
+) {
+  toaster.create({ ...withId(id), ...withAction(action), type, title, description });
 }
 
 /** The toast's `id`, left out when there's none: zag rejects `id: undefined`. */

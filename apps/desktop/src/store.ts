@@ -305,45 +305,42 @@ export async function sendToCardAnvil(jobs?: number[], run?: number) {
   const runId = run ?? useRun.getState().runId;
   const { settings } = useSettings.getState();
   if (runId === null || !settings) return;
-  const toast = `card-anvil-${++sendToasts}`;
+  const id = `card-anvil-${++sendToasts}`;
   useCardAnvil.setState({ sending: true });
-  showLoading("Sending the art to Card Anvil…", toast);
+  showLoading("Sending the art to Card Anvil…", id);
   try {
     const sent = await api.sendToCardAnvil(runId, jobs ?? null, settings);
     switch (sent.outcome) {
       case "delivered":
-        showSuccess(
-          `Sent ${count(sent.images, "image")} to Card Anvil`,
-          toast,
-          `Card Anvil will ask where to put ${sent.images === 1 ? "it" : "them"}.`,
-        );
+        showSuccess(`Sent ${count(sent.images, "image")} to Card Anvil`, {
+          id,
+          description: `Card Anvil will ask where to put ${sent.images === 1 ? "it" : "them"}.`,
+        });
         break;
       case "notFound":
-        showWarning(
-          "Card Anvil isn't installed",
-          "Install it, or choose where it is in Settings.",
-          toast,
-          GET_CARD_ANVIL,
-        );
+        showWarning("Card Anvil isn't installed", {
+          id,
+          description: "Install it, or choose where it is in Settings.",
+          action: GET_CARD_ANVIL,
+        });
         break;
       case "notTaken":
-        showWarning(
-          "Card Anvil didn't take the art",
-          "This version is too old. Update it, then send again.",
-          toast,
-          GET_CARD_ANVIL,
-        );
+        showWarning("Card Anvil didn't take the art", {
+          id,
+          description: "This version is too old. Update it, then send again.",
+          action: GET_CARD_ANVIL,
+        });
         break;
       case "tooMany":
         showError(
           "Too many images for Card Anvil",
           `Card Anvil takes up to ${count(sent.max, "card")} at a time, and that's ${count(sent.images, "image")}. Send cards one at a time instead: right-click a card.`,
-          toast,
+          { id },
         );
         break;
     }
   } catch (error) {
-    showError("Couldn't send the art to Card Anvil", error, toast);
+    showError("Couldn't send the art to Card Anvil", error, { id });
   } finally {
     useCardAnvil.setState({ sending: false });
   }
@@ -433,9 +430,9 @@ export async function saveArtFrom(job: number, face: number, known: KnownSource)
   try {
     const file = await api.saveArtFrom(runId, job, face, known.source, known.copy);
     replaceFile(runId, job, file);
-    showSuccess(`Saved ${file.face}'s art from ${name}`, toast);
+    showSuccess(`Saved ${file.face}'s art from ${name}`, { id: toast });
   } catch (error) {
-    showError("Couldn't save the art", error, toast);
+    showError("Couldn't save the art", error, { id: toast });
   }
 }
 
@@ -475,7 +472,7 @@ export async function choosePageImage(index: number | null) {
   try {
     await api.choosePageImage(pageImages.token, index);
   } catch (error) {
-    showError("Couldn't save the image", error, FOUND_TOAST);
+    showError("Couldn't save the image", error, { id: FOUND_TOAST });
   }
 }
 
@@ -495,7 +492,7 @@ function onFound(event: FoundEvent) {
       break;
     case "saved":
       replaceFile(event.run, event.job, event.file);
-      showSuccess(`Saved the larger copy of ${event.file.face}`, FOUND_TOAST);
+      showSuccess(`Saved the larger copy of ${event.file.face}`, { id: FOUND_TOAST });
       break;
     case "doubtful":
       // The dialog asks; the spinner has nothing left to say.
@@ -508,14 +505,13 @@ function onFound(event: FoundEvent) {
       useRun.setState({ pageImages: event });
       break;
     case "noImages":
-      showInfo(
-        "No image on this page is large enough",
-        `None could be a larger copy of ${event.face}'s art.`,
-        FOUND_TOAST,
-      );
+      showInfo("No image on this page is large enough", {
+        id: FOUND_TOAST,
+        description: `None could be a larger copy of ${event.face}'s art.`,
+      });
       break;
     case "failed":
-      showError("Couldn't save the image", event.message, FOUND_TOAST);
+      showError("Couldn't save the image", event.message, { id: FOUND_TOAST });
       break;
   }
 }

@@ -27,9 +27,10 @@ describe("toasts", () => {
   it("shows a warning, with a button and the time to press it", () => {
     const create = created();
     const onClick = vi.fn<() => void>();
-    showWarning("Card Anvil isn't installed", "Install it.", "send", {
-      label: "Get Card Anvil",
-      onClick,
+    showWarning("Card Anvil isn't installed", {
+      id: "send",
+      description: "Install it.",
+      action: { label: "Get Card Anvil", onClick },
     });
     expect(create).toHaveBeenCalledWith({
       id: "send",
@@ -49,7 +50,7 @@ describe("toasts", () => {
       title: "Careful",
       description: undefined,
     });
-    showInfo("Note", "Something to know");
+    showInfo("Note", { description: "Something to know" });
     expect(create).toHaveBeenLastCalledWith({
       type: "info",
       title: "Note",
@@ -60,7 +61,11 @@ describe("toasts", () => {
   it("gives success and error toasts a button too", () => {
     const create = created();
     const action = { label: "Open", onClick: vi.fn<() => void>() };
-    showSuccess("Sent 3 images", "send", "Card Anvil will ask where to put them.", action);
+    showSuccess("Sent 3 images", {
+      id: "send",
+      description: "Card Anvil will ask where to put them.",
+      action,
+    });
     expect(create).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: "send",
@@ -69,7 +74,7 @@ describe("toasts", () => {
         action,
       }),
     );
-    showError("Couldn't send", "Disk full", undefined, action);
+    showError("Couldn't send", "Disk full", { action });
     expect(create).toHaveBeenLastCalledWith(
       expect.objectContaining({ type: "error", description: "Disk full", action }),
     );
