@@ -251,7 +251,9 @@ export async function startRun(input: RunInput) {
   const runIdPromise = api.startRun(input, settings, (event) => {
     queue.push(event);
     timer ??= setTimeout(flush, BATCH_MS);
-    if (event.event === "finished" && sendsWhenFinished(settings, event.summary)) {
+    // The setting as it is when the run finishes, not as it was when it started.
+    const current = event.event === "finished" ? useSettings.getState().settings : null;
+    if (event.event === "finished" && current && sendsWhenFinished(current, event.summary)) {
       // Asked for a moment later: an event can arrive before `runIdPromise` is set.
       void Promise.resolve()
         .then(() => runIdPromise)
@@ -284,11 +286,12 @@ export function cancelRun() {
 // --- Sending art to Card Anvil ------------------------------------------------
 
 interface CardAnvilState {
-  /** Whether art is on its way to Card Anvil, until it's taken or it's clear it won't be. */
-  sending: boolean;
+  /** How many sends are on their way to Card Anvil, each until it's taken or it's clear it
+   * won't be soon. They can overlap: one when a run finishes doesn't wait for the user's. */
+  sending: number;
 }
 
-export const useCardAnvil = create<CardAnvilState>()(() => ({ sending: false }));
+export const useCardAnvil = create<CardAnvilState>()(() => ({ sending: 0 }));
 
 /** Numbers each send's toast, so a second doesn't take over the first's. */
 let sendToasts = 0;
@@ -306,7 +309,7 @@ export async function sendToCardAnvil(jobs?: number[], run?: number) {
   const { settings } = useSettings.getState();
   if (runId === null || !settings) return;
   const id = `card-anvil-${++sendToasts}`;
-  useCardAnvil.setState({ sending: true });
+  useCardAnvil.setState((state) => ({ sending: state.sending + 1 }));
   showLoading("Sending the art to Card Anvil…", id);
   try {
     const sent = await api.sendToCardAnvil(runId, jobs ?? null, settings);
@@ -342,7 +345,7 @@ export async function sendToCardAnvil(jobs?: number[], run?: number) {
   } catch (error) {
     showError("Couldn't send the art to Card Anvil", error, { id });
   } finally {
-    useCardAnvil.setState({ sending: false });
+    useCardAnvil.setState((state) => ({ sending: state.sending - 1 }));
   }
 }
 

@@ -6,7 +6,7 @@ import { api } from "@/api";
 import type { RunEvent } from "@/bindings/RunEvent";
 import type { RunSummary } from "@/bindings/RunSummary";
 import type { Settings } from "@/bindings/Settings";
-import { startRun, useCardAnvil, useRun, useSettings } from "@/store";
+import { sendToCardAnvil, startRun, useCardAnvil, useRun, useSettings } from "@/store";
 
 // No Tauri here: the commands the store calls, and the modules that reach Tauri, are stand-ins.
 vi.mock("@/api", () => ({
@@ -56,7 +56,23 @@ describe("sending a download to Card Anvil when it finishes", () => {
 
     send({ event: "finished", summary: finishedSummary });
     await vi.waitFor(() => expect(sendMock).toHaveBeenCalledWith(7, null, autoSend));
-    await vi.waitFor(() => expect(useCardAnvil.getState().sending).toBe(false));
+    await vi.waitFor(() => expect(useCardAnvil.getState().sending).toBe(0));
+  });
+
+  it("follows the setting as it is when the run finishes", async () => {
+    // Turned off during the run: not sent.
+    let send = await started(autoSend);
+    useSettings.setState({ settings: defaultSettings });
+    send({ event: "finished", summary: finishedSummary });
+    await settle();
+    expect(sendMock).not.toHaveBeenCalled();
+
+    // Turned on during the run: sent.
+    useRun.setState(useRun.getInitialState(), true);
+    send = await started(defaultSettings);
+    useSettings.setState({ settings: autoSend });
+    send({ event: "finished", summary: finishedSummary });
+    await vi.waitFor(() => expect(sendMock).toHaveBeenCalledWith(7, null, autoSend));
   });
 
   it("sends a run that finishes before its id arrives", async () => {
@@ -91,5 +107,41 @@ describe("sending a download to Card Anvil when it finishes", () => {
     send({ event: "finished", summary });
     await settle();
     expect(sendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("sends to Card Anvil", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useRun.setState({ ...useRun.getInitialState(), runId: 3 }, true);
+    useCardAnvil.setState(useCardAnvil.getInitialState(), true);
+    useSettings.setState({ settings: defaultSettings });
+  });
+
+  it("count as sending until the last of those that overlap is done", async () => {
+    const answers: (() => void)[] = [];
+    sendMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answers.push(() => resolve({ outcome: "delivered", images: 1 }));
+        }),
+    );
+    const first = sendToCardAnvil([1]);
+    const second = sendToCardAnvil([2]);
+    expect(useCardAnvil.getState().sending).toBe(2);
+
+    answers[0]?.();
+    await first;
+    expect(useCardAnvil.getState().sending).toBe(1);
+
+    answers[1]?.();
+    await second;
+    expect(useCardAnvil.getState().sending).toBe(0);
+  });
+
+  it("stops counting one that fails", async () => {
+    sendMock.mockRejectedValue("Couldn't start Card Anvil");
+    await sendToCardAnvil();
+    expect(useCardAnvil.getState().sending).toBe(0);
   });
 });

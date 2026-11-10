@@ -305,7 +305,7 @@ const PLACEHOLDER_ROWS = 6;
 export function RunView() {
   const { jobs, skipped, error, summary, running, folder, listFolder } = useRun();
   const outputDir = useSettings((state) => state.settings?.outputDir);
-  const sending = useCardAnvil((state) => state.sending);
+  const sending = useCardAnvil((state) => state.sending > 0);
   const [filter, setFilter] = useState<Filter>("all");
   const [nameWidth, measureNames] = useWidth();
   const [savedHeader, lineSizer] = useStacked();
@@ -794,7 +794,6 @@ function RowMenu({
 }) {
   // Per file, where its art is known to be; `null` while they're asked for.
   const [known, setKnown] = useState<KnownSource[][] | null>(null);
-  const sending = useCardAnvil((state) => state.sending);
   const actions = new Map<string, RowAction>();
 
   async function load() {
@@ -860,11 +859,20 @@ function RowMenu({
           index === 0 ? [group] : [<MenuSeparator key={`separator-${index}`} />, group],
         )}
         <MenuSeparator />
-        <MenuItem value={SEND_TO_CARD_ANVIL} disabled={sending}>
-          <LuAnvil /> Send to Card Anvil
-        </MenuItem>
+        <SendToCardAnvilItem />
       </MenuContent>
     </MenuRoot>
+  );
+}
+
+/** A row menu's item that sends the row's art to Card Anvil, off while a send is on its way.
+ * Its own component, so a send re-renders the open menu's item and not every row's menu. */
+function SendToCardAnvilItem() {
+  const sending = useCardAnvil((state) => state.sending > 0);
+  return (
+    <MenuItem value={SEND_TO_CARD_ANVIL} disabled={sending}>
+      <LuAnvil /> Send to Card Anvil
+    </MenuItem>
   );
 }
 
