@@ -409,11 +409,9 @@ pub fn default_inbox_dir() -> Option<PathBuf> {
 /// Writes `manifest` to `<id>.cardanvil-inbox` in `dir`, through a temporary
 /// file so Card Anvil never reads half of one, and returns its path.
 pub fn write_manifest(dir: &Path, manifest: &Manifest) -> Result<PathBuf> {
-    if !valid_id(&manifest.id) {
-        return Err(Error::Other(format!("{:?} can't name a manifest", manifest.id)));
-    }
+    let path = manifest_path(dir, &manifest.id)
+        .ok_or_else(|| Error::Other(format!("{:?} can't name a manifest", manifest.id)))?;
     std::fs::create_dir_all(dir)?;
-    let path = dir.join(format!("{}.{EXTENSION}", manifest.id));
     let temp = dir.join(format!("{}.{EXTENSION}.part", manifest.id));
     let written =
         std::fs::write(&temp, serde_json::to_vec_pretty(manifest)?).and_then(|()| std::fs::rename(&temp, &path));
@@ -424,28 +422,53 @@ pub fn write_manifest(dir: &Path, manifest: &Manifest) -> Result<PathBuf> {
     Ok(path)
 }
 
-/// Deletes the files in `dir` last written more than [`KEEP_UNTAKEN`]
-/// before `now`: manifests Card Anvil never took. A newer one may belong to a
-/// send still waiting on Card Anvil, in this window or another, so it's left.
-/// A folder that isn't there is already clear.
+/// Where the manifest `id` is kept in `dir`, if `id` can name a file.
+pub fn manifest_path(dir: &Path, id: &str) -> Option<PathBuf> {
+    valid_id(id).then(|| dir.join(format!("{id}.{EXTENSION}")))
+}
+
+/// Deletes the files in `dir` left long enough ([`is_stale`]): manifests
+/// Card Anvil never took. A newer one may belong to a send still waiting on
+/// Card Anvil, in this window or another, so it's left. A folder that isn't
+/// there is already clear, and a file gone already, deleted by another window
+/// starting at the same time, is too. One that can't be looked at or deleted
+/// is left, and the rest are still cleared; the first such error is returned.
 pub fn clear_inbox_dir(dir: &Path, now: SystemTime) -> Result<()> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error.into()),
     };
+    let mut failed = None;
     for entry in entries {
-        let entry = entry?;
-        let metadata = entry.metadata()?;
-        // One written "after" `now`, by a clock since set back, is old enough.
-        let stale = now
-            .duration_since(metadata.modified()?)
-            .map_or(true, |age| age > KEEP_UNTAKEN);
-        if metadata.is_file() && stale {
-            std::fs::remove_file(entry.path())?;
+        let cleared = entry.and_then(|entry| {
+            let metadata = entry.metadata()?;
+            if metadata.is_file() && is_stale(metadata.modified()?, now) {
+                std::fs::remove_file(entry.path())?;
+            }
+            Ok(())
+        });
+        match cleared {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                failed.get_or_insert(error);
+            }
         }
     }
-    Ok(())
+    failed.map_or(Ok(()), |error| Err(error.into()))
+}
+
+/// Whether a manifest last written at `modified` was left long enough to be
+/// cleared away: more than [`KEEP_UNTAKEN`] before `now`. One written "after"
+/// `now` was written before a clock was set back: by a little, as a clock is
+/// corrected, and a send may still be waiting on it; by more than
+/// [`KEEP_UNTAKEN`], by a clock that was wrong, and it's as old as the rest.
+fn is_stale(modified: SystemTime, now: SystemTime) -> bool {
+    match now.duration_since(modified) {
+        Ok(age) => age > KEEP_UNTAKEN,
+        Err(ahead) => ahead.duration() > KEEP_UNTAKEN,
+    }
 }
 
 /// Waits for Card Anvil to take the manifest at `path`, which it does by
@@ -1215,9 +1238,38 @@ mod tests {
         assert!(waiting.exists() && new.exists());
         assert!(dir.path().join("folder").exists());
 
-        // Written "after" now, by a clock since set back.
+        // Written "after" now, by a clock set back a little since: a send may
+        // still be waiting on them.
         clear_inbox_dir(dir.path(), now - Duration::from_secs(60)).unwrap();
+        assert!(waiting.exists() && new.exists());
+        // By far more, a clock that was wrong: they're as old as any.
+        clear_inbox_dir(dir.path(), now - KEEP_UNTAKEN - Duration::from_secs(60)).unwrap();
         assert!(!new.exists() && !waiting.exists());
+    }
+
+    #[test]
+    fn counts_a_manifest_stale_once_its_left_long_enough() {
+        let now = SystemTime::now();
+        let second = Duration::from_secs(1);
+        assert!(!is_stale(now, now));
+        assert!(!is_stale(now - KEEP_UNTAKEN, now));
+        assert!(is_stale(now - KEEP_UNTAKEN - second, now));
+        // From a clock set back since.
+        assert!(!is_stale(now + TAKE_WITHIN, now));
+        assert!(!is_stale(now + KEEP_UNTAKEN, now));
+        assert!(is_stale(now + KEEP_UNTAKEN + second, now));
+    }
+
+    #[test]
+    fn names_a_manifest_only_by_an_id_that_can_name_a_file() {
+        let dir = Path::new("inbox");
+        assert_eq!(
+            manifest_path(dir, "18c3f7a9e2b-1f4"),
+            Some(dir.join("18c3f7a9e2b-1f4.cardanvil-inbox"))
+        );
+        for id in ["", "../x", "a/b", "a\\b", "a b", &"x".repeat(65)] {
+            assert_eq!(manifest_path(dir, id), None, "{id:?}");
+        }
     }
 
     #[tokio::test]
