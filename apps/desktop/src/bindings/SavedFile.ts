@@ -36,6 +36,12 @@ export type SavedFile = {
    */
   splitHalf?: boolean;
   /**
+   * Whether this is an image of the whole card, frame and all, that the
+   * user saved though the check said so ([`crate::manual::Doubt::CardScan`]).
+   * Left out when it isn't.
+   */
+  wholeCard?: boolean;
+  /**
    * The address the image was downloaded from, when it can be downloaded
    * from there again: not a page's `blob:` or `data:` image.
    */
