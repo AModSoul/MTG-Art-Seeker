@@ -6,7 +6,7 @@ members = ["crates/core", "crates/cli", "apps/desktop/src-tauri"]
 version = "0.3.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/AModSoul/mtg-art-downloader-rust"
+repository = "https://github.com/AModSoul/MTG-Art-Seeker"
 rust-version = "1.80"
 
 [workspace.dependencies]

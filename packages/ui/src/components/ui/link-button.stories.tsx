@@ -7,7 +7,7 @@ import { LinkButton } from "./link-button";
 const meta = {
   component: LinkButton,
   args: {
-    href: "https://github.com/AModSoul/mtg-art-downloader-rust/releases/latest",
+    href: "https://github.com/AModSoul/MTG-Art-Seeker/releases/latest",
     children: "Go to the latest release",
   },
 } satisfies Meta<typeof LinkButton>;

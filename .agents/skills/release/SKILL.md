@@ -215,8 +215,8 @@ must print `200`:
 
 ```bash
 gh api repos/{owner}/{repo}/releases/latest --jq .tag_name     # v<version>
-curl -sIL -o /dev/null -w '%{http_code}\n' https://github.com/AModSoul/mtg-art-downloader-rust/releases/download/v<version>/latest.json
-curl -sL https://github.com/AModSoul/mtg-art-downloader-rust/releases/latest/download/latest.json | jq -r .version
+curl -sIL -o /dev/null -w '%{http_code}\n' https://github.com/AModSoul/MTG-Art-Seeker/releases/download/v<version>/latest.json
+curl -sL https://github.com/AModSoul/MTG-Art-Seeker/releases/latest/download/latest.json | jq -r .version
 gh run watch $(gh run list --workflow site.yml --limit 20 --json databaseId,headBranch,event --jq '[.[] | select(.headBranch=="v<version>" and .event=="release")][0].databaseId') --exit-status
 ```
 

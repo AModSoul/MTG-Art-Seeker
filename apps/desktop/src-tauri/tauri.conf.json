@@ -67,7 +67,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM4MkU4QjE3MTUzNDdDNEQKUldSTmZEUVZGNHN1T0ZGUEo4M2NBd2c2TzFqc2ZWMHFBT3RaNTlqR211aFpjdXNXNW9uNTdOVUsK",
       "endpoints": [
-        "https://github.com/AModSoul/mtg-art-downloader-rust/releases/latest/download/latest.json"
+        "https://github.com/AModSoul/MTG-Art-Seeker/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

@@ -5,7 +5,7 @@ export const SITE_URL = "https://getmtg.art/";
 
 /** The repository whose Releases ship the desktop app. */
 export const GITHUB_OWNER = "AModSoul";
-export const GITHUB_REPO = "mtg-art-downloader-rust";
+export const GITHUB_REPO = "MTG-Art-Seeker";
 
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
