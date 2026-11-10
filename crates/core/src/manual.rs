@@ -435,6 +435,7 @@ pub async fn import(
                 page: found.page.map(str::to_owned),
                 site: found.site.map(|site| site.key().to_owned()),
                 size: file.size,
+                whole_card: file.whole_card,
             },
         );
     }
@@ -504,6 +505,8 @@ pub(crate) struct FoundCopyAt<'a> {
     pub page: Option<&'a str>,
     /// Its size when the user saved it, if known.
     pub accepted: Option<ImageSize>,
+    /// Whether it was a scan of the whole card when the user saved it.
+    pub whole_card: bool,
 }
 
 /// What downloading a copy the user found again came to.
@@ -521,7 +524,8 @@ pub(crate) enum Refetched {
 
 /// Downloads `copy` again to `dest`, as the page it was on asks for it, and
 /// checks it against the face's art crop. A copy the user saved though the
-/// check doubted it passes if it's the size it was then.
+/// check doubted it passes if it's the size it was then — and so does one
+/// the check can't be made of, as what it was then.
 pub(crate) async fn refetch_found_copy(
     http: &Http,
     card: &Card,
@@ -541,12 +545,22 @@ pub(crate) async fn refetch_found_copy(
         Ok(crop) => crop.doubt(dest).await,
         Err(error) => Err(error),
     };
-    let whole_card = matches!(checked, Ok(Some(Doubt::CardScan)));
     match checked {
-        Ok(None) => Ok(Refetched::Ready { kind, whole_card }),
-        _ if unchanged => Ok(Refetched::Ready { kind, whole_card }),
+        Ok(None) => Ok(Refetched::Ready {
+            kind,
+            whole_card: false,
+        }),
+        Ok(Some(doubt)) if unchanged => Ok(Refetched::Ready {
+            kind,
+            whole_card: doubt == Doubt::CardScan,
+        }),
         Ok(Some(_)) => Ok(Refetched::Changed),
-        // The check couldn't be made.
+        // The check couldn't be made, but it's the image the user saved: what
+        // it was then, it still is.
+        Err(_) if unchanged => Ok(Refetched::Ready {
+            kind,
+            whole_card: copy.whole_card,
+        }),
         Err(error) => Err(error),
     }
 }

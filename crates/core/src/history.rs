@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS found_copies (
   width INTEGER,
   height INTEGER,
   saved_at INTEGER NOT NULL,
+  whole_card INTEGER NOT NULL DEFAULT 0, -- a card scan the user saved anyway
   UNIQUE (illustration_id, url)
 );
 -- The size of images the app has looked at, by address.
@@ -59,7 +60,7 @@ CREATE TABLE IF NOT EXISTS image_sizes (
 
 /// The log's version, kept in SQLite's `user_version`. Opening an older log
 /// brings it up to date; see [`migrate`].
-const VERSION: i64 = 2;
+const VERSION: i64 = 3;
 
 /// A face MTGPics had no art for is looked for again after this long, in case
 /// MTGPics has added it since.
@@ -90,6 +91,9 @@ pub struct FoundCopy {
     /// Where the user started looking for it, as [`crate::manual::Site::key`] names it.
     pub site: Option<String>,
     pub size: Option<ImageSize>,
+    /// A scan of the whole card, frame and all, that the user saved though
+    /// the check said what it is.
+    pub whole_card: bool,
 }
 
 /// What MTGPics said of an artist's website, and when.
@@ -240,10 +244,10 @@ impl History {
     pub fn remember_found_copy(&self, illustration: &str, copy: &FoundCopy) -> Result<()> {
         self.lock()
             .prepare_cached(
-                "INSERT INTO found_copies (illustration_id, url, page, site, width, height, saved_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+                "INSERT INTO found_copies (illustration_id, url, page, site, width, height, saved_at, whole_card) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
                  ON CONFLICT (illustration_id, url) DO UPDATE SET page = ?3, site = ?4, width = ?5, \
-                 height = ?6, saved_at = ?7",
+                 height = ?6, saved_at = ?7, whole_card = ?8",
             )?
             .execute(params![
                 illustration,
@@ -253,6 +257,7 @@ impl History {
                 copy.size.map(|size| size.width),
                 copy.size.map(|size| size.height),
                 now(),
+                copy.whole_card,
             ])?;
         Ok(())
     }
@@ -262,7 +267,7 @@ impl History {
     pub fn found_copies(&self, illustration: &str) -> Result<Vec<(i64, FoundCopy)>> {
         let conn = self.lock();
         let mut statement = conn.prepare_cached(
-            "SELECT id, url, page, site, width, height FROM found_copies WHERE illustration_id = ?1 \
+            "SELECT id, url, page, site, width, height, whole_card FROM found_copies WHERE illustration_id = ?1 \
              ORDER BY coalesce(width * height, 0) DESC, saved_at DESC",
         )?;
         let copies = statement
@@ -275,7 +280,9 @@ impl History {
     pub fn found_copy(&self, id: i64) -> Result<Option<(String, FoundCopy)>> {
         Ok(self
             .lock()
-            .prepare_cached("SELECT illustration_id, url, page, site, width, height FROM found_copies WHERE id = ?1")?
+            .prepare_cached(
+                "SELECT illustration_id, url, page, site, width, height, whole_card FROM found_copies WHERE id = ?1",
+            )?
             .query_row([id], |row| Ok((row.get(0)?, found_copy(row)?)))
             .optional()?)
     }
@@ -329,7 +336,7 @@ fn now() -> i64 {
         .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(i64::MAX))
 }
 
-/// A copy from columns 1 to 5: url, page, site, width, height.
+/// A copy from columns 1 to 6: url, page, site, width, height, whole_card.
 fn found_copy(row: &rusqlite::Row<'_>) -> rusqlite::Result<FoundCopy> {
     let (width, height): (Option<u32>, Option<u32>) = (row.get(4)?, row.get(5)?);
     Ok(FoundCopy {
@@ -337,6 +344,7 @@ fn found_copy(row: &rusqlite::Row<'_>) -> rusqlite::Result<FoundCopy> {
         page: row.get(2)?,
         site: row.get(3)?,
         size: width.zip(height).map(|(width, height)| ImageSize { width, height }),
+        whole_card: row.get(6)?,
     })
 }
 
@@ -357,6 +365,21 @@ fn migrate(conn: &Connection) -> Result<()> {
              SELECT illustration_id, url, page, saved_at FROM found_by_hand",
             [],
         )?;
+    }
+    if version < 3 {
+        // Version 3 remembers which copies are card scans the user saved
+        // anyway. A log made new already has the column, from `SCHEMA`.
+        let has_column: bool = conn.query_row(
+            "SELECT count(*) > 0 FROM pragma_table_info('found_copies') WHERE name = 'whole_card'",
+            [],
+            |row| row.get(0),
+        )?;
+        if !has_column {
+            conn.execute(
+                "ALTER TABLE found_copies ADD COLUMN whole_card INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
     }
     if version < VERSION {
         conn.pragma_update(None, "user_version", VERSION)?;
@@ -428,6 +451,7 @@ mod tests {
                 width,
                 height: width * 3 / 4,
             }),
+            whole_card: false,
         };
         history
             .remember_found_copy("art", &copy("https://cdn.example/small.jpg", "lens", 900))
@@ -457,6 +481,62 @@ mod tests {
         history.forget_found_copy(*id).unwrap();
         assert_eq!(history.found_copies("art").unwrap().len(), 2);
         assert_eq!(history.found_copy(*id).unwrap(), None);
+    }
+
+    #[test]
+    fn remembers_a_card_scan_saved_anyway() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.sqlite");
+        let scan = FoundCopy {
+            url: "https://cdn.example/scan.jpg".into(),
+            page: None,
+            site: Some("instagram".into()),
+            size: Some(ImageSize {
+                width: 745,
+                height: 1040,
+            }),
+            whole_card: true,
+        };
+        {
+            // A log from before version 3 has no column for it.
+            let history = History::open(&path).unwrap();
+            let conn = history.lock();
+            conn.execute_batch(
+                "DROP TABLE found_copies;
+                 CREATE TABLE found_copies (
+                   id INTEGER PRIMARY KEY,
+                   illustration_id TEXT NOT NULL,
+                   url TEXT NOT NULL,
+                   page TEXT,
+                   site TEXT,
+                   width INTEGER,
+                   height INTEGER,
+                   saved_at INTEGER NOT NULL,
+                   UNIQUE (illustration_id, url)
+                 );
+                 INSERT INTO found_copies (illustration_id, url, saved_at)
+                   VALUES ('art', 'https://cdn.example/old.jpg', 1);",
+            )
+            .unwrap();
+            conn.pragma_update(None, "user_version", 2).unwrap();
+        }
+        let history = History::open(&path).unwrap();
+        let old = history.found_copies("art").unwrap();
+        assert_eq!(old.len(), 1);
+        assert!(!old[0].1.whole_card, "a copy logged before is art");
+
+        history.remember_found_copy("art", &scan).unwrap();
+        drop(history);
+        // Opened again, there's nothing left to bring up to date.
+        let history = History::open(&path).unwrap();
+        let scans: Vec<_> = history
+            .found_copies("art")
+            .unwrap()
+            .into_iter()
+            .map(|(_, copy)| copy)
+            .filter(|copy| copy.whole_card)
+            .collect();
+        assert_eq!(scans, [scan]);
     }
 
     #[test]

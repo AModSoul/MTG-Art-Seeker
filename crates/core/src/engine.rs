@@ -916,6 +916,7 @@ async fn found_by_hand(
         .find(|(_, copy)| copy.url == found.url)
         .map(|(_, copy)| copy);
     let accepted = copy.as_ref().and_then(|copy| copy.size);
+    let was_whole_card = copy.as_ref().is_some_and(|copy| copy.whole_card);
     let site = copy.and_then(|copy| copy.site).as_deref().and_then(Site::from_key);
 
     let saved = async {
@@ -926,6 +927,7 @@ async fn found_by_hand(
             url: &found.url,
             page: found.page.as_deref(),
             accepted,
+            whole_card: was_whole_card,
         };
         let (kind, whole_card) = match refetch_found_copy(context.http, card, face, copy, temp.path()).await? {
             Refetched::Ready { kind, whole_card } => (kind, whole_card),
