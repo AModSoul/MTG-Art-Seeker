@@ -324,17 +324,17 @@ export async function sendToCardAnvil(jobs?: number[], run?: number) {
           action: GET_CARD_ANVIL,
         });
         break;
-      case "notTaken":
-        showWarning("Card Anvil didn't take the art", {
+      case "notYetTaken":
+        showWarning("Card Anvil hasn't taken the art yet", {
           id,
-          description: "This version is too old. Update it, then send again.",
+          description: `It may still be starting. If it doesn't ask where to put ${sent.images === 1 ? "it" : "them"} soon, update Card Anvil and send again.`,
           action: GET_CARD_ANVIL,
         });
         break;
       case "tooMany":
         showError(
-          "Too many images for Card Anvil",
-          `Card Anvil takes up to ${count(sent.max, "card")} at a time, and that's ${count(sent.images, "image")}. Send cards one at a time instead: right-click a card.`,
+          "Too many cards for Card Anvil",
+          `Card Anvil takes up to ${count(sent.max, "card")} at a time, and that's ${count(sent.cards, "card")}. Send cards one at a time instead: right-click a card.`,
           { id },
         );
         break;
