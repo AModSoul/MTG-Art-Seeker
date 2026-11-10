@@ -6,5 +6,5 @@
 export type CardAnvilSend =
   | { outcome: "delivered"; images: number }
   | { outcome: "notFound" }
-  | { outcome: "notYetTaken"; images: number }
+  | { outcome: "notYetTaken"; images: number; request: string }
   | { outcome: "tooMany"; cards: number; max: number };

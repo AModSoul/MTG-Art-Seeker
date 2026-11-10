@@ -315,10 +315,7 @@ export async function sendToCardAnvil(jobs?: number[], run?: number) {
     const sent = await api.sendToCardAnvil(runId, jobs ?? null, settings);
     switch (sent.outcome) {
       case "delivered":
-        showSuccess(`Sent ${count(sent.images, "image")} to Card Anvil`, {
-          id,
-          description: `Card Anvil will ask where to put ${sent.images === 1 ? "it" : "them"}.`,
-        });
+        showSent(sent.images, id);
         break;
       case "notFound":
         showWarning("Card Anvil isn't installed", {
@@ -330,9 +327,17 @@ export async function sendToCardAnvil(jobs?: number[], run?: number) {
       case "notYetTaken":
         showWarning("Card Anvil hasn't taken the art yet", {
           id,
-          description: `It may still be starting. If it doesn't ask where to put ${sent.images === 1 ? "it" : "them"} soon, update Card Anvil and send again.`,
+          description: `It may still be starting, so give it a minute before sending again. If it doesn't ask where to put ${sent.images === 1 ? "it" : "them"} by then, update Card Anvil.`,
           action: GET_CARD_ANVIL,
         });
+        // Card Anvil may yet take it: the toast says so if it does. That isn't a send in
+        // progress, so the buttons don't wait for it.
+        void api.cardAnvilTaken(sent.request).then(
+          (taken) => {
+            if (taken) showSent(sent.images, id);
+          },
+          () => {},
+        );
         break;
       case "tooMany":
         showError(
@@ -347,6 +352,14 @@ export async function sendToCardAnvil(jobs?: number[], run?: number) {
   } finally {
     useCardAnvil.setState((state) => ({ sending: state.sending - 1 }));
   }
+}
+
+/** The toast for `images` images Card Anvil has taken, in place of toast `id`. */
+function showSent(images: number, id: string) {
+  showSuccess(`Sent ${count(images, "image")} to Card Anvil`, {
+    id,
+    description: `Card Anvil will ask where to put ${images === 1 ? "it" : "them"}.`,
+  });
 }
 
 /** Opens Card Anvil's download page. */

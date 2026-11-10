@@ -13,6 +13,7 @@ vi.mock("@/api", () => ({
   api: {
     startRun: vi.fn<() => void>(),
     sendToCardAnvil: vi.fn<() => void>(),
+    cardAnvilTaken: vi.fn<() => void>(),
     openCardAnvilSite: vi.fn<() => void>(),
   },
 }));
@@ -136,6 +137,15 @@ describe("sends to Card Anvil", () => {
 
     answers[1]?.();
     await second;
+    expect(useCardAnvil.getState().sending).toBe(0);
+  });
+
+  it("doesn't count one Card Anvil may still take as sending", async () => {
+    sendMock.mockResolvedValue({ outcome: "notYetTaken", images: 2, request: "abc-1" });
+    // Watched for after the send has stopped waiting on it.
+    const taken = vi.mocked(api.cardAnvilTaken).mockReturnValue(new Promise(() => {}));
+    await sendToCardAnvil();
+    expect(taken).toHaveBeenCalledWith("abc-1");
     expect(useCardAnvil.getState().sending).toBe(0);
   });
 

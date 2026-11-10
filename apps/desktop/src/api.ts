@@ -42,6 +42,9 @@ export const api = {
    * it. Resolves once Card Anvil has taken it, or once it's clear it won't. */
   sendToCardAnvil: (run: number, jobs: number[] | null, settings: Settings) =>
     invoke<CardAnvilSend>("send_to_card_anvil", { run, jobs, settings }),
+  /** Whether Card Anvil takes `request`, a send that came back `notYetTaken`, after all.
+   * Resolves once it has, or after a few minutes with `false`. */
+  cardAnvilTaken: (request: string) => invoke<boolean>("card_anvil_taken", { request }),
   /** The Card Anvil art is sent to: `path`, the one the user chose, while it's there,
    * otherwise the installed one. */
   cardAnvilStatus: (path: string | null) => invoke<CardAnvilStatus>("card_anvil_status", { path }),

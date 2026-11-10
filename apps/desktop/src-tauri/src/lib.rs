@@ -731,6 +731,7 @@ async fn send_to_card_anvil(
         env!("CARGO_PKG_VERSION"),
     );
     let images = manifest.images();
+    let request = manifest.id.clone();
     if manifest.items.len() > card_anvil::MAX_ITEMS {
         return Ok(CardAnvilSend::TooMany {
             cards: manifest.items.len() as u32,
@@ -759,10 +760,21 @@ async fn send_to_card_anvil(
     if card_anvil::wait_until_taken(&path, card_anvil::TAKE_WITHIN).await {
         Ok(CardAnvilSend::Delivered { images })
     } else {
-        // Left for Card Anvil, which may still be starting; a later launch
-        // clears it once it's old.
-        Ok(CardAnvilSend::NotYetTaken { images })
+        // Left for Card Anvil, which may still be starting: the front end
+        // asks after it with `card_anvil_taken`, and a later launch clears it
+        // once it's old.
+        Ok(CardAnvilSend::NotYetTaken { images, request })
     }
+}
+
+/// Whether Card Anvil takes `request`, a send that came back
+/// `NotYetTaken`, after all: waits up to `card_anvil::TAKE_LATE_WITHIN` for it
+/// to. Doesn't hold up other sends.
+#[tauri::command]
+async fn card_anvil_taken(state: State<'_, AppState>, request: String) -> CommandResult<bool> {
+    let path = card_anvil::manifest_path(&state.card_anvil_inbox, &request)
+        .ok_or("That isn't a request sent to Card Anvil.")?;
+    Ok(card_anvil::wait_until_taken(&path, card_anvil::TAKE_LATE_WITHIN).await)
 }
 
 /// The Card Anvil art is sent to: `path`, the one the user chose, while it's
@@ -927,6 +939,7 @@ pub fn run() {
             open_discord,
             send_to_card_anvil,
             card_anvil_status,
+            card_anvil_taken,
             open_card_anvil_site,
             find_larger_copy,
             confirm_found_art,

@@ -6,8 +6,9 @@
 //! started with that file's path ([`locate`], [`launch`]). It deletes the
 //! manifest once it has kept the request, which is the receipt: one still
 //! there after [`TAKE_WITHIN`] hasn't been taken yet ([`wait_until_taken`]).
-//! It's left for Card Anvil, which may still be starting, and cleared away
-//! once it's older than [`KEEP_UNTAKEN`] ([`clear_inbox_dir`]).
+//! It's left for Card Anvil, which may still be starting — watched for up to
+//! [`TAKE_LATE_WITHIN`] more, so a late receipt is still heard — and cleared
+//! away once it's older than [`KEEP_UNTAKEN`] ([`clear_inbox_dir`]).
 //!
 //! The protocol is Card Anvil's, and `docs/inbox.md` in its repository
 //! (<https://github.com/Card-Anvil/Card-Anvil>) is its specification.
@@ -44,6 +45,9 @@ pub const MAX_ITEMS: usize = 1000;
 /// after this, it hasn't been taken yet: Card Anvil may still be starting, or
 /// it's too old to know the inbox, or turned the manifest down.
 pub const TAKE_WITHIN: Duration = Duration::from_secs(15);
+/// How much longer a manifest not taken within [`TAKE_WITHIN`] is watched
+/// for: a slow first start is over well within it.
+pub const TAKE_LATE_WITHIN: Duration = Duration::from_secs(5 * 60);
 /// How long a manifest is left for Card Anvil to take: long enough for the
 /// slowest start, so clearing the folder never takes one from a send still
 /// waiting on it.
@@ -518,8 +522,9 @@ pub enum CardAnvilSend {
     NotFound,
     /// Card Anvil was started but hasn't taken the request of `images` images
     /// yet. It may still be starting, so the request is left for it; or it's
-    /// too old to know the inbox.
-    NotYetTaken { images: u32 },
+    /// too old to know the inbox. Ask after it as `request` with
+    /// `card_anvil_taken`.
+    NotYetTaken { images: u32, request: String },
     /// More cards than one request can hold: `cards`, of at most `max`.
     TooMany { cards: u32, max: u32 },
 }
