@@ -333,8 +333,18 @@ pub enum Imported {
         replaced: Option<String>,
     },
     /// Not saved: it doesn't look like a larger copy of the art. Importing it
-    /// again with `force` saves it anyway.
+    /// again with [`Check::Seen`] saves it anyway.
     Doubtful(Doubt),
+}
+
+/// Whether an image the user saved is checked against the art before it's saved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Check {
+    /// Checked first: one that doesn't look like a larger copy of the art
+    /// isn't saved, and why is returned.
+    First,
+    /// Saved as it is: the user saw what the check said of it, `doubt`.
+    Seen(Option<Doubt>),
 }
 
 /// Where the image the user saved came from.
@@ -359,7 +369,9 @@ pub struct Destination<'a> {
 }
 
 /// Saves the image at `downloaded` as the art of `target`'s face, if it's a
-/// larger copy of it or `force` is set. `downloaded` is left where it is.
+/// larger copy of it or the user saw it isn't ([`Check::Seen`]). A card scan
+/// they saved anyway is marked [`SavedFile::whole_card`]. `downloaded` is left
+/// where it is.
 pub async fn import(
     http: &Http,
     history: Option<&History>,
@@ -367,7 +379,7 @@ pub async fn import(
     destination: Destination<'_>,
     downloaded: &Path,
     found: Found<'_>,
-    force: bool,
+    check: Check,
 ) -> Result<Imported> {
     let invalid = |reason: &str| Error::Invalid {
         url: found.image_url.to_owned(),
@@ -381,11 +393,13 @@ pub async fn import(
         .await?;
     let kind = ImageKind::sniff(&head).ok_or_else(|| invalid("it isn't a JPEG, PNG or WebP image"))?;
 
-    if !force {
-        if let Some(doubt) = doubt(http, target, downloaded).await? {
-            return Ok(Imported::Doubtful(doubt));
-        }
-    }
+    let doubt = match check {
+        Check::First => match doubt(http, target, downloaded).await? {
+            Some(doubt) => return Ok(Imported::Doubtful(doubt)),
+            None => None,
+        },
+        Check::Seen(doubt) => doubt,
+    };
 
     let dir = source_dir(target, destination, ArtSource::Web);
     tokio::fs::create_dir_all(&dir).await?;
@@ -397,6 +411,7 @@ pub async fn import(
     let file = SavedFile {
         page: found.page.map(str::to_owned),
         site: found.site,
+        whole_card: doubt == Some(Doubt::CardScan),
         ..file
     };
 
@@ -494,8 +509,9 @@ pub(crate) struct FoundCopyAt<'a> {
 /// What downloading a copy the user found again came to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Refetched {
-    /// Downloaded, and still the copy the user saved.
-    Ready(ImageKind),
+    /// Downloaded, and still the copy the user saved: a card scan, frame and
+    /// all, if `whole_card`.
+    Ready { kind: ImageKind, whole_card: bool },
     /// Gone from where it was, or never at an address to download from.
     Gone,
     /// Something else is there now: neither a larger copy of the art nor the
@@ -522,13 +538,14 @@ pub(crate) async fn refetch_found_copy(
     let unchanged = copy.accepted.is_some() && image_size(dest, kind) == copy.accepted;
     let dir = dest.parent().unwrap_or(Path::new("."));
     let checked = match ArtCrop::fetch(http, card, face, dir).await {
-        Ok(crop) => crop.doubt(dest).await.map(|doubt| doubt.is_none()),
+        Ok(crop) => crop.doubt(dest).await,
         Err(error) => Err(error),
     };
+    let whole_card = matches!(checked, Ok(Some(Doubt::CardScan)));
     match checked {
-        Ok(true) => Ok(Refetched::Ready(kind)),
-        _ if unchanged => Ok(Refetched::Ready(kind)),
-        Ok(false) => Ok(Refetched::Changed),
+        Ok(None) => Ok(Refetched::Ready { kind, whole_card }),
+        _ if unchanged => Ok(Refetched::Ready { kind, whole_card }),
+        Ok(Some(_)) => Ok(Refetched::Changed),
         // The check couldn't be made.
         Err(error) => Err(error),
     }
@@ -601,7 +618,7 @@ pub struct PageImage {
 pub struct PageCandidate {
     pub image_url: String,
     /// Where it was downloaded, named with its type's extension. Saving it
-    /// is [`import`] with `force`, since the user saw what the check said.
+    /// is [`import`] with [`Check::Seen`], since the user saw what the check said.
     pub downloaded: PathBuf,
     /// Its size in pixels, read from the file.
     pub size: ImageSize,

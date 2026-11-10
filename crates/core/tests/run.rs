@@ -852,9 +852,17 @@ async fn saves_a_larger_copy_the_user_found_in_place_of_scryfalls() {
         list_folder: None,
         replace: Some(&scryfall_file),
     };
-    let imported = manual::import(&http, Some(&history), &target, destination, &downloaded, found, false)
-        .await
-        .unwrap();
+    let imported = manual::import(
+        &http,
+        Some(&history),
+        &target,
+        destination,
+        &downloaded,
+        found,
+        manual::Check::First,
+    )
+    .await
+    .unwrap();
 
     let manual::Imported::Saved { file, replaced } = imported else {
         panic!("not saved: {imported:?}");
@@ -903,21 +911,31 @@ async fn asks_before_saving_an_image_that_is_not_the_art() {
         replace: None,
     };
 
-    let imported = manual::import(&http, None, &target, destination, &downloaded, found, false).await;
+    let imported = manual::import(
+        &http,
+        None,
+        &target,
+        destination,
+        &downloaded,
+        found,
+        manual::Check::First,
+    )
+    .await;
     assert_eq!(imported.unwrap(), manual::Imported::Doubtful(manual::Doubt::Different));
     assert!(!out.path().join("web").exists(), "nothing is saved");
 
     // The user says to save it anyway.
-    let imported = manual::import(&http, None, &target, destination, &downloaded, found, true).await;
-    assert!(matches!(
-        imported.unwrap(),
-        manual::Imported::Saved { replaced: None, .. }
-    ));
+    let anyway = manual::Check::Seen(Some(manual::Doubt::Different));
+    let imported = manual::import(&http, None, &target, destination, &downloaded, found, anyway).await;
+    let manual::Imported::Saved { file, replaced: None } = imported.unwrap() else {
+        panic!("it wasn't saved");
+    };
+    assert!(!file.whole_card, "it isn't a card scan");
     assert_eq!(walk(out.path()).len(), 1);
 
     // Not an image at all.
     std::fs::write(&downloaded, b"<html>").unwrap();
-    let imported = manual::import(&http, None, &target, destination, &downloaded, found, true).await;
+    let imported = manual::import(&http, None, &target, destination, &downloaded, found, anyway).await;
     assert!(imported.is_err());
 }
 
@@ -1111,9 +1129,17 @@ async fn keeps_only_a_copy_that_can_be_downloaded_again() {
         list_folder: None,
         replace: None,
     };
-    let imported = manual::import(&http, Some(&history), &target, destination, &downloaded, found, false)
-        .await
-        .unwrap();
+    let imported = manual::import(
+        &http,
+        Some(&history),
+        &target,
+        destination,
+        &downloaded,
+        found,
+        manual::Check::First,
+    )
+    .await
+    .unwrap();
     let manual::Imported::Saved { file, .. } = imported else {
         panic!("not saved this once: {imported:?}");
     };
@@ -1306,7 +1332,8 @@ async fn offers_the_images_of_a_page_art_first() {
         page,
         site: Some(manual::Site::Instagram),
     };
-    let imported = manual::import(&http, None, &target, destination, &found[0].downloaded, from, true)
+    let seen = manual::Check::Seen(found[0].doubt);
+    let imported = manual::import(&http, None, &target, destination, &found[0].downloaded, from, seen)
         .await
         .unwrap();
     let manual::Imported::Saved { file, .. } = imported else {
@@ -1318,6 +1345,22 @@ async fn offers_the_images_of_a_page_art_first() {
     );
     assert_eq!(file.page.as_deref(), page);
     assert_eq!(file.size.map(|s| s.width), Some(1200));
+    assert!(!file.whole_card);
+
+    // The card scan, chosen though the check said what it is, is marked as one.
+    let from = manual::Found {
+        image_url: &found[1].image_url,
+        page,
+        site: Some(manual::Site::Instagram),
+    };
+    let seen = manual::Check::Seen(found[1].doubt);
+    let imported = manual::import(&http, None, &target, destination, &found[1].downloaded, from, seen)
+        .await
+        .unwrap();
+    let manual::Imported::Saved { file, .. } = imported else {
+        panic!("the card scan wasn't saved");
+    };
+    assert!(file.whole_card);
 
     // A page with nothing large enough has nothing to choose from.
     let none = manual::fetch_page_images(&http, &target, &[image("avatar.jpg", 150, 150)], None, dir.path())
@@ -1397,6 +1440,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
         page: None,
         site: Some(manual::Site::Artstation),
         split_half: false,
+        whole_card: false,
         url: Some(artstation.clone()),
         illustration: Some(KARN_ART.into()),
     };

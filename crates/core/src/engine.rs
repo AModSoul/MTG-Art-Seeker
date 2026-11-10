@@ -187,6 +187,11 @@ pub struct SavedFile {
     /// [`FacePlan::is_split_half`]. Left out when it isn't.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub split_half: bool,
+    /// Whether this is an image of the whole card, frame and all, that the
+    /// user saved though the check said so ([`crate::manual::Doubt::CardScan`]).
+    /// Left out when it isn't.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub whole_card: bool,
     /// The address the image was downloaded from, when it can be downloaded
     /// from there again: not a page's `blob:` or `data:` image.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -922,8 +927,8 @@ async fn found_by_hand(
             page: found.page.as_deref(),
             accepted,
         };
-        let kind = match refetch_found_copy(context.http, card, face, copy, temp.path()).await? {
-            Refetched::Ready(kind) => kind,
+        let (kind, whole_card) = match refetch_found_copy(context.http, card, face, copy, temp.path()).await? {
+            Refetched::Ready { kind, whole_card } => (kind, whole_card),
             other => return Ok(Err(other)),
         };
         let stem = face_stem(context.settings, card, face);
@@ -932,7 +937,7 @@ async fn found_by_hand(
             .reserve(&dir, &stem, kind.extension(), context.settings.overwrite);
         place(temp, kind, &path, card, face, ArtSource::Web, Some(&found.url))
             .await
-            .map(Ok)
+            .map(|file| Ok(SavedFile { whole_card, ..file }))
     };
     match saved.await {
         Ok(Ok(file)) => Some(SavedFile {
@@ -1099,6 +1104,7 @@ pub(crate) async fn place(
         page: None,
         site: None,
         split_half: face.is_split_half(),
+        whole_card: false,
         url: url.map(str::to_owned),
         illustration: face.illustration_id().map(str::to_owned),
     })

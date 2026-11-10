@@ -292,7 +292,8 @@ fn card_of(file: &SavedFile) -> CardRef {
 }
 
 fn art_of(file: &SavedFile, scryfall_image: ScryfallImage) -> Art {
-    let whole_card = file.source == ArtSource::Scryfall && scryfall_image == ScryfallImage::FullCard;
+    let whole_card =
+        file.whole_card || (file.source == ArtSource::Scryfall && scryfall_image == ScryfallImage::FullCard);
     Art {
         path: file.path.clone(),
         artist: Some(file.artist.trim())
@@ -725,6 +726,7 @@ mod tests {
             page: None,
             site: None,
             split_half: false,
+            whole_card: false,
             url: None,
             illustration: None,
         }
@@ -1101,6 +1103,19 @@ mod tests {
                 (Origin::Web, ImageKind::Art),
             ]
         );
+    }
+
+    #[test]
+    fn a_card_scan_the_user_saved_anyway_is_sent_as_a_card() {
+        let mut jobs = fixture_jobs();
+        // Birds of Paradise, found on the web: the whole card, frame and all.
+        jobs[4][0].whole_card = true;
+        let items = fixture_manifest(&jobs, ScryfallImage::ArtCrop).items;
+        assert_eq!(
+            (items[5].art.origin, items[5].art.image),
+            (Origin::Web, ImageKind::Card)
+        );
+        assert!(items[..5].iter().all(|item| item.art.image == ImageKind::Art));
     }
 
     #[test]

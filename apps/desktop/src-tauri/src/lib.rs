@@ -22,7 +22,7 @@ use mtg_art_core::{
     http::{Http, HttpConfig, USER_AGENT},
     known::{self, KnownSource},
     list::{parse_list, ListFile, ParsedList},
-    manual::{self, Destination, Doubt, Found, FoundEvent, Imported, PageCandidate, PageImage, Site, Target},
+    manual::{self, Check, Destination, Doubt, Found, FoundEvent, Imported, PageCandidate, PageImage, Site, Target},
     mtgpics::Artists,
     presets::{presets, PresetInfo},
     settings::{default_settings_path, Settings},
@@ -52,7 +52,7 @@ struct AppState {
     search: Mutex<Option<Search>>,
     /// Images the user saved that didn't look like a larger copy of the art,
     /// kept until they say whether to save them anyway, by token.
-    doubtful: Mutex<HashMap<u32, (Search, finder::Saved)>>,
+    doubtful: Mutex<HashMap<u32, (Search, finder::Saved, Doubt)>>,
     /// The images of the page the user last asked to find the art on, while
     /// they choose one.
     choices: Mutex<Option<Choices>>,
@@ -432,11 +432,11 @@ fn record_file(state: &AppState, run: u32, job: u32, file: SavedFile) {
 /// `save` false, throws it away.
 #[tauri::command]
 async fn confirm_found_art(app: AppHandle, state: State<'_, AppState>, token: u32, save: bool) -> CommandResult<()> {
-    let (search, saved) = lock(&state.doubtful)
+    let (search, saved, doubt) = lock(&state.doubtful)
         .remove(&token)
         .ok_or("That image is gone. Save it from the search window again.")?;
     if save {
-        let event = import_found(&state, &search, &saved, true).await;
+        let event = import_found(&state, &search, &saved, Check::Seen(Some(doubt))).await;
         report(&app, &search, event);
     } else {
         let _ = std::fs::remove_file(&saved.path);
@@ -471,7 +471,7 @@ async fn choose_page_image(
                     page: choices.page.clone(),
                     path: chosen.downloaded.clone(),
                 };
-                import_found(&state, &choices.search, &saved, true).await
+                import_found(&state, &choices.search, &saved, Check::Seen(chosen.doubt)).await
             }
             Err(error) => FoundEvent::Failed {
                 message: error.to_string(),
@@ -502,7 +502,7 @@ fn on_saved(app: &AppHandle, saved: finder::Saved) {
                 page: false,
             },
         );
-        let event = import_found(&state, &search, &saved, false).await;
+        let event = import_found(&state, &search, &saved, Check::First).await;
         report(&app, &search, event);
     });
 }
@@ -606,7 +606,7 @@ fn saved(state: &AppState, search: &Search, file: SavedFile, replaced: Option<St
     }
 }
 
-async fn import_found(state: &AppState, search: &Search, found: &finder::Saved, force: bool) -> FoundEvent {
+async fn import_found(state: &AppState, search: &Search, found: &finder::Saved, check: Check) -> FoundEvent {
     let Some((settings, list_folder, replace)) = destination(state, search) else {
         let _ = std::fs::remove_file(&found.path);
         return too_long_ago();
@@ -628,7 +628,7 @@ async fn import_found(state: &AppState, search: &Search, found: &finder::Saved, 
         destination,
         &found.path,
         from,
-        force,
+        check,
     )
     .await;
     match imported {
@@ -638,7 +638,7 @@ async fn import_found(state: &AppState, search: &Search, found: &finder::Saved, 
         }
         Ok(Imported::Doubtful(doubt)) => {
             let token = state.next_token.fetch_add(1, Ordering::Relaxed);
-            lock(&state.doubtful).insert(token, (search.clone(), found.clone()));
+            lock(&state.doubtful).insert(token, (search.clone(), found.clone(), doubt));
             FoundEvent::Doubtful {
                 token,
                 face: search.target.face.name.clone(),

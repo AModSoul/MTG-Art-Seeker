@@ -166,7 +166,7 @@ pub async fn save_from(
             let _ = history.forget_found_copy(id);
         }
     };
-    let kind = if source == ArtSource::Web {
+    let (kind, whole_card) = if source == ArtSource::Web {
         // Anything could be at a copy's address now: it's checked again.
         let found = FoundCopyAt {
             url: &url,
@@ -174,7 +174,7 @@ pub async fn save_from(
             accepted,
         };
         match refetch_found_copy(http, &target.card, &target.face, found, temp.path()).await? {
-            Refetched::Ready(kind) => kind,
+            Refetched::Ready { kind, whole_card } => (kind, whole_card),
             Refetched::Gone => {
                 forget();
                 return Err(Error::Other(format!("{name}'s art is gone from {url}")));
@@ -188,7 +188,7 @@ pub async fn save_from(
         }
     } else {
         match http.download(&url, temp.path()).await? {
-            Some(kind) => kind,
+            Some(kind) => (kind, false),
             None => return Err(Error::Other(format!("{name}'s art is gone from {url}"))),
         }
     };
@@ -209,5 +209,13 @@ pub async fn save_from(
             _ => history.forget_found_by_hand(art),
         };
     }
-    Ok((SavedFile { page, site, ..file }, replaced))
+    Ok((
+        SavedFile {
+            page,
+            site,
+            whole_card,
+            ..file
+        },
+        replaced,
+    ))
 }
