@@ -971,6 +971,7 @@ async fn later_runs_save_the_users_copy_from_where_they_found_it() {
         page: found.page.clone(),
         site: Some(manual::Site::Lens.key().into()),
         size: None,
+        whole_card: false,
     };
     history.remember_found_copy(KARN_ART, &copy).unwrap();
 
@@ -1097,12 +1098,81 @@ async fn checks_the_users_copy_again_before_saving_it() {
         page: None,
         site: None,
         size: Some(mtg_art_core::imagesize::ImageSize { width, height }),
+        whole_card: false,
     };
     history.remember_found_copy(KARN_ART, &copy(1400, 1050)).unwrap();
     let out = tempfile::tempdir().unwrap();
     let summary = run_karn(&servers, &history, out.path()).await;
     assert_eq!((summary.done, summary.web_files), (1, 1));
     assert!(history.found_by_hand(KARN_ART).unwrap().is_some());
+}
+
+#[tokio::test]
+async fn keeps_a_card_scan_a_card_scan_when_it_cant_be_checked_again() {
+    let servers = Servers::start().await;
+    // Karn, but Scryfall's art crop won't download: the copy can't be checked.
+    Mock::given(method("POST"))
+        .and(path("/cards/collection"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [servers.card("Karn")],
+            "not_found": [],
+        })))
+        .mount(&servers.scryfall)
+        .await;
+    Servers::image(&servers.cdn, "/found/scan.jpg", &jpeg(&painting(745, 1040, 4))).await;
+    let dir = tempfile::tempdir().unwrap();
+    let history = History::open(&dir.path().join("history.sqlite")).unwrap();
+    let url = format!("{}/found/scan.jpg", servers.cdn.uri());
+    let found = FoundByHand {
+        url: url.clone(),
+        page: None,
+    };
+    history.remember_found_by_hand(KARN_ART, &found).unwrap();
+    let scan = mtg_art_core::history::FoundCopy {
+        url,
+        page: None,
+        site: Some(manual::Site::Instagram.key().into()),
+        size: Some(mtg_art_core::imagesize::ImageSize {
+            width: 745,
+            height: 1040,
+        }),
+        whole_card: true,
+    };
+    history.remember_found_copy(KARN_ART, &scan).unwrap();
+
+    let out = tempfile::tempdir().unwrap();
+    let events = Mutex::new(Vec::new());
+    let summary = run(
+        &servers.http(),
+        RunInput::List {
+            text: "Karn, Scion of Urza (DOM) 1".into(),
+            folder: None,
+        },
+        &settings(out.path()),
+        Local {
+            cards: None,
+            history: Some(&history),
+        },
+        &CancellationToken::new(),
+        &|event| events.lock().unwrap().push(event),
+    )
+    .await;
+    assert_eq!((summary.done, summary.web_files), (1, 1));
+    let files: Vec<_> = events
+        .into_inner()
+        .unwrap()
+        .into_iter()
+        .filter_map(|event| match event {
+            RunEvent::Job {
+                status: JobStatus::Done { files, .. },
+                ..
+            } => Some(files),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(files.len(), 1);
+    assert!(files[0].whole_card, "still the card scan the user saved");
 }
 
 #[tokio::test]
@@ -1413,6 +1483,7 @@ async fn goes_back_to_mtgpics_art_and_to_a_copy_the_user_found() {
             page: page.map(Into::into),
             site: Some(site.key().into()),
             size: Some(mtg_art_core::imagesize::ImageSize { width, height: 900 }),
+            whole_card: false,
         };
         history.remember_found_copy(KARN_ART, &copy).unwrap();
     }
