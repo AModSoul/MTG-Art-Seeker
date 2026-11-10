@@ -5,7 +5,9 @@
 //! each is the art of ([`manifest`], [`write_manifest`]), and Card Anvil is
 //! started with that file's path ([`locate`], [`launch`]). It deletes the
 //! manifest once it has kept the request, which is the receipt: one still
-//! there after [`TAKE_WITHIN`] wasn't taken ([`wait_until_taken`]).
+//! there after [`TAKE_WITHIN`] hasn't been taken yet ([`wait_until_taken`]).
+//! It's left for Card Anvil, which may still be starting, and cleared away
+//! once it's older than [`KEEP_UNTAKEN`] ([`clear_inbox_dir`]).
 //!
 //! The protocol is Card Anvil's, and `docs/inbox.md` in its repository
 //! (<https://github.com/Card-Anvil/Card-Anvil>) is its specification.
@@ -38,10 +40,14 @@ pub const KIND: &str = "cardanvil.inbox";
 pub const VERSION: u32 = 1;
 /// The most items, cards, one manifest may hold.
 pub const MAX_ITEMS: usize = 1000;
-/// How long Card Anvil has to take a manifest. Still there after this, it
-/// wasn't taken: Card Anvil isn't where it was looked for, is too old to know
-/// the inbox, or turned the manifest down.
+/// How long a send waits for Card Anvil to take its manifest. Still there
+/// after this, it hasn't been taken yet: Card Anvil may still be starting, or
+/// it's too old to know the inbox, or turned the manifest down.
 pub const TAKE_WITHIN: Duration = Duration::from_secs(15);
+/// How long a manifest is left for Card Anvil to take: long enough for the
+/// slowest start, so clearing the folder never takes one from a send still
+/// waiting on it.
+pub const KEEP_UNTAKEN: Duration = Duration::from_secs(60 * 60);
 /// Where Card Anvil can be downloaded.
 pub const DOWNLOAD_PAGE: &str = "https://cardanvil.com/download";
 
@@ -417,9 +423,11 @@ pub fn write_manifest(dir: &Path, manifest: &Manifest) -> Result<PathBuf> {
     Ok(path)
 }
 
-/// Deletes every file in `dir`: manifests Card Anvil never took, left by a
-/// send the app quit during. A folder that isn't there is already clear.
-pub fn clear_inbox_dir(dir: &Path) -> Result<()> {
+/// Deletes the files in `dir` last written more than [`KEEP_UNTAKEN`]
+/// before `now`: manifests Card Anvil never took. A newer one may belong to a
+/// send still waiting on Card Anvil, in this window or another, so it's left.
+/// A folder that isn't there is already clear.
+pub fn clear_inbox_dir(dir: &Path, now: SystemTime) -> Result<()> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -427,7 +435,12 @@ pub fn clear_inbox_dir(dir: &Path) -> Result<()> {
     };
     for entry in entries {
         let entry = entry?;
-        if entry.file_type()?.is_file() {
+        let metadata = entry.metadata()?;
+        // One written "after" `now`, by a clock since set back, is old enough.
+        let stale = now
+            .duration_since(metadata.modified()?)
+            .map_or(true, |age| age > KEEP_UNTAKEN);
+        if metadata.is_file() && stale {
             std::fs::remove_file(entry.path())?;
         }
     }
@@ -435,11 +448,13 @@ pub fn clear_inbox_dir(dir: &Path) -> Result<()> {
 }
 
 /// Waits for Card Anvil to take the manifest at `path`, which it does by
-/// deleting it: `true` once it's gone, `false` if it's still there after `timeout`.
+/// deleting it: `true` once it's gone, `false` if it's still there after
+/// `timeout`. A look that fails, as when another program has the file open,
+/// says nothing either way, so it looks again.
 pub async fn wait_until_taken(path: &Path, timeout: Duration) -> bool {
     let started = Instant::now();
     loop {
-        if !path.exists() {
+        if let Ok(false) = path.try_exists() {
             return true;
         }
         if started.elapsed() >= timeout {
@@ -477,11 +492,12 @@ pub enum CardAnvilSend {
     Delivered { images: u32 },
     /// Card Anvil isn't installed, or isn't where the user said it is.
     NotFound,
-    /// Card Anvil was started but didn't take the request: too old to know
-    /// the inbox, most likely.
-    NotTaken { images: u32 },
-    /// More cards than one request can hold.
-    TooMany { images: u32, max: u32 },
+    /// Card Anvil was started but hasn't taken the request of `images` images
+    /// yet. It may still be starting, so the request is left for it; or it's
+    /// too old to know the inbox.
+    NotYetTaken { images: u32 },
+    /// More cards than one request can hold: `cards`, of at most `max`.
+    TooMany { cards: u32, max: u32 },
 }
 
 /// The Card Anvil to send art to: `chosen`, the one the user picked, if it's
@@ -1170,10 +1186,35 @@ mod tests {
         };
         assert!(write_manifest(&inbox, &bad).is_err());
 
-        std::fs::write(inbox.join("old.cardanvil-inbox.part"), b"{").unwrap();
-        clear_inbox_dir(&inbox).unwrap();
-        assert_eq!(std::fs::read_dir(&inbox).unwrap().count(), 0);
-        clear_inbox_dir(&dir.path().join("never made")).unwrap();
+        clear_inbox_dir(&dir.path().join("never made"), SystemTime::now()).unwrap();
+    }
+
+    #[test]
+    fn clears_only_manifests_left_long_enough() {
+        let dir = tempfile::tempdir().unwrap();
+        let now = SystemTime::now();
+        let written = |name: &str, age: Duration| {
+            let path = dir.path().join(name);
+            std::fs::write(&path, b"{}").unwrap();
+            let file = std::fs::File::options().write(true).open(&path).unwrap();
+            file.set_modified(now - age).unwrap();
+            path
+        };
+        let old = written("old.cardanvil-inbox", KEEP_UNTAKEN + Duration::from_secs(1));
+        let half = written("old.cardanvil-inbox.part", KEEP_UNTAKEN * 2);
+        // Another window's send, still waiting on a slow start.
+        let waiting = written("waiting.cardanvil-inbox", TAKE_WITHIN * 2);
+        let new = written("new.cardanvil-inbox", Duration::ZERO);
+        std::fs::create_dir(dir.path().join("folder")).unwrap();
+
+        clear_inbox_dir(dir.path(), now).unwrap();
+        assert!(!old.exists() && !half.exists());
+        assert!(waiting.exists() && new.exists());
+        assert!(dir.path().join("folder").exists());
+
+        // Written "after" now, by a clock since set back.
+        clear_inbox_dir(dir.path(), now - Duration::from_secs(60)).unwrap();
+        assert!(!new.exists() && !waiting.exists());
     }
 
     #[tokio::test]

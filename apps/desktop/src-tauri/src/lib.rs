@@ -733,7 +733,7 @@ async fn send_to_card_anvil(
     let images = manifest.images();
     if manifest.items.len() > card_anvil::MAX_ITEMS {
         return Ok(CardAnvilSend::TooMany {
-            images,
+            cards: manifest.items.len() as u32,
             max: card_anvil::MAX_ITEMS as u32,
         });
     }
@@ -759,8 +759,9 @@ async fn send_to_card_anvil(
     if card_anvil::wait_until_taken(&path, card_anvil::TAKE_WITHIN).await {
         Ok(CardAnvilSend::Delivered { images })
     } else {
-        let _ = std::fs::remove_file(&path);
-        Ok(CardAnvilSend::NotTaken { images })
+        // Left for Card Anvil, which may still be starting; a later launch
+        // clears it once it's old.
+        Ok(CardAnvilSend::NotYetTaken { images })
     }
 }
 
@@ -867,8 +868,9 @@ pub fn run() {
             let card_anvil_inbox = card_anvil::default_inbox_dir()
                 .or_else(|| app.path().app_local_data_dir().ok().map(|dir| dir.join("card-anvil")))
                 .ok_or("no data folder to write Card Anvil's lists of art in")?;
-            // A list of art left from the last session was never taken.
-            if let Err(error) = card_anvil::clear_inbox_dir(&card_anvil_inbox) {
+            // A list of art left long enough was never taken. A newer one may be
+            // another window's, still waiting on Card Anvil to start.
+            if let Err(error) = card_anvil::clear_inbox_dir(&card_anvil_inbox, SystemTime::now()) {
                 eprintln!("can't clear the art left for Card Anvil: {error}");
             }
             // The main window shows the pictures of the decks' boxes.

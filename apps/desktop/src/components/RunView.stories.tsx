@@ -713,17 +713,22 @@ export const CardAnvilNotFound: Story = {
   },
 };
 
-/** Card Anvil started but didn't take the art: it's too old to know how. */
-export const CardAnvilNotTaken: Story = {
+/** Card Anvil started but hasn't taken the art yet: it may still be starting, or be too old
+ * to know how. */
+export const CardAnvilNotYetTaken: Story = {
   beforeEach: () => {
     useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
-    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "notTaken", images: 6 });
+    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "notYetTaken", images: 6 });
   },
   play: async ({ canvas }) => {
     await userEvent.click(sendButton(canvas));
-    await waitFor(() => expect(screen.getByText("Card Anvil didn't take the art")).toBeVisible());
+    await waitFor(() =>
+      expect(screen.getByText("Card Anvil hasn't taken the art yet")).toBeVisible(),
+    );
     await expect(
-      screen.getByText("This version is too old. Update it, then send again."),
+      screen.getByText(
+        "It may still be starting. If it doesn't ask where to put them soon, update Card Anvil and send again.",
+      ),
     ).toBeVisible();
     await expect(screen.getByRole("button", { name: "Get Card Anvil" })).toBeVisible();
   },
@@ -733,12 +738,14 @@ export const CardAnvilNotTaken: Story = {
 export const TooManyForCardAnvil: Story = {
   beforeEach: () => {
     useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
-    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "tooMany", images: 1204, max: 1000 });
+    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "tooMany", cards: 1204, max: 1000 });
   },
   play: async ({ canvas }) => {
     await userEvent.click(sendButton(canvas));
-    await waitFor(() => expect(screen.getByText("Too many images for Card Anvil")).toBeVisible());
-    await expect(screen.getByText(/that's 1,204 images/)).toBeVisible();
+    await waitFor(() => expect(screen.getByText("Too many cards for Card Anvil")).toBeVisible());
+    await expect(
+      screen.getByText(/up to 1,000 cards at a time, and that's 1,204 cards/),
+    ).toBeVisible();
     await expect(screen.getByText(/right-click a card/)).toBeVisible();
   },
 };
