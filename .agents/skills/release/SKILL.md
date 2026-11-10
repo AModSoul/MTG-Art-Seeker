@@ -202,18 +202,34 @@ Show the user that URL (a draft's page is visible only to the repo's maintainers
 before publishing, then:
 
 ```bash
-gh api -X PATCH 'repos/{owner}/{repo}/releases/<release-id>' -F draft=false -f make_latest=true --jq '{draft, html_url}'
+gh api -X PATCH 'repos/{owner}/{repo}/releases/<release-id>' -F draft=false -f make_latest=true -f tag_name=v<version> --jq '{tag_name, draft, html_url}'
 ```
 
-Then check it went out:
+Always pass `tag_name`. Without it, GitHub can publish the draft under a placeholder tag,
+`untagged-<hash>`, even though `v<version>` exists. Then every link in `latest.json`
+(`…/download/v<version>/…`) is a 404, so each installed copy is offered the update and fails to
+download it. The site also deploys at once with links to the placeholder.
+
+Then check it went out. The first line must print `v<version>`, not `untagged-…`, and the second
+must print `200`:
 
 ```bash
 gh api repos/{owner}/{repo}/releases/latest --jq .tag_name     # v<version>
+curl -sIL -o /dev/null -w '%{http_code}\n' https://github.com/AModSoul/MTG-Art-Seeker/releases/download/v<version>/latest.json
 curl -sL https://github.com/AModSoul/MTG-Art-Seeker/releases/latest/download/latest.json | jq -r .version
 gh run watch $(gh run list --workflow site.yml --limit 20 --json databaseId,headBranch,event --jq '[.[] | select(.headBranch=="v<version>" and .event=="release")][0].databaseId') --exit-status
 ```
 
-Report the release's URL and whether the site redeployed.
+If the tag still comes back as `untagged-…`, fix it at once, because updates are failing. Set
+`tag_name` back with
+`gh api -X PATCH 'repos/{owner}/{repo}/releases/<release-id>' -f tag_name=v<version>`.
+Then find the site run the publish started. Its `headBranch` is the `untagged-…` name, not
+`v<version>`. Re-run it with `gh api -X POST 'repos/{owner}/{repo}/actions/runs/<run-id>/rerun'`,
+so the download page stops linking to the placeholder. A download link can return 404 for a
+minute or two after the fix, while GitHub's cache catches up.
+
+Report the release's URL and whether the site redeployed. Then check that
+`curl -sL https://getmtg.art/download` links only to `releases/download/v<version>/`.
 
 If a bad build went out, setting it back to a draft
 (`gh api -X PATCH 'repos/{owner}/{repo}/releases/<release-id>' -F draft=true`) takes it back: `releases/latest`
