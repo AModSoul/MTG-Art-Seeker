@@ -53,6 +53,7 @@ const preview: Preview = {
     mocked(api.cardDataStatus).mockResolvedValue(cardData);
     mocked(api.openDiscord).mockResolvedValue();
     mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "delivered", images: 1 });
+    mocked(api.cardAnvilTaken).mockResolvedValue(false);
     mocked(api.cardAnvilStatus).mockResolvedValue(installedCardAnvil);
     mocked(api.openCardAnvilSite).mockResolvedValue();
     mocked(api.cancelRun).mockResolvedValue();

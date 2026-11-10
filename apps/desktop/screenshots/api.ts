@@ -57,6 +57,7 @@ export const api: typeof realApi = {
     recording().cardData ?? { updatedAt: null, cards: 0, updating: false, error: null },
   openDiscord: done,
   sendToCardAnvil: () => Promise.reject(new Error("Not while taking screenshots")),
+  cardAnvilTaken: async () => false,
   cardAnvilStatus: async () => ({ path: SHOWN_CARD_ANVIL, chosen: false, chosenMissing: false }),
   openCardAnvilSite: done,
   confirmFoundArt: done,

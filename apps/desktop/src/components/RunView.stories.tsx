@@ -718,7 +718,11 @@ export const CardAnvilNotFound: Story = {
 export const CardAnvilNotYetTaken: Story = {
   beforeEach: () => {
     useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
-    mocked(api.sendToCardAnvil).mockResolvedValue({ outcome: "notYetTaken", images: 6 });
+    mocked(api.sendToCardAnvil).mockResolvedValue({
+      outcome: "notYetTaken",
+      images: 6,
+      request: "18c3f7a9e2b-1f4",
+    });
   },
   play: async ({ canvas }) => {
     await userEvent.click(sendButton(canvas));
@@ -727,10 +731,42 @@ export const CardAnvilNotYetTaken: Story = {
     );
     await expect(
       screen.getByText(
-        "It may still be starting. If it doesn't ask where to put them soon, update Card Anvil and send again.",
+        "It may still be starting, so give it a minute before sending again. If it doesn't ask where to put them by then, update Card Anvil.",
       ),
     ).toBeVisible();
     await expect(screen.getByRole("button", { name: "Get Card Anvil" })).toBeVisible();
+    // It's still watched for.
+    await expect(api.cardAnvilTaken).toHaveBeenCalledWith("18c3f7a9e2b-1f4");
+    await waitFor(() => expect(sendButton(canvas)).toBeEnabled());
+  },
+};
+
+/** Card Anvil was slow to start, and took the art after the send stopped waiting: the
+ * toast turns into the one for a send it took. */
+export const CardAnvilTakesItLate: Story = {
+  beforeEach: () => {
+    useRun.setState({ runId: 3, jobs: finishedJobs, summary: finishedSummary });
+    mocked(api.sendToCardAnvil).mockResolvedValue({
+      outcome: "notYetTaken",
+      images: 6,
+      request: "18c3f7a9e2b-1f4",
+    });
+  },
+  play: async ({ canvas }) => {
+    let take: (() => void) | undefined;
+    mocked(api.cardAnvilTaken).mockReturnValue(
+      new Promise((resolve) => {
+        take = () => resolve(true);
+      }),
+    );
+    await userEvent.click(sendButton(canvas));
+    await waitFor(() =>
+      expect(screen.getByText("Card Anvil hasn't taken the art yet")).toBeVisible(),
+    );
+
+    take?.();
+    await waitFor(() => expect(screen.getByText("Sent 6 images to Card Anvil")).toBeVisible());
+    await expect(screen.queryByText("Card Anvil hasn't taken the art yet")).toBeNull();
   },
 };
 
