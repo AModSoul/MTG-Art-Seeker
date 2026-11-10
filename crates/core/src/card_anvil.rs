@@ -66,7 +66,8 @@ const WINDOWS_EXE: &str = "Card-Anvil.exe";
 /// records the folder it installed to and the executable's name.
 #[cfg_attr(not(windows), allow(dead_code))]
 const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Card Anvil";
-/// The key whose default value Card Anvil's installer sets to its folder.
+/// The key under which Card Anvil's installer records its folder: as the
+/// key's default value (NSIS), or as `InstallDir` (MSI).
 #[cfg_attr(not(windows), allow(dead_code))]
 const INSTALL_DIR_KEY: &str = r"Software\cardanvil\Card Anvil";
 /// Card Anvil's macOS app bundle.
@@ -578,8 +579,10 @@ fn windows_candidates(
             candidates.push(PathBuf::from(dir).join(exe));
         }
     }
-    if let Some(dir) = read(Hive::CurrentUser, INSTALL_DIR_KEY, "") {
-        candidates.push(PathBuf::from(dir).join(WINDOWS_EXE));
+    for name in ["", "InstallDir"] {
+        if let Some(dir) = read(Hive::CurrentUser, INSTALL_DIR_KEY, name) {
+            candidates.push(PathBuf::from(dir).join(WINDOWS_EXE));
+        }
     }
     for (variable, folder) in [("LOCALAPPDATA", "Card Anvil"), ("ProgramFiles", "Card Anvil")] {
         if let Some(dir) = var(variable) {
@@ -1253,6 +1256,8 @@ mod tests {
                     Some(r#""C:\Program Files\Card Anvil""#.into())
                 }
                 (Hive::CurrentUser, INSTALL_DIR_KEY, "") => Some(r"D:\Apps\Card Anvil".into()),
+                // An MSI's name for it.
+                (Hive::CurrentUser, INSTALL_DIR_KEY, "InstallDir") => Some(r"E:\Card Anvil".into()),
                 _ => None,
             }
         };
@@ -1268,6 +1273,7 @@ mod tests {
                 Path::new(r"C:\Users\me\AppData\Local\Card Anvil").join("Card-Anvil.exe"),
                 Path::new(r"C:\Program Files\Card Anvil").join("Card-Anvil.exe"),
                 Path::new(r"D:\Apps\Card Anvil").join("Card-Anvil.exe"),
+                Path::new(r"E:\Card Anvil").join("Card-Anvil.exe"),
                 Path::new(r"C:\Users\me\AppData\Local")
                     .join("Card Anvil")
                     .join("Card-Anvil.exe"),
